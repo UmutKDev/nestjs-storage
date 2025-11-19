@@ -1,0 +1,50 @@
+{
+  "compilerOptions": {
+    "module": "commonjs",
+    "declaration": true,
+    "removeComments": true,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "target": "ES2021",
+    "sourceMap": true,
+    "outDir": "./dist",
+    "baseUrl": "./",
+    "incremental": true,
+    "skipLibCheck": true,
+    "strictNullChecks": false,
+    "noImplicitAny": false,
+    "strictBindCallApply": false,
+    "forceConsistentCasingInFileNames": false,
+    "noFallthroughCasesInSwitch": false,
+
+    "paths": {
+      "@common/*": ["src/common/*"],
+      "@decorators/*": ["src/common/decorators/*"],
+      "@schemas/*": ["src/schemas/*"],
+      "@entities/*": ["src/entities/*"],
+      "@modules": ["src/modules"]
+    },
+
+    "typeRoots": ["./node_modules/@types", "./@types", "./src/@types"],
+    "inlineSources": true,
+    // Set `sourceRoot` to  "/" to strip the build path prefix
+    // from generated source code references.
+    // This improves issue grouping in Sentry.
+    "sourceRoot": "/"
+  },
+  "watchOptions": {
+    // Use native file system events for files and directories
+    "watchFile": "priorityPollingInterval",
+    "watchDirectory": "dynamicprioritypolling",
+    // Poll files for updates more frequently
+    // when they're updated a lot.
+    "fallbackPolling": "dynamicPriority",
+    // Don't coalesce watch notification
+    "synchronousWatchDirectory": true,
+    // Finally, two additional settings for reducing the amount of possible
+    // files to track  work from these directories
+    "excludeDirectories": ["**/node_modules", "dist"]
+  }
+}

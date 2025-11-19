@@ -1,0 +1,14 @@
+export enum DefinitionGroups {
+  LABELS = 'LABELS',
+}
+
+export enum Definitions {
+  SIGNATURE = 'SIGNATURE',
+  SPECIAL_PRESENTATION = 'SPECIAL_PRESENTATION',
+  HANDMADE = 'HANDMADE',
+  SPECIAL = 'SPECIAL',
+  POPULAR = 'POPULAR',
+  NEW = 'NEW',
+  LIMITED_ITEMS = 'LIMITED_ITEMS',
+  SEASONAL = 'SEASONAL',
+}
