@@ -21,7 +21,7 @@ export class TransformInterceptor implements NestInterceptor {
     const status: BaseStatusModel = {
       messages: ['OK'],
       code: 200,
-      timestamp: dayjs().format() as unknown as Date,
+      timestamp: dayjs().utc().format(),
       path: request.url,
     };
 

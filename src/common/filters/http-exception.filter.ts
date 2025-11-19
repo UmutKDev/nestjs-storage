@@ -40,7 +40,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const statusResponse: BaseStatusModel = {
       messages: httpMessage instanceof Array ? httpMessage : [httpMessage],
       code: httpStatus,
-      timestamp: dayjs().format() as unknown as Date,
+      timestamp: dayjs().utc().format(),
       path: httpAdapter.getRequestUrl(ctx.getRequest()),
     };
 

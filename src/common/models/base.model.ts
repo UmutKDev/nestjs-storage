@@ -16,7 +16,7 @@ export class BaseStatusModel {
   })
   code: number;
   @ApiProperty()
-  timestamp: Date;
+  timestamp: string;
   @ApiProperty()
   path: string;
 }

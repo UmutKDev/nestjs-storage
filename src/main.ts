@@ -16,6 +16,13 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { useContainer } from 'class-validator';
 import basicAuth from 'express-basic-auth';
 
+import dayjs from 'dayjs';
+import timezone from 'dayjs/plugin/timezone';
+import utc from 'dayjs/plugin/utc';
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
+
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(CoreModule, {
     cors: true,
