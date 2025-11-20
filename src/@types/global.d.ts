@@ -26,6 +26,7 @@ export declare global {
       STORAGE_S3_BUCKET?: string;
       STORAGE_S3_MAX_SOCKETS?: string;
       STORAGE_S3_ENDPOINT?: string;
+      STORAGE_S3_PUBLIC_ENDPOINT?: string;
       STORAGE_S3_FORCE_PATH_STYLE?: string;
       STORAGE_S3_REGION?: string;
 
@@ -67,6 +68,10 @@ export declare global {
         EntityNotFoundError = 'EntityNotFoundError',
         EntityConflictError = '23505',
         QueryFailedError = 'QueryFailedError',
+      }
+
+      const enum Cloud {
+        FILE_NOT_FOUND = 'CL-001',
       }
 
       const enum User {

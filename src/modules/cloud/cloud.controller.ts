@@ -1,7 +1,8 @@
-import { Controller, Get, Param } from '@nestjs/common';
+import { Controller, Get, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { CloudService } from './cloud.service';
-import { CloudFindRequestModel } from './cloud.model';
+import { CloudFindRequestModel, CloudListResponseModel } from './cloud.model';
+import { ApiSuccessResponse } from '@common/decorators/response.decorator';
 
 @Controller('Cloud')
 @ApiTags('Cloud')
@@ -10,17 +11,18 @@ export class CloudController {
   constructor(private readonly cloudService: CloudService) {}
 
   @Get('List')
-  async List() {
+  @ApiSuccessResponse(CloudListResponseModel)
+  async List(): Promise<CloudListResponseModel> {
     return this.cloudService.List();
   }
 
-  @Get('Find/:Key')
-  async Find(@Param() model: CloudFindRequestModel) {
+  @Get('Find')
+  async Find(@Query() model: CloudFindRequestModel) {
     return this.cloudService.Find(model);
   }
 
-  @Get('PresignedUrl/:Key')
-  async GetPresignedUrl(@Param() model: CloudFindRequestModel) {
+  @Get('PresignedUrl')
+  async GetPresignedUrl(@Query() model: CloudFindRequestModel) {
     return this.cloudService.GetPresignedUrl(model);
   }
 }

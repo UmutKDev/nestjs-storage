@@ -35,8 +35,8 @@ export const mbToBytes = (mb: number): number => {
   return mb * 1024 * 1024;
 };
 
-export const cdnPathResolver = (path: string): string => {
-  return path ? process.env.AWS_CLOUDFRONT_PUBLIC_ENDPOINT + '/' + path : path;
+export const CDNPathResolver = (path: string): string => {
+  return path ? process.env.STORAGE_S3_PUBLIC_ENDPOINT + '/' + path : path;
 };
 
 export const isManager = (user: UserContext, cursor: keyof UserContext) => {

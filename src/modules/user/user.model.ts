@@ -4,7 +4,7 @@ import { ApiProperty, OmitType } from '@nestjs/swagger';
 import { IsEmail, IsOptional, IsPhoneNumber, IsString } from 'class-validator';
 import { Role, Status } from '@common/enums';
 import { Expose, Transform } from 'class-transformer';
-import { cdnPathResolver } from '@common/helpers/cast.helper';
+import { CDNPathResolver } from '@common/helpers/cast.helper';
 
 export class UserDateModel extends BaseDateModel {
   @ApiProperty()
@@ -39,7 +39,7 @@ export class UserViewModel implements UserEntity {
 
   @Expose()
   @ApiProperty()
-  @Transform(({ value }) => cdnPathResolver(value), {
+  @Transform(({ value }) => CDNPathResolver(value), {
     toClassOnly: true,
   })
   avatar: string;
