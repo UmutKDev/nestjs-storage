@@ -5,41 +5,43 @@ export declare global {
 
   namespace NodeJS {
     interface ProcessEnv {
-      NODE_ENV: 'development' | 'production' | 'test';
-      PORT?: string;
-
-      // Database
-      DATABASE_HOST: string;
-      DATABASE_PORT: string;
-      DATABASE_USERNAME: string;
-      DATABASE_PASSWORD: string;
-      DATABASE_NAME: string;
-      DATABASE_SCHEMA: string;
-      DATABASE_SYNCHRONIZE: 'true' | 'false';
-      DATABASE_CACERT?: string;
+      // Database Configuration
+      PG_HOSTNAME: string;
+      PG_USERNAME: string;
+      PG_PASSWORD: string;
+      PG_DATABASE: string;
+      PG_PORT: string;
+      PG_SCHEMA: string;
+      PG_SYNCHRONIZE: string;
+      PG_CACERT?: string;
 
       // Sentry
       SENTRY_DSN?: string;
       SENTRY_AUTH_TOKEN?: string;
 
       // AWS S3
-      AWS_S3_BUCKET?: string;
-      AWS_CLOUDFRONT_ENDPOINT?: string;
-      AWS_CLOUDFRONT_PUBLIC_ENDPOINT?: string;
-      AWS_SECRET_ACCESS_KEY?: string;
-      AWS_ACCESS_KEY_ID?: string;
+      S3_PROTOCOL_ACCESS_KEY_ID?: string;
+      S3_PROTOCOL_ACCESS_KEY_SECRET?: string;
 
-      // Mail
-      MAIL_HOST?: string;
-      MAIL_SECURE?: 'true' | 'false';
-      MAIL_FROM?: string;
-      MAIL_PORT?: string;
-      MAIL_USER?: string;
-      MAIL_PASS?: string;
+      STORAGE_S3_BUCKET?: string;
+      STORAGE_S3_MAX_SOCKETS?: string;
+      STORAGE_S3_ENDPOINT?: string;
+      STORAGE_S3_FORCE_PATH_STYLE?: string;
+      STORAGE_S3_REGION?: string;
 
-      // Application
-      TZ?: string;
-      APP_URL?: string;
+      // Mail Configuration
+      MAIL_HOST: string;
+      MAIL_SECURE: string;
+      MAIL_FROM: string;
+      MAIL_PORT: string;
+      MAIL_USER: string;
+      MAIL_PASS: string;
+
+      // Application Configuration
+      TZ: string;
+      NODE_ENV: string;
+      PORT: string;
+      APP_URL: string;
     }
   }
 

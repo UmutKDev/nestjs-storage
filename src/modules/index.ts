@@ -13,6 +13,7 @@ export default [
   AccountModule,
   AuthenticationModule,
   UserModule,
+  CloudModule,
   HealthModule,
   DefinitionModule,
 ];
