@@ -1,9 +1,17 @@
 import { CDNPathResolver } from '@common/helpers/cast.helper';
 import { ApiProperty } from '@nestjs/swagger';
 import { Expose, Transform, Type } from 'class-transformer';
-import { IsString, IsNotEmpty } from 'class-validator';
+import { IsString, IsNotEmpty, IsBoolean, IsOptional } from 'class-validator';
 
-export class CloudBreadCrumbModel {}
+export class CloudBreadCrumbModel {
+  @Expose()
+  @ApiProperty()
+  Name: string;
+
+  @Expose()
+  @ApiProperty()
+  Path: string;
+}
 
 export class CloudPathModel {
   @Expose()
@@ -78,6 +86,29 @@ export class CloudViewModel {
 }
 
 export class CloudListResponseModel extends CloudViewModel {}
+
+export class CloudListRequestModel {
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  Path: string;
+
+  @ApiProperty({ required: false })
+  @IsBoolean()
+  @Transform(({ obj }) => {
+    return obj.Delimiter === 'true' ? true : false;
+  })
+  @IsOptional()
+  Delimiter: boolean;
+
+  @ApiProperty({ required: false })
+  @IsBoolean()
+  @Transform(({ obj }) => {
+    return obj.IsMetadataProcessing === 'true' ? true : false;
+  })
+  @IsOptional()
+  IsMetadataProcessing: boolean;
+}
 
 export class CloudFindRequestModel {
   @ApiProperty()

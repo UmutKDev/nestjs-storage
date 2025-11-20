@@ -1,7 +1,11 @@
 import { Controller, Get, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { CloudService } from './cloud.service';
-import { CloudFindRequestModel, CloudListResponseModel } from './cloud.model';
+import {
+  CloudFindRequestModel,
+  CloudListRequestModel,
+  CloudListResponseModel,
+} from './cloud.model';
 import { ApiSuccessResponse } from '@common/decorators/response.decorator';
 
 @Controller('Cloud')
@@ -12,8 +16,10 @@ export class CloudController {
 
   @Get('List')
   @ApiSuccessResponse(CloudListResponseModel)
-  async List(): Promise<CloudListResponseModel> {
-    return this.cloudService.List();
+  async List(
+    @Query() model: CloudListRequestModel,
+  ): Promise<CloudListResponseModel> {
+    return this.cloudService.List(model);
   }
 
   @Get('Find')
