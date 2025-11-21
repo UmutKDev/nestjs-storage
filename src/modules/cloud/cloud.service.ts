@@ -29,8 +29,6 @@ export class CloudService {
   private readonly IsDirectory = (key: string) =>
     key.includes('.emptyFolderPlaceholder');
   private Prefix = null;
-  private Delimiter = false;
-  private IsMetadataProcessing = false;
 
   constructor(@InjectAws(S3Client) private readonly s3: S3Client) {}
 
@@ -43,27 +41,19 @@ export class CloudService {
       this.Prefix = Path.replace(/^\/+|\/+$/g, '') + '/';
     }
 
-    if (this.Delimiter) {
-      this.Delimiter = Delimiter;
-    }
-
-    if (this.IsMetadataProcessing) {
-      this.IsMetadataProcessing = IsMetadataProcessing;
-    }
-
     const command = await this.s3.send(
       new ListObjectsV2Command({
         Bucket: process.env.STORAGE_S3_BUCKET,
         MaxKeys: this.MaxListObjects,
-        Delimiter: this.Delimiter ? '/' : '',
+        Delimiter: Delimiter ? '/' : '',
         Prefix: this.Prefix,
       }),
     );
 
     const [Breadcrumb, Directories, Contents] = await Promise.all([
-      this.ProcessBreadcrumb(Path || ''),
+      this.ProcessBreadcrumb(Path || '', Delimiter),
       this.ProcessDirectories(command.CommonPrefixes ?? [], this.Prefix),
-      this.ProcessObjects(command.Contents ?? [], this.IsMetadataProcessing),
+      this.ProcessObjects(command.Contents ?? [], IsMetadataProcessing),
     ]);
 
     return plainToInstance(CloudListResponseModel, {
@@ -139,8 +129,9 @@ export class CloudService {
 
   private async ProcessBreadcrumb(
     Path: string,
+    Delimiter: boolean = false,
   ): Promise<CloudBreadCrumbModel[]> {
-    const breadcrumb: CloudBreadCrumbModel[] = this.Delimiter
+    const breadcrumb: CloudBreadCrumbModel[] = Delimiter
       ? [
           {
             Name: 'root',
