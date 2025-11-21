@@ -1,21 +1,35 @@
 import {
   _Object,
+  AbortMultipartUploadCommand,
   CommonPrefix,
+  CompleteMultipartUploadCommand,
+  CreateMultipartUploadCommand,
   GetObjectCommand,
   HeadObjectCommand,
   HeadObjectCommandOutput,
   ListObjectsV2Command,
+  PutObjectCommand,
   S3Client,
+  UploadPartCommand,
 } from '@aws-sdk/client-s3';
 import { HttpException, Injectable } from '@nestjs/common';
 import { InjectAws } from 'aws-sdk-v3-nest';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import {
+  CloudAbortMultipartUploadRequestModel,
   CloudBreadCrumbModel,
-  CloudFindRequestModel,
+  CloudCompleteMultipartUploadRequestModel,
+  CloudCompleteMultipartUploadResponseModel,
+  CloudCreateMultipartUploadRequestModel,
+  CloudCreateMultipartUploadResponseModel,
+  CloudKeyRequestModel,
+  CloudGetMultipartPartUrlRequestModel,
+  CloudGetMultipartPartUrlResponseModel,
   CloudListRequestModel,
   CloudListResponseModel,
   CloudObjectModel,
+  CloudUploadPartRequestModel,
+  CloudUploadPartResponseModel,
 } from './cloud.model';
 import { plainToInstance } from 'class-transformer';
 
@@ -26,8 +40,11 @@ export class CloudService {
   private readonly MaxListObjects = 1000;
   private readonly MaxObjectSizeBytes = 50 * 1024 * 1024; // 50 MB
   private readonly PresignedUrlExpirySeconds = 3600; // 1 hour
+  private readonly MinMultipartUploadSizeBytes = 5 * 1024 * 1024; // 5 MB
+  private readonly MaxMultipartUploadSizeBytes = 5 * 1024 * 1024 * 1024; // 5 GB
+  private readonly EmptyFolderPlaceholder = '.emptyFolderPlaceholder';
   private readonly IsDirectory = (key: string) =>
-    key.includes('.emptyFolderPlaceholder');
+    key.includes(this.EmptyFolderPlaceholder);
   private Prefix = null;
 
   constructor(@InjectAws(S3Client) private readonly s3: S3Client) {}
@@ -63,7 +80,7 @@ export class CloudService {
     });
   }
 
-  async Find({ Key }: CloudFindRequestModel) {
+  async Find({ Key }: CloudKeyRequestModel) {
     try {
       const command = await this.s3.send(
         new HeadObjectCommand({
@@ -81,7 +98,7 @@ export class CloudService {
     }
   }
 
-  async GetPresignedUrl({ Key }: CloudFindRequestModel): Promise<string> {
+  async GetPresignedUrl({ Key }: CloudKeyRequestModel): Promise<string> {
     try {
       await this.s3.send(
         new HeadObjectCommand({
@@ -110,7 +127,7 @@ export class CloudService {
 
   async GetObjectStream({
     Key,
-  }: CloudFindRequestModel): Promise<ReadableStream> {
+  }: CloudKeyRequestModel): Promise<ReadableStream> {
     try {
       const command = await this.s3.send(
         new GetObjectCommand({
@@ -209,24 +226,133 @@ export class CloudService {
       }
 
       processedContents.push({
-        Name: content.Key?.split('/').pop() || '',
+        Name: content.Key?.split('/').pop(),
         Extension: content.Key?.includes('.')
-          ? content.Key.split('.').pop() || ''
-          : '',
-        MimeType: metadata.ContentType || '',
+          ? content.Key.split('.').pop()
+          : undefined,
+        MimeType: metadata.ContentType,
         Path: {
-          Host: process.env.STORAGE_S3_PUBLIC_ENDPOINT || '',
-          Key: content.Key || '',
+          Host: process.env.STORAGE_S3_PUBLIC_ENDPOINT,
+          Key: content.Key,
           Url: content.Key,
         },
-        Metadata: metadata.Metadata || {},
-        Size: content.Size || 0,
-        ETag: content.ETag || '',
+        Metadata: metadata.Metadata,
+        Size: content.Size,
+        ETag: content.ETag,
         LastModified: content.LastModified
           ? content.LastModified.toISOString()
           : '',
       });
     }
     return processedContents;
+  }
+
+  async CreateDirectory({ Key }: CloudKeyRequestModel): Promise<void> {
+    const directoryKey =
+      Key.replace(/^\/+|\/+$/g, '') + '/' + this.EmptyFolderPlaceholder;
+
+    await this.s3.send(
+      new PutObjectCommand({
+        Bucket: process.env.STORAGE_S3_BUCKET,
+        Key: directoryKey,
+        Body: '',
+      }),
+    );
+  }
+
+  async UploadCreateMultipartUpload({
+    Key,
+    ContentType,
+  }: CloudCreateMultipartUploadRequestModel): Promise<CloudCreateMultipartUploadResponseModel> {
+    const command = await this.s3.send(
+      new CreateMultipartUploadCommand({
+        Bucket: process.env.STORAGE_S3_BUCKET,
+        Key: Key,
+        ContentType: ContentType,
+      }),
+    );
+
+    return plainToInstance(CloudCreateMultipartUploadResponseModel, {
+      UploadId: command.UploadId,
+      Key: command.Key,
+    });
+  }
+
+  async UploadGetMultipartPartUrl({
+    Key,
+    UploadId,
+    PartNumber,
+  }: CloudGetMultipartPartUrlRequestModel): Promise<CloudGetMultipartPartUrlResponseModel> {
+    const command = new UploadPartCommand({
+      Bucket: process.env.STORAGE_S3_BUCKET,
+      Key: Key,
+      UploadId: UploadId,
+      PartNumber: PartNumber,
+    });
+
+    const url = await getSignedUrl(this.s3, command, {
+      expiresIn: this.PresignedUrlExpirySeconds,
+    });
+
+    return plainToInstance(CloudGetMultipartPartUrlResponseModel, {
+      Url: url,
+      Expires: this.PresignedUrlExpirySeconds,
+    });
+  }
+
+  async UploadPart(
+    { Key, UploadId, PartNumber }: CloudUploadPartRequestModel,
+    file: Express.Multer.File,
+  ): Promise<CloudUploadPartResponseModel> {
+    const command = new UploadPartCommand({
+      Bucket: process.env.STORAGE_S3_BUCKET,
+      Key: Key,
+      UploadId: UploadId,
+      PartNumber: PartNumber,
+      Body: file.buffer,
+    });
+
+    const result = await this.s3.send(command);
+
+    return plainToInstance(CloudUploadPartResponseModel, {
+      ETag: result.ETag,
+    });
+  }
+
+  async UploadCompleteMultipartUpload({
+    Key,
+    UploadId,
+    Parts,
+  }: CloudCompleteMultipartUploadRequestModel): Promise<CloudCompleteMultipartUploadResponseModel> {
+    const command = await this.s3.send(
+      new CompleteMultipartUploadCommand({
+        Bucket: process.env.STORAGE_S3_BUCKET,
+        Key: Key,
+        UploadId: UploadId,
+        MultipartUpload: {
+          Parts: Parts,
+        },
+      }),
+    );
+
+    return plainToInstance(CloudCompleteMultipartUploadResponseModel, {
+      Location: command.Location,
+      Key: command.Key,
+      Bucket: command.Bucket,
+      ETag: command.ETag,
+    });
+  }
+
+  async UploadAbortMultipartUpload({
+    Key,
+    UploadId,
+  }: CloudAbortMultipartUploadRequestModel): Promise<void> {
+    await this.s3.send(
+      new AbortMultipartUploadCommand({
+        Bucket: process.env.STORAGE_S3_BUCKET,
+        Key: Key,
+        UploadId: UploadId,
+      }),
+    );
   }
 }

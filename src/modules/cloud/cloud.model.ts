@@ -101,18 +101,155 @@ export class CloudListRequestModel {
   @IsOptional()
   Delimiter: boolean;
 
-  @ApiProperty({ required: false })
+  @ApiProperty({ required: false, default: true })
   @IsBoolean()
   @Transform(({ obj }) => {
     return obj.IsMetadataProcessing === 'true' ? true : false;
   })
   @IsOptional()
-  IsMetadataProcessing: boolean;
+  IsMetadataProcessing: boolean = true;
 }
 
-export class CloudFindRequestModel {
+export class CloudKeyRequestModel {
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
   Key: string;
+}
+
+export class CloudCreateMultipartUploadRequestModel {
+  @Expose()
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  Key: string;
+
+  @Expose()
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  ContentType?: string;
+}
+
+export class CloudCreateMultipartUploadResponseModel {
+  @Expose()
+  @ApiProperty()
+  UploadId: string;
+
+  @Expose()
+  @ApiProperty()
+  Key: string;
+}
+
+export class CloudGetMultipartPartUrlRequestModel {
+  @Expose()
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  Key: string;
+
+  @Expose()
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  UploadId: string;
+
+  @Expose()
+  @ApiProperty()
+  @IsNotEmpty()
+  PartNumber: number;
+}
+
+export class CloudGetMultipartPartUrlResponseModel {
+  @Expose()
+  @ApiProperty()
+  Url: string;
+
+  @Expose()
+  @ApiProperty()
+  Expires: number;
+}
+
+export class CloudUploadPartRequestModel {
+  @Expose()
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  Key: string;
+
+  @Expose()
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  UploadId: string;
+
+  @Expose()
+  @ApiProperty()
+  @IsNotEmpty()
+  PartNumber: number;
+}
+
+export class CloudUploadPartResponseModel {
+  @Expose()
+  @ApiProperty()
+  ETag: string;
+}
+
+export class CloudMultipartPartModel {
+  @Expose()
+  @ApiProperty()
+  @IsNotEmpty()
+  PartNumber: number;
+
+  @Expose()
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  ETag: string;
+}
+
+export class CloudCompleteMultipartUploadRequestModel {
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  Key: string;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  UploadId: string;
+
+  @ApiProperty({ type: CloudMultipartPartModel, isArray: true })
+  @IsNotEmpty()
+  Parts: Array<CloudMultipartPartModel>;
+}
+
+export class CloudCompleteMultipartUploadResponseModel {
+  @Expose()
+  @ApiProperty()
+  Location: string;
+
+  @Expose()
+  @ApiProperty()
+  Key: string;
+
+  @Expose()
+  @ApiProperty()
+  Bucket: string;
+
+  @Expose()
+  @ApiProperty()
+  ETag: string;
+}
+
+export class CloudAbortMultipartUploadRequestModel {
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  Key: string;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  UploadId: string;
 }
