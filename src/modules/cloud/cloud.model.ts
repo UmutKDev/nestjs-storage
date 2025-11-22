@@ -1,7 +1,13 @@
 import { CDNPathResolver } from '@common/helpers/cast.helper';
 import { ApiProperty } from '@nestjs/swagger';
 import { Expose, Transform, Type } from 'class-transformer';
-import { IsString, IsNotEmpty, IsBoolean, IsOptional } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsBoolean,
+  IsOptional,
+  IsArray,
+} from 'class-validator';
 
 export class CloudBreadCrumbModel {
   @Expose()
@@ -117,6 +123,14 @@ export class CloudKeyRequestModel {
   Key: string;
 }
 
+export class CloudDeleteRequestModel {
+  @ApiProperty()
+  @IsNotEmpty()
+  @IsArray()
+  @IsString({ each: true })
+  Key: Array<string>;
+}
+
 export class CloudCreateMultipartUploadRequestModel {
   @Expose()
   @ApiProperty()
@@ -129,6 +143,11 @@ export class CloudCreateMultipartUploadRequestModel {
   @IsString()
   @IsOptional()
   ContentType?: string;
+
+  @Expose()
+  @ApiProperty({ required: false })
+  @IsOptional()
+  Metadata?: Record<string, string>;
 }
 
 export class CloudCreateMultipartUploadResponseModel {
@@ -240,6 +259,10 @@ export class CloudCompleteMultipartUploadResponseModel {
   @Expose()
   @ApiProperty()
   ETag: string;
+
+  @Expose()
+  @ApiProperty({ required: false })
+  Metadata?: Record<string, string>;
 }
 
 export class CloudAbortMultipartUploadRequestModel {

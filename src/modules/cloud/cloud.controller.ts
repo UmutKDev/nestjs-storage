@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Post,
   Query,
@@ -23,6 +24,7 @@ import {
   CloudListResponseModel,
   CloudUploadPartRequestModel,
   CloudUploadPartResponseModel,
+  CloudDeleteRequestModel,
 } from './cloud.model';
 import { ApiSuccessResponse } from '@common/decorators/response.decorator';
 
@@ -50,8 +52,13 @@ export class CloudController {
     return this.cloudService.GetPresignedUrl(model);
   }
 
+  @Delete('Delete')
+  async Delete(@Body() model: CloudDeleteRequestModel): Promise<boolean> {
+    return this.cloudService.Delete(model);
+  }
+
   @Post('CreateDirectory')
-  async CreateDirectory(@Body() model: CloudKeyRequestModel): Promise<void> {
+  async CreateDirectory(@Body() model: CloudKeyRequestModel): Promise<boolean> {
     return this.cloudService.CreateDirectory(model);
   }
 

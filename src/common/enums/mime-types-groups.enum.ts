@@ -4,7 +4,6 @@ export namespace MimeTypeGroups {
     Png = 'image/png',
     Gif = 'image/gif',
     Bmp = 'image/bmp',
-    Svg = 'image/svg+xml',
     Webp = 'image/webp',
     Tiff = 'image/tiff',
   }

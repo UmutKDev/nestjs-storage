@@ -3,7 +3,9 @@ import {
   AbortMultipartUploadCommand,
   CommonPrefix,
   CompleteMultipartUploadCommand,
+  CopyObjectCommand,
   CreateMultipartUploadCommand,
+  DeleteObjectCommand,
   GetObjectCommand,
   HeadObjectCommand,
   HeadObjectCommandOutput,
@@ -12,9 +14,11 @@ import {
   S3Client,
   UploadPartCommand,
 } from '@aws-sdk/client-s3';
-import { HttpException, Injectable } from '@nestjs/common';
+import { HttpException, Injectable, Logger } from '@nestjs/common';
 import { InjectAws } from 'aws-sdk-v3-nest';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import sharp from 'sharp';
+import { Readable } from 'stream';
 import {
   CloudAbortMultipartUploadRequestModel,
   CloudBreadCrumbModel,
@@ -30,11 +34,15 @@ import {
   CloudObjectModel,
   CloudUploadPartRequestModel,
   CloudUploadPartResponseModel,
+  CloudDeleteRequestModel,
 } from './cloud.model';
 import { plainToInstance } from 'class-transformer';
+import { fstatSync } from 'fs';
+import { IsImageFile } from '@common/helpers/cast.helper';
 
 @Injectable()
 export class CloudService {
+  private readonly logger = new Logger(CloudService.name);
   private readonly NotFoundErrorCodes = ['NoSuchKey', 'NotFound'];
   private readonly MaxProcessMetadataObjects = 1000;
   private readonly MaxListObjects = 1000;
@@ -247,7 +255,26 @@ export class CloudService {
     return processedContents;
   }
 
-  async CreateDirectory({ Key }: CloudKeyRequestModel): Promise<void> {
+  async Delete({ Key }: CloudDeleteRequestModel): Promise<boolean> {
+    try {
+      for await (const key of Key) {
+        await this.s3.send(
+          new DeleteObjectCommand({
+            Bucket: process.env.STORAGE_S3_BUCKET,
+            Key: key,
+          }),
+        );
+      }
+    } catch (error) {
+      if (this.NotFoundErrorCodes.includes(error.name)) {
+        throw new HttpException(Codes.Error.Cloud.FILE_NOT_FOUND, 404);
+      }
+      throw error;
+    }
+    return true;
+  }
+
+  async CreateDirectory({ Key }: CloudKeyRequestModel): Promise<boolean> {
     const directoryKey =
       Key.replace(/^\/+|\/+$/g, '') + '/' + this.EmptyFolderPlaceholder;
 
@@ -258,17 +285,20 @@ export class CloudService {
         Body: '',
       }),
     );
+    return true;
   }
 
   async UploadCreateMultipartUpload({
     Key,
     ContentType,
+    Metadata,
   }: CloudCreateMultipartUploadRequestModel): Promise<CloudCreateMultipartUploadResponseModel> {
     const command = await this.s3.send(
       new CreateMultipartUploadCommand({
         Bucket: process.env.STORAGE_S3_BUCKET,
         Key: Key,
         ContentType: ContentType,
+        Metadata: Metadata,
       }),
     );
 
@@ -335,12 +365,86 @@ export class CloudService {
       }),
     );
 
+    let metadata = {};
+    if (IsImageFile(Key)) {
+      metadata = await this.ProcessImageMetadata(Key);
+    }
+
     return plainToInstance(CloudCompleteMultipartUploadResponseModel, {
       Location: command.Location,
       Key: command.Key,
       Bucket: command.Bucket,
       ETag: command.ETag,
+      Metadata: metadata,
     });
+  }
+
+  private async ProcessImageMetadata(
+    key: string,
+  ): Promise<Record<string, string>> {
+    try {
+      const getObjectCommand = new GetObjectCommand({
+        Bucket: process.env.STORAGE_S3_BUCKET,
+        Key: key,
+      });
+      const object = await this.s3.send(getObjectCommand);
+
+      const existingMetadata = object.Metadata || {};
+
+      const stream = object.Body as Readable;
+      const chunks: Buffer[] = [];
+
+      for await (const chunk of stream) {
+        chunks.push(Buffer.from(chunk));
+      }
+      const buffer = Buffer.concat(chunks);
+
+      console.log(fstatSync(buffer.length));
+
+      const metadata = await sharp(buffer).metadata();
+
+      if (metadata.width && metadata.height) {
+        const newMetadata = {
+          ...existingMetadata,
+          width: metadata.width.toString(),
+          height: metadata.height.toString(),
+        };
+
+        const copySource = `${process.env.STORAGE_S3_BUCKET}/${key}`;
+
+        await this.s3.send(
+          new PutObjectCommand({
+            Bucket: process.env.STORAGE_S3_BUCKET,
+            Key: key,
+            Body: buffer,
+            ContentType: object.ContentType,
+            Metadata: newMetadata,
+          }),
+        );
+
+        await this.s3.send(
+          new CopyObjectCommand({
+            Bucket: process.env.STORAGE_S3_BUCKET,
+            CopySource: copySource,
+            Key: key,
+            Metadata: newMetadata,
+            MetadataDirective: 'REPLACE',
+            ContentType: object.ContentType,
+          }),
+        );
+
+        return newMetadata;
+      } else {
+        this.logger.warn('Sharp did not return width/height', metadata);
+      }
+      return existingMetadata;
+    } catch (error) {
+      this.logger.error(
+        `Failed to process image metadata for key ${key}:`,
+        error,
+      );
+      return {};
+    }
   }
 
   async UploadAbortMultipartUpload({

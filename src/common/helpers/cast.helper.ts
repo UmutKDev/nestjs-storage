@@ -1,4 +1,4 @@
-import { Role, UUID } from '@common/enums';
+import { MimeTypeGroups, Role, UUID } from '@common/enums';
 
 export const slugify = (value: string): string =>
   value
@@ -53,4 +53,12 @@ export const isAdmin = (user: UserContext, cursor: keyof UserContext) => {
       ? user[cursor]
       : UUID.EMPTY
     : undefined;
+};
+
+export const IsImageFile = (name: string): boolean => {
+  const imageExtensions = Object.values(MimeTypeGroups.Images).map(
+    (type) => type.split('/')[1],
+  );
+  const lowerName = name.toLowerCase();
+  return imageExtensions.some((ext) => lowerName.endsWith(ext));
 };
