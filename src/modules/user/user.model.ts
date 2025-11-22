@@ -45,7 +45,7 @@ export class UserViewModel implements UserEntity {
   avatar: string;
 
   @Expose()
-  @ApiProperty({ enum: Role, default: Role.EMPLOYEE })
+  @ApiProperty({ enum: Role, default: Role.USER })
   role: string;
 
   @Expose()

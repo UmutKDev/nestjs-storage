@@ -1,8 +1,6 @@
 enum Role {
   ADMIN = 'ADMIN',
-  OWNER = 'OWNER',
-  MANAGER = 'MANAGER',
-  EMPLOYEE = 'EMPLOYEE',
+  USER = 'USER',
 }
 
 enum Status {
@@ -32,20 +30,15 @@ enum UploadSessionStatus {
 
 enum CloudContextLevel {
   ROOT = 'ROOT',
-  ORGANIZATION = 'ORGANIZATION',
   SUBFOLDER = 'SUBFOLDER',
 }
 
 enum CloudDirectoryType {
-  ORGANIZATION = 'ORGANIZATION',
   FOLDER = 'FOLDER',
 }
 
 enum CloudBreadcrumbLevelType {
   ROOT = 'ROOT',
-  USER = 'USER',
-  FOLDER = 'FOLDER',
-  CURRENT = 'CURRENT',
 }
 
 export {

@@ -276,3 +276,15 @@ export class CloudAbortMultipartUploadRequestModel {
   @IsNotEmpty()
   UploadId: string;
 }
+
+export class CloudMoveRequestModel {
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  SourceKey: string;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  DestinationKey: string;
+}

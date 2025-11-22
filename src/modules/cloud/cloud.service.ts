@@ -35,10 +35,10 @@ import {
   CloudUploadPartRequestModel,
   CloudUploadPartResponseModel,
   CloudDeleteRequestModel,
+  CloudMoveRequestModel,
 } from './cloud.model';
 import { plainToInstance } from 'class-transformer';
-import { fstatSync } from 'fs';
-import { IsImageFile } from '@common/helpers/cast.helper';
+import { IsImageFile, KeyCombiner } from '@common/helpers/cast.helper';
 
 @Injectable()
 export class CloudService {
@@ -57,13 +57,14 @@ export class CloudService {
 
   constructor(@InjectAws(S3Client) private readonly s3: S3Client) {}
 
-  async List({
-    Path,
-    Delimiter,
-    IsMetadataProcessing,
-  }: CloudListRequestModel): Promise<CloudListResponseModel> {
+  async List(
+    { Path, Delimiter, IsMetadataProcessing }: CloudListRequestModel,
+    User: UserContext,
+  ): Promise<CloudListResponseModel> {
     if (Path) {
-      this.Prefix = Path.replace(/^\/+|\/+$/g, '') + '/';
+      this.Prefix = KeyCombiner([User.id, Path.replace(/^\/+|\/+$/g, '')]);
+    } else {
+      this.Prefix = KeyCombiner([User.id, '']);
     }
 
     const command = await this.s3.send(
@@ -78,7 +79,7 @@ export class CloudService {
     const [Breadcrumb, Directories, Contents] = await Promise.all([
       this.ProcessBreadcrumb(Path || '', Delimiter),
       this.ProcessDirectories(command.CommonPrefixes ?? [], this.Prefix),
-      this.ProcessObjects(command.Contents ?? [], IsMetadataProcessing),
+      this.ProcessObjects(command.Contents ?? [], IsMetadataProcessing, User),
     ]);
 
     return plainToInstance(CloudListResponseModel, {
@@ -88,16 +89,34 @@ export class CloudService {
     });
   }
 
-  async Find({ Key }: CloudKeyRequestModel) {
+  async Find(
+    { Key }: CloudKeyRequestModel,
+    User: UserContext,
+  ): Promise<CloudObjectModel> {
     try {
       const command = await this.s3.send(
         new HeadObjectCommand({
           Bucket: process.env.STORAGE_S3_BUCKET,
-          Key: Key,
+          Key: KeyCombiner([User.id, Key]),
         }),
       );
 
-      return command;
+      return plainToInstance(CloudObjectModel, {
+        Name: Key?.split('/').pop(),
+        Extension: Key?.includes('.') ? Key.split('.').pop() : undefined,
+        MimeType: command.ContentType,
+        Path: {
+          Host: process.env.STORAGE_S3_PUBLIC_ENDPOINT,
+          Key: Key.replace('' + User.id + '/', ''),
+          Url: Key,
+        },
+        Metadata: command.Metadata,
+        Size: command.ContentLength,
+        ETag: command.ETag,
+        LastModified: command.LastModified
+          ? command.LastModified.toISOString()
+          : '',
+      });
     } catch (error) {
       if (this.NotFoundErrorCodes.includes(error.name)) {
         throw new HttpException(Codes.Error.Cloud.FILE_NOT_FOUND, 404);
@@ -106,18 +125,21 @@ export class CloudService {
     }
   }
 
-  async GetPresignedUrl({ Key }: CloudKeyRequestModel): Promise<string> {
+  async GetPresignedUrl(
+    { Key }: CloudKeyRequestModel,
+    User: UserContext,
+  ): Promise<string> {
     try {
       await this.s3.send(
         new HeadObjectCommand({
           Bucket: process.env.STORAGE_S3_BUCKET,
-          Key: Key,
+          Key: KeyCombiner([User.id, Key]),
         }),
       );
 
       const command = new GetObjectCommand({
         Bucket: process.env.STORAGE_S3_BUCKET,
-        Key: Key,
+        Key: KeyCombiner([User.id, Key]),
       });
 
       const url = await getSignedUrl(this.s3, command, {
@@ -133,14 +155,15 @@ export class CloudService {
     }
   }
 
-  async GetObjectStream({
-    Key,
-  }: CloudKeyRequestModel): Promise<ReadableStream> {
+  async GetObjectStream(
+    { Key }: CloudKeyRequestModel,
+    User: UserContext,
+  ): Promise<ReadableStream> {
     try {
       const command = await this.s3.send(
         new GetObjectCommand({
           Bucket: process.env.STORAGE_S3_BUCKET,
-          Key: Key,
+          Key: KeyCombiner([User.id, Key]),
         }),
       );
       return command.Body.transformToWebStream();
@@ -209,6 +232,7 @@ export class CloudService {
   private async ProcessObjects(
     Contents: _Object[],
     IsMetadataProcessing = false,
+    User: UserContext,
   ): Promise<CloudObjectModel[]> {
     if (Contents.length === 0) {
       return [];
@@ -241,7 +265,7 @@ export class CloudService {
         MimeType: metadata.ContentType,
         Path: {
           Host: process.env.STORAGE_S3_PUBLIC_ENDPOINT,
-          Key: content.Key,
+          Key: content.Key.replace('' + User.id + '/', ''),
           Url: content.Key,
         },
         Metadata: metadata.Metadata,
@@ -255,13 +279,46 @@ export class CloudService {
     return processedContents;
   }
 
-  async Delete({ Key }: CloudDeleteRequestModel): Promise<boolean> {
+  async Move(
+    { SourceKey, DestinationKey }: CloudMoveRequestModel,
+    User: UserContext,
+  ): Promise<boolean> {
+    try {
+      const copySource = `${process.env.STORAGE_S3_BUCKET}/${SourceKey}`;
+
+      await this.s3.send(
+        new CopyObjectCommand({
+          Bucket: process.env.STORAGE_S3_BUCKET,
+          CopySource: copySource,
+          Key: KeyCombiner([User.id, DestinationKey]),
+        }),
+      );
+
+      await this.s3.send(
+        new DeleteObjectCommand({
+          Bucket: process.env.STORAGE_S3_BUCKET,
+          Key: KeyCombiner([User.id, SourceKey]),
+        }),
+      );
+    } catch (error) {
+      if (this.NotFoundErrorCodes.includes(error.name)) {
+        throw new HttpException(Codes.Error.Cloud.FILE_NOT_FOUND, 404);
+      }
+      throw error;
+    }
+    return true;
+  }
+
+  async Delete(
+    { Key }: CloudDeleteRequestModel,
+    User: UserContext,
+  ): Promise<boolean> {
     try {
       for await (const key of Key) {
         await this.s3.send(
           new DeleteObjectCommand({
             Bucket: process.env.STORAGE_S3_BUCKET,
-            Key: key,
+            Key: KeyCombiner([User.id, key]),
           }),
         );
       }
@@ -274,29 +331,31 @@ export class CloudService {
     return true;
   }
 
-  async CreateDirectory({ Key }: CloudKeyRequestModel): Promise<boolean> {
+  async CreateDirectory(
+    { Key }: CloudKeyRequestModel,
+    User: UserContext,
+  ): Promise<boolean> {
     const directoryKey =
       Key.replace(/^\/+|\/+$/g, '') + '/' + this.EmptyFolderPlaceholder;
 
     await this.s3.send(
       new PutObjectCommand({
         Bucket: process.env.STORAGE_S3_BUCKET,
-        Key: directoryKey,
+        Key: KeyCombiner([User.id, directoryKey]),
         Body: '',
       }),
     );
     return true;
   }
 
-  async UploadCreateMultipartUpload({
-    Key,
-    ContentType,
-    Metadata,
-  }: CloudCreateMultipartUploadRequestModel): Promise<CloudCreateMultipartUploadResponseModel> {
+  async UploadCreateMultipartUpload(
+    { Key, ContentType, Metadata }: CloudCreateMultipartUploadRequestModel,
+    User: UserContext,
+  ): Promise<CloudCreateMultipartUploadResponseModel> {
     const command = await this.s3.send(
       new CreateMultipartUploadCommand({
         Bucket: process.env.STORAGE_S3_BUCKET,
-        Key: Key,
+        Key: KeyCombiner([User.id, Key]),
         ContentType: ContentType,
         Metadata: Metadata,
       }),
@@ -308,14 +367,13 @@ export class CloudService {
     });
   }
 
-  async UploadGetMultipartPartUrl({
-    Key,
-    UploadId,
-    PartNumber,
-  }: CloudGetMultipartPartUrlRequestModel): Promise<CloudGetMultipartPartUrlResponseModel> {
+  async UploadGetMultipartPartUrl(
+    { Key, UploadId, PartNumber }: CloudGetMultipartPartUrlRequestModel,
+    User: UserContext,
+  ): Promise<CloudGetMultipartPartUrlResponseModel> {
     const command = new UploadPartCommand({
       Bucket: process.env.STORAGE_S3_BUCKET,
-      Key: Key,
+      Key: KeyCombiner([User.id, Key]),
       UploadId: UploadId,
       PartNumber: PartNumber,
     });
@@ -333,10 +391,11 @@ export class CloudService {
   async UploadPart(
     { Key, UploadId, PartNumber }: CloudUploadPartRequestModel,
     file: Express.Multer.File,
+    User: UserContext,
   ): Promise<CloudUploadPartResponseModel> {
     const command = new UploadPartCommand({
       Bucket: process.env.STORAGE_S3_BUCKET,
-      Key: Key,
+      Key: KeyCombiner([User.id, Key]),
       UploadId: UploadId,
       PartNumber: PartNumber,
       Body: file.buffer,
@@ -349,15 +408,14 @@ export class CloudService {
     });
   }
 
-  async UploadCompleteMultipartUpload({
-    Key,
-    UploadId,
-    Parts,
-  }: CloudCompleteMultipartUploadRequestModel): Promise<CloudCompleteMultipartUploadResponseModel> {
+  async UploadCompleteMultipartUpload(
+    { Key, UploadId, Parts }: CloudCompleteMultipartUploadRequestModel,
+    User: UserContext,
+  ): Promise<CloudCompleteMultipartUploadResponseModel> {
     const command = await this.s3.send(
       new CompleteMultipartUploadCommand({
         Bucket: process.env.STORAGE_S3_BUCKET,
-        Key: Key,
+        Key: KeyCombiner([User.id, Key]),
         UploadId: UploadId,
         MultipartUpload: {
           Parts: Parts,
@@ -367,12 +425,12 @@ export class CloudService {
 
     let metadata = {};
     if (IsImageFile(Key)) {
-      metadata = await this.ProcessImageMetadata(Key);
+      metadata = await this.ProcessImageMetadata(KeyCombiner([User.id, Key]));
     }
 
     return plainToInstance(CloudCompleteMultipartUploadResponseModel, {
       Location: command.Location,
-      Key: command.Key,
+      Key: command.Key.replace('' + User.id + '/', ''),
       Bucket: command.Bucket,
       ETag: command.ETag,
       Metadata: metadata,
@@ -398,8 +456,6 @@ export class CloudService {
         chunks.push(Buffer.from(chunk));
       }
       const buffer = Buffer.concat(chunks);
-
-      console.log(fstatSync(buffer.length));
 
       const metadata = await sharp(buffer).metadata();
 
@@ -447,14 +503,14 @@ export class CloudService {
     }
   }
 
-  async UploadAbortMultipartUpload({
-    Key,
-    UploadId,
-  }: CloudAbortMultipartUploadRequestModel): Promise<void> {
+  async UploadAbortMultipartUpload(
+    { Key, UploadId }: CloudAbortMultipartUploadRequestModel,
+    User: UserContext,
+  ): Promise<void> {
     await this.s3.send(
       new AbortMultipartUploadCommand({
         Bucket: process.env.STORAGE_S3_BUCKET,
-        Key: Key,
+        Key: KeyCombiner([User.id, Key]),
         UploadId: UploadId,
       }),
     );

@@ -177,7 +177,7 @@ export class AuthenticationService {
         email: email,
         password: password,
         status: Status.ACTIVE,
-        role: Role.OWNER,
+        role: Role.USER,
       });
 
       // await this.mailService.sendMail({

@@ -40,7 +40,7 @@ export const CDNPathResolver = (path: string): string => {
 };
 
 export const isManager = (user: UserContext, cursor: keyof UserContext) => {
-  return user.role === Role.MANAGER
+  return user.role === Role.USER
     ? user[cursor]
       ? user[cursor]
       : UUID.EMPTY
@@ -61,4 +61,8 @@ export const IsImageFile = (name: string): boolean => {
   );
   const lowerName = name.toLowerCase();
   return imageExtensions.some((ext) => lowerName.endsWith(ext));
+};
+
+export const KeyCombiner = (keys: string[]): string => {
+  return keys.filter((key) => key && key.length > 0).join('/');
 };

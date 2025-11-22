@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   Post,
+  Put,
   Query,
   UploadedFile,
   UseInterceptors,
@@ -25,8 +26,10 @@ import {
   CloudUploadPartRequestModel,
   CloudUploadPartResponseModel,
   CloudDeleteRequestModel,
+  CloudMoveRequestModel,
 } from './cloud.model';
 import { ApiSuccessResponse } from '@common/decorators/response.decorator';
+import { User } from '@common/decorators/user.decorator';
 
 @Controller('Cloud')
 @ApiTags('Cloud')
@@ -38,44 +41,64 @@ export class CloudController {
   @ApiSuccessResponse(CloudListResponseModel)
   async List(
     @Query() model: CloudListRequestModel,
+    @User() user: UserContext,
   ): Promise<CloudListResponseModel> {
-    return this.cloudService.List(model);
+    return this.cloudService.List(model, user);
   }
 
   @Get('Find')
-  async Find(@Query() model: CloudKeyRequestModel) {
-    return this.cloudService.Find(model);
+  async Find(@Query() model: CloudKeyRequestModel, @User() user: UserContext) {
+    return this.cloudService.Find(model, user);
   }
 
   @Get('PresignedUrl')
-  async GetPresignedUrl(@Query() model: CloudKeyRequestModel) {
-    return this.cloudService.GetPresignedUrl(model);
+  async GetPresignedUrl(
+    @Query() model: CloudKeyRequestModel,
+    @User() user: UserContext,
+  ) {
+    return this.cloudService.GetPresignedUrl(model, user);
+  }
+
+  @Put('Move')
+  async Move(
+    @Body() model: CloudMoveRequestModel,
+    @User() user: UserContext,
+  ): Promise<boolean> {
+    return this.cloudService.Move(model, user);
   }
 
   @Delete('Delete')
-  async Delete(@Body() model: CloudDeleteRequestModel): Promise<boolean> {
-    return this.cloudService.Delete(model);
+  async Delete(
+    @Body() model: CloudDeleteRequestModel,
+    @User() user: UserContext,
+  ): Promise<boolean> {
+    return this.cloudService.Delete(model, user);
   }
 
   @Post('CreateDirectory')
-  async CreateDirectory(@Body() model: CloudKeyRequestModel): Promise<boolean> {
-    return this.cloudService.CreateDirectory(model);
+  async CreateDirectory(
+    @Body() model: CloudKeyRequestModel,
+    @User() user: UserContext,
+  ): Promise<boolean> {
+    return this.cloudService.CreateDirectory(model, user);
   }
 
   @Post('Upload/CreateMultipartUpload')
   @ApiSuccessResponse(CloudCreateMultipartUploadResponseModel)
   async UploadCreateMultipartUpload(
     @Body() model: CloudCreateMultipartUploadRequestModel,
+    @User() user: UserContext,
   ): Promise<CloudCreateMultipartUploadResponseModel> {
-    return this.cloudService.UploadCreateMultipartUpload(model);
+    return this.cloudService.UploadCreateMultipartUpload(model, user);
   }
 
   @Post('Upload/GetMultipartPartUrl')
   @ApiSuccessResponse(CloudGetMultipartPartUrlResponseModel)
   async UploadGetMultipartPartUrl(
     @Body() model: CloudGetMultipartPartUrlRequestModel,
+    @User() user: UserContext,
   ): Promise<CloudGetMultipartPartUrlResponseModel> {
-    return this.cloudService.UploadGetMultipartPartUrl(model);
+    return this.cloudService.UploadGetMultipartPartUrl(model, user);
   }
 
   @Post('Upload/UploadPart')
@@ -99,22 +122,25 @@ export class CloudController {
   async UploadPart(
     @Body() model: CloudUploadPartRequestModel,
     @UploadedFile() file: Express.Multer.File,
+    @User() user: UserContext,
   ): Promise<CloudUploadPartResponseModel> {
-    return this.cloudService.UploadPart(model, file);
+    return this.cloudService.UploadPart(model, file, user);
   }
 
   @Post('Upload/CompleteMultipartUpload')
   @ApiSuccessResponse(CloudCompleteMultipartUploadResponseModel)
   async UploadCompleteMultipartUpload(
     @Body() model: CloudCompleteMultipartUploadRequestModel,
+    @User() user: UserContext,
   ): Promise<CloudCompleteMultipartUploadResponseModel> {
-    return this.cloudService.UploadCompleteMultipartUpload(model);
+    return this.cloudService.UploadCompleteMultipartUpload(model, user);
   }
 
   @Post('Upload/AbortMultipartUpload')
   async UploadAbortMultipartUpload(
     @Body() model: CloudAbortMultipartUploadRequestModel,
+    @User() user: UserContext,
   ): Promise<void> {
-    return this.cloudService.UploadAbortMultipartUpload(model);
+    return this.cloudService.UploadAbortMultipartUpload(model, user);
   }
 }
