@@ -39,6 +39,7 @@ enum CloudDirectoryType {
 
 enum CloudBreadcrumbLevelType {
   ROOT = 'ROOT',
+  SUBFOLDER = 'SUBFOLDER',
 }
 
 export {

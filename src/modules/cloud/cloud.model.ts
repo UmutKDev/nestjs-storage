@@ -1,3 +1,4 @@
+import { CloudBreadcrumbLevelType } from '@common/enums';
 import { CDNPathResolver } from '@common/helpers/cast.helper';
 import { ApiProperty } from '@nestjs/swagger';
 import { Expose, Transform, Type } from 'class-transformer';
@@ -17,6 +18,10 @@ export class CloudBreadCrumbModel {
   @Expose()
   @ApiProperty()
   Path: string;
+
+  @Expose()
+  @ApiProperty({ enum: CloudBreadcrumbLevelType })
+  Type: string;
 }
 
 export class CloudPathModel {
@@ -129,6 +134,11 @@ export class CloudDeleteRequestModel {
   @IsArray()
   @IsString({ each: true })
   Key: Array<string>;
+
+  @ApiProperty({ required: false, default: false })
+  @IsBoolean()
+  @IsOptional()
+  IsDirectory: boolean = false;
 }
 
 export class CloudCreateMultipartUploadRequestModel {
