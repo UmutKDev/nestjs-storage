@@ -61,6 +61,10 @@ export class UserResponseModel extends OmitType(UserViewModel, [
   'password',
 ] as const) {}
 
+export class UserListResponseModel extends UserResponseModel {}
+
+export class UserFindResponseModel extends UserResponseModel {}
+
 export class UserBodyRequestModel extends OmitType(UserViewModel, [
   'id',
   'password',

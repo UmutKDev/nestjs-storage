@@ -11,7 +11,6 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiBody, ApiConsumes, ApiTags } from '@nestjs/swagger';
 import { CloudService } from './cloud.service';
-import { FileInterceptor } from '@nestjs/platform-express';
 import {
   CloudAbortMultipartUploadRequestModel,
   CloudCompleteMultipartUploadRequestModel,
@@ -23,13 +22,24 @@ import {
   CloudGetMultipartPartUrlResponseModel,
   CloudListRequestModel,
   CloudListResponseModel,
-  CloudUploadPartRequestModel,
-  CloudUploadPartResponseModel,
   CloudDeleteRequestModel,
   CloudMoveRequestModel,
+  CloudBreadCrumbModel,
+  CloudDirectoryModel,
+  CloudObjectModel,
+  CloudListBreadcrumbRequestModel,
+  CloudListDirectoriesRequestModel,
+  CloudListObjectsRequestModel,
+  CloudUploadPartRequestModel,
+  CloudUploadPartResponseModel,
 } from './cloud.model';
-import { ApiSuccessResponse } from '@common/decorators/response.decorator';
+import {
+  ApiSuccessArrayResponse,
+  ApiSuccessResponse,
+} from '@common/decorators/response.decorator';
 import { User } from '@common/decorators/user.decorator';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { ByteToMB } from '@common/helpers/cast.helper';
 
 @Controller('Cloud')
 @ApiTags('Cloud')
@@ -44,6 +54,32 @@ export class CloudController {
     @User() user: UserContext,
   ): Promise<CloudListResponseModel> {
     return this.cloudService.List(model, user);
+  }
+
+  @Get('List/Breadcrumb')
+  @ApiSuccessArrayResponse(CloudBreadCrumbModel)
+  async ListBreadcrumb(
+    @Query() model: CloudListBreadcrumbRequestModel,
+  ): Promise<CloudBreadCrumbModel[]> {
+    return this.cloudService.ListBreadcrumb(model);
+  }
+
+  @Get('List/Directories')
+  @ApiSuccessArrayResponse(CloudDirectoryModel)
+  async ListDirectories(
+    @Query() model: CloudListDirectoriesRequestModel,
+    @User() user: UserContext,
+  ): Promise<CloudDirectoryModel[]> {
+    return this.cloudService.ListDirectories(model, user);
+  }
+
+  @Get('List/Objects')
+  @ApiSuccessArrayResponse(CloudObjectModel)
+  async ListObjects(
+    @Query() model: CloudListObjectsRequestModel,
+    @User() user: UserContext,
+  ): Promise<CloudObjectModel[]> {
+    return this.cloudService.ListObjects(model, user);
   }
 
   @Get('Find')
@@ -110,6 +146,7 @@ export class CloudController {
         Key: { type: 'string' },
         UploadId: { type: 'string' },
         PartNumber: { type: 'integer' },
+        TotalPart: { type: 'integer' },
         File: {
           type: 'string',
           format: 'binary',
@@ -124,6 +161,7 @@ export class CloudController {
     @UploadedFile() file: Express.Multer.File,
     @User() user: UserContext,
   ): Promise<CloudUploadPartResponseModel> {
+    console.log(ByteToMB(file.size));
     return this.cloudService.UploadPart(model, file, user);
   }
 
@@ -136,7 +174,7 @@ export class CloudController {
     return this.cloudService.UploadCompleteMultipartUpload(model, user);
   }
 
-  @Post('Upload/AbortMultipartUpload')
+  @Delete('Upload/AbortMultipartUpload')
   async UploadAbortMultipartUpload(
     @Body() model: CloudAbortMultipartUploadRequestModel,
     @User() user: UserContext,

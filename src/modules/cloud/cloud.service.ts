@@ -32,11 +32,13 @@ import {
   CloudListRequestModel,
   CloudListResponseModel,
   CloudObjectModel,
-  CloudUploadPartRequestModel,
-  CloudUploadPartResponseModel,
   CloudDeleteRequestModel,
   CloudMoveRequestModel,
   CloudDirectoryModel,
+  CloudListDirectoriesRequestModel,
+  CloudListBreadcrumbRequestModel,
+  CloudUploadPartRequestModel,
+  CloudUploadPartResponseModel,
 } from './cloud.model';
 import { plainToInstance } from 'class-transformer';
 import { IsImageFile, KeyCombiner } from '@common/helpers/cast.helper';
@@ -78,6 +80,7 @@ export class CloudService {
         Prefix: this.Prefix,
       }),
     );
+
     const [Breadcrumb, Directories, Contents] = await Promise.all([
       this.ProcessBreadcrumb(Path || '', Delimiter),
       this.ProcessDirectories(command.CommonPrefixes ?? [], this.Prefix),
@@ -89,6 +92,63 @@ export class CloudService {
       Directories,
       Contents,
     });
+  }
+
+  async ListBreadcrumb({
+    Path,
+    Delimiter,
+  }: CloudListBreadcrumbRequestModel): Promise<CloudBreadCrumbModel[]> {
+    return this.ProcessBreadcrumb(Path || '', Delimiter);
+  }
+
+  async ListDirectories(
+    { Path, Delimiter }: CloudListDirectoriesRequestModel,
+    User: UserContext,
+  ): Promise<CloudDirectoryModel[]> {
+    const cleanedPath = Path ? Path.replace(/^\/+|\/+$/g, '') : '';
+    let prefix = KeyCombiner([User.id, cleanedPath]);
+    if (!prefix.endsWith('/')) {
+      prefix = prefix + '/';
+    }
+    this.Prefix = prefix;
+
+    const command = await this.s3.send(
+      new ListObjectsV2Command({
+        Bucket: process.env.STORAGE_S3_BUCKET,
+        MaxKeys: this.MaxListObjects,
+        Delimiter: Delimiter ? '/' : undefined,
+        Prefix: this.Prefix,
+      }),
+    );
+
+    return this.ProcessDirectories(command.CommonPrefixes ?? [], this.Prefix);
+  }
+
+  async ListObjects(
+    { Path, Delimiter, IsMetadataProcessing }: CloudListRequestModel,
+    User: UserContext,
+  ): Promise<CloudObjectModel[]> {
+    const cleanedPath = Path ? Path.replace(/^\/+|\/+$/g, '') : '';
+    let prefix = KeyCombiner([User.id, cleanedPath]);
+    if (!prefix.endsWith('/')) {
+      prefix = prefix + '/';
+    }
+    this.Prefix = prefix;
+
+    const command = await this.s3.send(
+      new ListObjectsV2Command({
+        Bucket: process.env.STORAGE_S3_BUCKET,
+        MaxKeys: this.MaxListObjects,
+        Delimiter: Delimiter ? '/' : undefined,
+        Prefix: this.Prefix,
+      }),
+    );
+
+    return this.ProcessObjects(
+      command.Contents ?? [],
+      IsMetadataProcessing,
+      User,
+    );
   }
 
   async Find(
@@ -319,15 +379,8 @@ export class CloudService {
     { Key, IsDirectory }: CloudDeleteRequestModel,
     User: UserContext,
   ): Promise<boolean> {
-    console.log(IsDirectory);
     try {
       for await (const key of Key) {
-        console.log(
-          KeyCombiner([
-            User.id,
-            key + (IsDirectory ? '/' + this.EmptyFolderPlaceholder : ''),
-          ]),
-        );
         await this.s3.send(
           new DeleteObjectCommand({
             Bucket: process.env.STORAGE_S3_BUCKET,
@@ -379,7 +432,7 @@ export class CloudService {
 
     return plainToInstance(CloudCreateMultipartUploadResponseModel, {
       UploadId: command.UploadId,
-      Key: command.Key,
+      Key: command.Key.replace('' + User.id + '/', ''),
     });
   }
 

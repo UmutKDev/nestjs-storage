@@ -7,6 +7,8 @@ export class AccountViewModel extends UserResponseModel {}
 
 export class AccountResponseModel extends AccountViewModel {}
 
+export class AccountProfileResponseModel extends AccountResponseModel {}
+
 export class AccountBodyRequestModel extends PickType(UserBodyRequestModel, [
   'fullName',
   'phoneNumber',

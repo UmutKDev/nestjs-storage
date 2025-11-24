@@ -1,6 +1,6 @@
 import { CloudBreadcrumbLevelType } from '@common/enums';
 import { CDNPathResolver } from '@common/helpers/cast.helper';
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, OmitType } from '@nestjs/swagger';
 import { Expose, Transform, Type } from 'class-transformer';
 import {
   IsString,
@@ -121,6 +121,18 @@ export class CloudListRequestModel {
   IsMetadataProcessing: boolean = true;
 }
 
+export class CloudListBreadcrumbRequestModel extends OmitType(
+  CloudListRequestModel,
+  ['IsMetadataProcessing'] as const,
+) {}
+
+export class CloudListDirectoriesRequestModel extends OmitType(
+  CloudListRequestModel,
+  ['IsMetadataProcessing'] as const,
+) {}
+
+export class CloudListObjectsRequestModel extends CloudListRequestModel {}
+
 export class CloudKeyRequestModel {
   @ApiProperty()
   @IsString()
@@ -216,6 +228,13 @@ export class CloudUploadPartRequestModel {
   @ApiProperty()
   @IsNotEmpty()
   PartNumber: number;
+
+  @Expose()
+  @ApiProperty({ required: false })
+  @IsOptional()
+  TotalPart?: number;
+
+  // TotalPart is optional — if provided the server will slice the uploaded file into parts
 }
 
 export class CloudUploadPartResponseModel {

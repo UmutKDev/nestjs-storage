@@ -66,3 +66,7 @@ export const IsImageFile = (name: string): boolean => {
 export const KeyCombiner = (keys: string[]): string => {
   return keys.filter((key) => key && key.length > 0).join('/');
 };
+
+export const ByteToMB = (bytes: number): number => {
+  return bytes / (1024 * 1024);
+};

@@ -11,9 +11,10 @@ import {
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { UserService } from './user.service';
 import {
+  UserFindResponseModel,
+  UserListResponseModel,
   UserPostBodyRequestModel,
   UserPutBodyRequestModel,
-  UserResponseModel,
 } from './user.model';
 import {
   ApiSuccessArrayResponse,
@@ -33,19 +34,21 @@ export class UserController {
   constructor(private readonly userService: UserService) {}
 
   @Get('List')
-  @ApiSuccessArrayResponse(UserResponseModel)
+  @ApiSuccessArrayResponse(UserListResponseModel)
   async List(
     @Query()
     model: PaginationRequestModel,
-  ): Promise<UserResponseModel[]> {
+  ): Promise<UserListResponseModel[]> {
     return await this.userService.List({
       model: model,
     });
   }
 
   @Get('Find/:id')
-  @ApiSuccessResponse(UserResponseModel)
-  async Find(@Param() model: BaseIdRequestModel): Promise<UserResponseModel> {
+  @ApiSuccessResponse(UserFindResponseModel)
+  async Find(
+    @Param() model: BaseIdRequestModel,
+  ): Promise<UserFindResponseModel> {
     return await this.userService.Find({ model: model });
   }
 

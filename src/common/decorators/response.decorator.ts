@@ -1,6 +1,14 @@
 import { applyDecorators, Type } from '@nestjs/common';
-import { ApiExtraModels, ApiInternalServerErrorResponse, ApiOkResponse, getSchemaPath, } from '@nestjs/swagger';
-import { ArrayResponseModel, BaseResponseModel, } from '@common/models/base.model';
+import {
+  ApiExtraModels,
+  ApiInternalServerErrorResponse,
+  ApiOkResponse,
+  getSchemaPath,
+} from '@nestjs/swagger';
+import {
+  ArrayResponseModel,
+  BaseResponseModel,
+} from '@common/models/base.model';
 
 export const ApiSuccessResponse = <GenericType extends Type<unknown>>(
   type: GenericType | 'string' | 'boolean',
@@ -13,7 +21,7 @@ export const ApiSuccessResponse = <GenericType extends Type<unknown>>(
       schema: {
         title:
           typeof type === 'function'
-            ? type.name.replace('Model', 'Model')
+            ? type.name.replace('Model', 'BaseModel')
             : type === 'string'
               ? 'StringResponseModel'
               : 'BooleanResponseModel',
@@ -86,12 +94,12 @@ export const ApiSuccessArrayResponse = (type: Type) =>
     ApiOkResponse({
       description: 'Success',
       schema: {
-        title: type.name.replace('Model', 'ListModel'),
+        title: type.name.replace('Model', 'ListBaseModel'),
         allOf: [
           { $ref: getSchemaPath(BaseResponseModel) },
           {
             type: 'object',
-            title: type.name.replace('Model', 'ListResultModel'),
+            title: type.name.replace('Model', 'ListModel'),
             properties: {
               result: {
                 allOf: [

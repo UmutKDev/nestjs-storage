@@ -4,8 +4,8 @@ import { AccountService } from './account.service';
 import { ApiSuccessResponse } from '@common/decorators/response.decorator';
 import {
   AccountChangePasswordRequestModel,
+  AccountProfileResponseModel,
   AccountPutBodyRequestModel,
-  AccountResponseModel,
 } from './account.model';
 import { User } from '@common/decorators/user.decorator';
 
@@ -16,8 +16,10 @@ export class AccountController {
   constructor(private readonly accountService: AccountService) {}
 
   @Get('Profile')
-  @ApiSuccessResponse(AccountResponseModel)
-  async Profile(@User() user: UserContext): Promise<AccountResponseModel> {
+  @ApiSuccessResponse(AccountProfileResponseModel)
+  async Profile(
+    @User() user: UserContext,
+  ): Promise<AccountProfileResponseModel> {
     return await this.accountService.Profile({ user });
   }
 
