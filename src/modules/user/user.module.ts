@@ -5,9 +5,13 @@ import { MailService } from '../mail/mail.service';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { UserSubscriber } from 'src/subscribers/user.subscriber';
 import { UserEntity } from '@entities/user.entity';
+import { UserSubscriptionEntity } from '@entities/user-subscription.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([UserEntity]), UserSubscriber],
+  imports: [
+    TypeOrmModule.forFeature([UserEntity, UserSubscriptionEntity]),
+    UserSubscriber,
+  ],
   controllers: [UserController],
   providers: [UserService, MailService],
 })

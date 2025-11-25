@@ -294,6 +294,24 @@ export class CloudCompleteMultipartUploadResponseModel {
   Metadata?: Record<string, string>;
 }
 
+export class CloudUserStorageUsageResponseModel {
+  @Expose()
+  @ApiProperty()
+  UsedStorageInBytes: number = 0;
+
+  @Expose()
+  @ApiProperty()
+  MaxStorageInBytes: number = 0;
+
+  @Expose()
+  @ApiProperty()
+  IsLimitExceeded: boolean = false;
+
+  @Expose()
+  @ApiProperty()
+  UsagePercentage: number = 0;
+}
+
 export class CloudAbortMultipartUploadRequestModel {
   @ApiProperty()
   @IsString()

@@ -39,10 +39,14 @@ import {
   CloudListBreadcrumbRequestModel,
   CloudUploadPartRequestModel,
   CloudUploadPartResponseModel,
+  CloudUserStorageUsageResponseModel,
 } from './cloud.model';
 import { plainToInstance } from 'class-transformer';
 import { IsImageFile, KeyCombiner } from '@common/helpers/cast.helper';
 import { CloudBreadcrumbLevelType } from '@common/enums';
+import { UserSubscriptionEntity } from '@entities/user-subscription.entity';
+import { Repository } from 'typeorm';
+import { InjectRepository } from '@nestjs/typeorm';
 
 @Injectable()
 export class CloudService {
@@ -58,8 +62,12 @@ export class CloudService {
   private readonly IsDirectory = (key: string) =>
     key.includes(this.EmptyFolderPlaceholder);
   private Prefix = null;
+ @InjectRepository(UserSubscriptionEntity)
+    private userSubscriptionRepository: Repository<UserSubscriptionEntity>;
 
   constructor(@InjectAws(S3Client) private readonly s3: S3Client) {}
+
+  //#region List
 
   async List(
     { Path, Delimiter, IsMetadataProcessing }: CloudListRequestModel,
@@ -94,12 +102,20 @@ export class CloudService {
     });
   }
 
+  //#endregion
+
+  //#region Breadcrumb
+
   async ListBreadcrumb({
     Path,
     Delimiter,
   }: CloudListBreadcrumbRequestModel): Promise<CloudBreadCrumbModel[]> {
     return this.ProcessBreadcrumb(Path || '', Delimiter);
   }
+
+  //#endregion
+
+  //#region Directories
 
   async ListDirectories(
     { Path, Delimiter }: CloudListDirectoriesRequestModel,
@@ -123,6 +139,10 @@ export class CloudService {
 
     return this.ProcessDirectories(command.CommonPrefixes ?? [], this.Prefix);
   }
+
+  //#endregion
+
+  //#region Objects
 
   async ListObjects(
     { Path, Delimiter, IsMetadataProcessing }: CloudListRequestModel,
@@ -150,6 +170,54 @@ export class CloudService {
       User,
     );
   }
+
+  //#endregion
+
+  //#region User Storage Usage
+
+  async UserStorageUsage(User: UserContext): Promise<CloudUserStorageUsageResponseModel> {
+    let continuationToken: string | undefined = undefined;
+    let totalSize = 0;
+    
+    const userSubscription = await this.userSubscriptionRepository.findOne({
+      where: { user: {
+          id: User.id
+      } },
+    });
+
+    do {
+      const command = await this.s3.send(
+        new ListObjectsV2Command({
+          Bucket: process.env.STORAGE_S3_BUCKET,
+          Prefix: KeyCombiner([User.id, '']),
+          ContinuationToken: continuationToken,
+        }),
+      );
+      
+      const contents = command.Contents || [];
+      for (const content of contents) {
+        if (content.Size) {
+          totalSize += content.Size;
+        }
+      }
+
+      continuationToken = command.IsTruncated ? command.NextContinuationToken : undefined;
+    }
+    while (continuationToken);
+    
+    return plainToInstance(CloudUserStorageUsageResponseModel, {
+      UsedStorageInBytes: totalSize, 
+      MaxStorageInBytes: userSubscription ? userSubscription.subscription.storageLimitBytes : null,
+      IsLimitExceeded: userSubscription ? (userSubscription.subscription.storageLimitBytes !== null && totalSize > userSubscription.subscription.storageLimitBytes) : false,
+      UsagePercentage: userSubscription && userSubscription.subscription.storageLimitBytes
+        ? (totalSize / userSubscription.subscription.storageLimitBytes) * 100
+        : null,
+    });
+  }
+
+  //#endregion
+
+  //#region Find
 
   async Find(
     { Key }: CloudKeyRequestModel,
@@ -187,6 +255,10 @@ export class CloudService {
     }
   }
 
+  //#endregion
+
+  //#region PresignedURL
+
   async GetPresignedUrl(
     { Key }: CloudKeyRequestModel,
     User: UserContext,
@@ -217,6 +289,8 @@ export class CloudService {
     }
   }
 
+  //#region Get Object Stream
+
   async GetObjectStream(
     { Key }: CloudKeyRequestModel,
     User: UserContext,
@@ -236,6 +310,10 @@ export class CloudService {
       throw error;
     }
   }
+
+  //#endregion
+
+  //#region Breadcrumb
 
   private async ProcessBreadcrumb(
     Path: string,
@@ -272,6 +350,10 @@ export class CloudService {
     return breadcrumb;
   }
 
+  //#endregion
+
+  //#region Directories
+
   private async ProcessDirectories(
     CommonPrefixes: CommonPrefix[],
     Prefix: string,
@@ -294,6 +376,10 @@ export class CloudService {
     }
     return directories;
   }
+
+  //#endregion
+
+  //#region Objects
 
   private async ProcessObjects(
     Contents: _Object[],
@@ -345,6 +431,10 @@ export class CloudService {
     return processedContents;
   }
 
+  //#endregion
+
+  //#region Move
+
   async Move(
     { SourceKey, DestinationKey }: CloudMoveRequestModel,
     User: UserContext,
@@ -375,6 +465,10 @@ export class CloudService {
     return true;
   }
 
+  //#endregion
+
+  //#region Delete
+
   async Delete(
     { Key, IsDirectory }: CloudDeleteRequestModel,
     User: UserContext,
@@ -400,6 +494,10 @@ export class CloudService {
     return true;
   }
 
+  //#endregion
+
+  //#region Create Directory
+
   async CreateDirectory(
     { Key }: CloudKeyRequestModel,
     User: UserContext,
@@ -416,6 +514,10 @@ export class CloudService {
     );
     return true;
   }
+
+  //#endregion
+
+  //#region Multipart Upload
 
   async UploadCreateMultipartUpload(
     { Key, ContentType, Metadata }: CloudCreateMultipartUploadRequestModel,
@@ -435,6 +537,10 @@ export class CloudService {
       Key: command.Key.replace('' + User.id + '/', ''),
     });
   }
+
+  //#endregion
+
+  //#region Multipart Upload
 
   async UploadGetMultipartPartUrl(
     { Key, UploadId, PartNumber }: CloudGetMultipartPartUrlRequestModel,
@@ -457,6 +563,10 @@ export class CloudService {
     });
   }
 
+  //#endregion
+
+  //#region Multipart Upload
+
   async UploadPart(
     { Key, UploadId, PartNumber }: CloudUploadPartRequestModel,
     file: Express.Multer.File,
@@ -476,6 +586,10 @@ export class CloudService {
       ETag: result.ETag,
     });
   }
+
+  //#endregion
+
+  //#region Complete Multipart Upload
 
   async UploadCompleteMultipartUpload(
     { Key, UploadId, Parts }: CloudCompleteMultipartUploadRequestModel,
@@ -505,6 +619,10 @@ export class CloudService {
       Metadata: metadata,
     });
   }
+
+  //#endregion
+
+  //#region Image Metadata Processing
 
   private async ProcessImageMetadata(
     key: string,
@@ -572,6 +690,10 @@ export class CloudService {
     }
   }
 
+  //#endregion
+
+  //#region Abort Multipart Upload
+
   async UploadAbortMultipartUpload(
     { Key, UploadId }: CloudAbortMultipartUploadRequestModel,
     User: UserContext,
@@ -584,4 +706,6 @@ export class CloudService {
       }),
     );
   }
+
+  //#endregion
 }

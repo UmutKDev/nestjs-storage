@@ -3,6 +3,7 @@ import { UserEntity } from '@entities//user.entity';
 import { ApiProperty, OmitType } from '@nestjs/swagger';
 import { IsEmail, IsOptional, IsPhoneNumber, IsString } from 'class-validator';
 import { Role, Status } from '@common/enums';
+import { UserSubscriptionResponseModel } from '../subscription/subscription.model';
 import { Expose, Transform } from 'class-transformer';
 import { CDNPathResolver } from '@common/helpers/cast.helper';
 
@@ -51,6 +52,10 @@ export class UserViewModel implements UserEntity {
   @Expose()
   @ApiProperty({ enum: Status })
   status: string;
+
+  @Expose()
+  @ApiProperty({ required: false, type: UserSubscriptionResponseModel })
+  subscription?: UserSubscriptionResponseModel;
 
   @Expose()
   @ApiProperty({ type: UserDateModel })

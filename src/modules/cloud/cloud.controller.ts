@@ -32,6 +32,7 @@ import {
   CloudListObjectsRequestModel,
   CloudUploadPartRequestModel,
   CloudUploadPartResponseModel,
+  CloudUserStorageUsageResponseModel,
 } from './cloud.model';
 import {
   ApiSuccessArrayResponse,
@@ -80,6 +81,12 @@ export class CloudController {
     @User() user: UserContext,
   ): Promise<CloudObjectModel[]> {
     return this.cloudService.ListObjects(model, user);
+  }
+
+  @Get('User/StorageUsage')
+  @ApiSuccessResponse(CloudUserStorageUsageResponseModel)
+  async UserStorageUsage(@User() user: UserContext): Promise<CloudUserStorageUsageResponseModel> {
+    return this.cloudService.UserStorageUsage(user);
   }
 
   @Get('Find')
@@ -161,7 +168,6 @@ export class CloudController {
     @UploadedFile() file: Express.Multer.File,
     @User() user: UserContext,
   ): Promise<CloudUploadPartResponseModel> {
-    console.log(ByteToMB(file.size));
     return this.cloudService.UploadPart(model, file, user);
   }
 

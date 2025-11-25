@@ -4,6 +4,7 @@ import { AccountModule } from './account/account.module';
 import { AuthenticationModule } from './authentication/authentication.module';
 import { UserModule } from './user/user.module';
 import { HealthModule } from './health/health.module';
+import { SubscriptionModule } from './subscription/subscription.module';
 
 import { DefinitionModule } from './definition/definition.module';
 
@@ -14,6 +15,7 @@ export default [
   AuthenticationModule,
   UserModule,
   CloudModule,
+  SubscriptionModule,
   HealthModule,
   DefinitionModule,
 ];

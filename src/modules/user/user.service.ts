@@ -13,8 +13,9 @@ import { WelcomeTemplate } from '@common/templates/mail';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Brackets, Repository } from 'typeorm';
 import { UserEntity } from '@entities/user.entity';
+import { UserSubscriptionEntity } from '@entities/user-subscription.entity';
 
-import { Role, Status } from '@common/enums';
+import { Role, Status, SubscriptionStatus } from '@common/enums';
 import { plainToInstance } from 'class-transformer';
 import { asyncLocalStorage } from '../../common/context/context.service';
 
@@ -23,6 +24,8 @@ export class UserService {
   constructor(
     @InjectRepository(UserEntity)
     private userRepository: Repository<UserEntity>,
+    @InjectRepository(UserSubscriptionEntity)
+    private userSubscriptionRepository: Repository<UserSubscriptionEntity>,
     private mailService: MailService,
   ) {}
 
@@ -59,7 +62,23 @@ export class UserService {
 
     request.totalRowCount = count;
 
-    return plainToInstance(UserResponseModel, result);
+    // attach current active subscription (if any)
+    const enhanced = await Promise.all(
+      result.map(async (u) => {
+        const active = await this.userSubscriptionRepository.findOne({
+          where: {
+            user: { id: u.id },
+            status: SubscriptionStatus.ACTIVE || SubscriptionStatus.TRIALING,
+          },
+          relations: ['subscription'],
+        });
+
+        if (active) u['subscription'] = active;
+        return u;
+      }),
+    );
+
+    return plainToInstance(UserResponseModel, enhanced);
   }
 
   async Find({
@@ -78,6 +97,18 @@ export class UserService {
 
       throw error;
     });
+
+    const active = await this.userSubscriptionRepository.findOne({
+      where: {
+        user: {
+          id: userEntity.id,
+          status: SubscriptionStatus.ACTIVE || SubscriptionStatus.TRIALING,
+        },
+      },
+      relations: ['subscription'],
+    });
+
+    if (active) userEntity['subscription'] = active;
 
     return plainToInstance(UserResponseModel, userEntity);
   }

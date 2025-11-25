@@ -4,6 +4,8 @@ import { AwsSdkModule } from 'aws-sdk-v3-nest';
 import { Agent } from 'https';
 import { CloudController } from './cloud.controller';
 import { CloudService } from './cloud.service';
+import { UserSubscriptionEntity } from '@entities/user-subscription.entity';
+import { TypeOrmModule } from '@nestjs/typeorm';
 
 @Module({
   imports: [
@@ -22,6 +24,7 @@ import { CloudService } from './cloud.service';
         },
       }),
     }),
+    TypeOrmModule.forFeature([UserSubscriptionEntity]),
   ],
   controllers: [CloudController],
   providers: [CloudService],
