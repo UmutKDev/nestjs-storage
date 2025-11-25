@@ -70,3 +70,11 @@ export const KeyCombiner = (keys: string[]): string => {
 export const ByteToMB = (bytes: number): number => {
   return bytes / (1024 * 1024);
 };
+
+export const KbyteToMB = (kilobytes: number): number => {
+  return kilobytes / 1024;
+};
+
+export const ByteToKbyte = (bytes: number): number => {
+  return bytes / 1024;
+};

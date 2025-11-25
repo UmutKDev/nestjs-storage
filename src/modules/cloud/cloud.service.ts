@@ -57,15 +57,15 @@ export class CloudService {
   private readonly MaxObjectSizeBytes = 50 * 1024 * 1024; // 50 MB
   private readonly PresignedUrlExpirySeconds = 3600; // 1 hour
   private readonly MinMultipartUploadSizeBytes = 5 * 1024 * 1024; // 5 MB
-  private readonly MaxMultipartUploadSizeBytes = 5 * 1024 * 1024 * 1024; // 5 GB
+  public readonly MaxMultipartUploadSizeBytes = 50 * 1024 * 1024; // 50 MB
   private readonly EmptyFolderPlaceholder = '.emptyFolderPlaceholder';
   private readonly IsDirectory = (key: string) =>
     key.includes(this.EmptyFolderPlaceholder);
   private Prefix = null;
- @InjectRepository(UserSubscriptionEntity)
-    private userSubscriptionRepository: Repository<UserSubscriptionEntity>;
-
-  constructor(@InjectAws(S3Client) private readonly s3: S3Client) {}
+  @InjectRepository(UserSubscriptionEntity)
+  private userSubscriptionRepository: Repository<UserSubscriptionEntity>;
+  @InjectAws(S3Client) private readonly s3: S3Client;
+  constructor() {}
 
   //#region List
 
@@ -175,14 +175,18 @@ export class CloudService {
 
   //#region User Storage Usage
 
-  async UserStorageUsage(User: UserContext): Promise<CloudUserStorageUsageResponseModel> {
+  async UserStorageUsage(
+    User: UserContext,
+  ): Promise<CloudUserStorageUsageResponseModel> {
     let continuationToken: string | undefined = undefined;
     let totalSize = 0;
-    
+
     const userSubscription = await this.userSubscriptionRepository.findOne({
-      where: { user: {
-          id: User.id
-      } },
+      where: {
+        user: {
+          id: User.id,
+        },
+      },
     });
 
     do {
@@ -193,7 +197,7 @@ export class CloudService {
           ContinuationToken: continuationToken,
         }),
       );
-      
+
       const contents = command.Contents || [];
       for (const content of contents) {
         if (content.Size) {
@@ -201,17 +205,31 @@ export class CloudService {
         }
       }
 
-      continuationToken = command.IsTruncated ? command.NextContinuationToken : undefined;
+      continuationToken = command.IsTruncated
+        ? command.NextContinuationToken
+        : undefined;
+    } while (continuationToken);
+
+    if (!userSubscription || !userSubscription?.subscription) {
+      throw new HttpException(Codes.Error.Subscription.NOT_FOUND, 404);
     }
-    while (continuationToken);
-    
+
     return plainToInstance(CloudUserStorageUsageResponseModel, {
-      UsedStorageInBytes: totalSize, 
-      MaxStorageInBytes: userSubscription ? userSubscription.subscription.storageLimitBytes : null,
-      IsLimitExceeded: userSubscription ? (userSubscription.subscription.storageLimitBytes !== null && totalSize > userSubscription.subscription.storageLimitBytes) : false,
-      UsagePercentage: userSubscription && userSubscription.subscription.storageLimitBytes
-        ? (totalSize / userSubscription.subscription.storageLimitBytes) * 100
+      UsedStorageInBytes: totalSize,
+      MaxStorageInBytes: userSubscription
+        ? userSubscription.subscription.storageLimitBytes
         : null,
+      IsLimitExceeded: userSubscription
+        ? userSubscription.subscription.storageLimitBytes !== null &&
+          totalSize > userSubscription.subscription.storageLimitBytes
+        : false,
+      UsagePercentage:
+        userSubscription && userSubscription.subscription.storageLimitBytes
+          ? (totalSize / userSubscription.subscription.storageLimitBytes) * 100
+          : null,
+      MaxUploadSizeBytes:
+        userSubscription.subscription.maxUploadSizeBytes ||
+        this.MaxObjectSizeBytes,
     });
   }
 

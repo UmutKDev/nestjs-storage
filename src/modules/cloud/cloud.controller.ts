@@ -3,6 +3,8 @@ import {
   Controller,
   Delete,
   Get,
+  HttpException,
+  HttpStatus,
   Post,
   Put,
   Query,
@@ -85,7 +87,9 @@ export class CloudController {
 
   @Get('User/StorageUsage')
   @ApiSuccessResponse(CloudUserStorageUsageResponseModel)
-  async UserStorageUsage(@User() user: UserContext): Promise<CloudUserStorageUsageResponseModel> {
+  async UserStorageUsage(
+    @User() user: UserContext,
+  ): Promise<CloudUserStorageUsageResponseModel> {
     return this.cloudService.UserStorageUsage(user);
   }
 
@@ -132,6 +136,29 @@ export class CloudController {
     @Body() model: CloudCreateMultipartUploadRequestModel,
     @User() user: UserContext,
   ): Promise<CloudCreateMultipartUploadResponseModel> {
+    if (model.TotalSize) {
+      const UserStorage = await this.cloudService.UserStorageUsage(user);
+      const usedStorageInMB = ByteToMB(UserStorage.UsedStorageInBytes);
+      const maxStoragePerUserInMB = ByteToMB(UserStorage.MaxStorageInBytes);
+      const newTotalStorageInMB = ByteToMB(model.TotalSize);
+
+      if (model.TotalSize > UserStorage.MaxUploadSizeBytes) {
+        throw new HttpException(
+          `File size exceeds the maximum upload size of ${ByteToMB(
+            UserStorage.MaxUploadSizeBytes,
+          )} MB.`,
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      if (usedStorageInMB + newTotalStorageInMB > maxStoragePerUserInMB) {
+        throw new HttpException(
+          'Storage limit exceeded. Please upgrade your subscription.',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+    }
+
     return this.cloudService.UploadCreateMultipartUpload(model, user);
   }
 
@@ -147,19 +174,7 @@ export class CloudController {
   @Post('Upload/UploadPart')
   @ApiConsumes('multipart/form-data')
   @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        Key: { type: 'string' },
-        UploadId: { type: 'string' },
-        PartNumber: { type: 'integer' },
-        TotalPart: { type: 'integer' },
-        File: {
-          type: 'string',
-          format: 'binary',
-        },
-      },
-    },
+    type: CloudUploadPartRequestModel,
   })
   @UseInterceptors(FileInterceptor('File'))
   @ApiSuccessResponse(CloudUploadPartResponseModel)

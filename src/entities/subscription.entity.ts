@@ -29,7 +29,7 @@ export class SubscriptionEntity {
   description?: string;
 
   // Price stored as cents to avoid floating point issues
-  @Column({ type: 'bigint', default: 0 })
+  @Column({ default: 0 })
   price: number;
 
   @Column({ nullable: false, default: 'USD' })
@@ -39,13 +39,16 @@ export class SubscriptionEntity {
   billingCycle: string;
 
   // Storage limits in bytes; 0 means unlimited
-  @Column({ type: 'bigint', default: 0 })
+  @Column({ type: 'bigint', default: 5 * 1024 * 1024 * 1024 }) // 5 GB
   storageLimitBytes: number;
 
   @Column({ type: 'bigint', nullable: true, default: null })
   maxFileSizeBytes?: number | null;
 
-  @Column({ type: 'int', nullable: true, default: null })
+  @Column({ type: 'bigint', nullable: true, default: 50 * 1024 * 1024 })
+  maxUploadSizeBytes?: number | null;
+
+  @Column({ type: 'bigint', nullable: true, default: null })
   maxObjectCount?: number | null;
 
   @Column({ type: 'json', nullable: true })

@@ -103,6 +103,10 @@ export declare global {
         NOT_STRONG = 'PR-003',
         NOT_MATCH = 'PR-004',
       }
+
+      const enum Subscription {
+        NOT_FOUND = 'SU-001',
+      }
     }
   }
 }

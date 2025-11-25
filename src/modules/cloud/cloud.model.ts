@@ -1,5 +1,5 @@
 import { CloudBreadcrumbLevelType } from '@common/enums';
-import { CDNPathResolver } from '@common/helpers/cast.helper';
+import { ByteToKbyte, CDNPathResolver } from '@common/helpers/cast.helper';
 import { ApiProperty, OmitType } from '@nestjs/swagger';
 import { Expose, Transform, Type } from 'class-transformer';
 import {
@@ -8,6 +8,7 @@ import {
   IsBoolean,
   IsOptional,
   IsArray,
+  IsNumber,
 } from 'class-validator';
 
 export class CloudBreadCrumbModel {
@@ -170,6 +171,12 @@ export class CloudCreateMultipartUploadRequestModel {
   @ApiProperty({ required: false })
   @IsOptional()
   Metadata?: Record<string, string>;
+
+  @Expose()
+  @ApiProperty()
+  @IsNotEmpty()
+  @IsNumber()
+  TotalSize: number;
 }
 
 export class CloudCreateMultipartUploadResponseModel {
@@ -230,11 +237,12 @@ export class CloudUploadPartRequestModel {
   PartNumber: number;
 
   @Expose()
-  @ApiProperty({ required: false })
+  @ApiProperty({
+    type: 'string',
+    format: 'binary',
+  })
   @IsOptional()
-  TotalPart?: number;
-
-  // TotalPart is optional — if provided the server will slice the uploaded file into parts
+  File: Express.Multer.File;
 }
 
 export class CloudUploadPartResponseModel {
@@ -297,10 +305,14 @@ export class CloudCompleteMultipartUploadResponseModel {
 export class CloudUserStorageUsageResponseModel {
   @Expose()
   @ApiProperty()
+  @IsNumber()
+  @Transform(({ value }) => Number(value))
   UsedStorageInBytes: number = 0;
 
   @Expose()
   @ApiProperty()
+  @IsNumber()
+  @Transform(({ value }) => Number(value))
   MaxStorageInBytes: number = 0;
 
   @Expose()
@@ -310,6 +322,12 @@ export class CloudUserStorageUsageResponseModel {
   @Expose()
   @ApiProperty()
   UsagePercentage: number = 0;
+
+  @Expose()
+  @ApiProperty()
+  @IsNumber()
+  @Transform(({ value }) => Number(value))
+  MaxUploadSizeBytes: number = 0;
 }
 
 export class CloudAbortMultipartUploadRequestModel {
