@@ -10,6 +10,24 @@ export const slugify = (value: string): string =>
     .replace(/\s+/g, '-')
     .replace(/-+/g, '-');
 
+export const turkishSlugify = (value: string): string => {
+  if (!value) return '';
+  return value
+    .normalize('NFC')
+    .replace(/\u011e/g, 'G') // Ğ
+    .replace(/\u00dc/g, 'U') // Ü
+    .replace(/\u015e/g, 'S') // Ş
+    .replace(/\u0130/g, 'I') // İ
+    .replace(/\u00d6/g, 'O') // Ö
+    .replace(/\u00c7/g, 'C') // Ç
+    .replace(/\u011f/g, 'g') // ğ
+    .replace(/\u00fc/g, 'u') // ü
+    .replace(/\u015f/g, 's') // ş
+    .replace(/\u0131/g, 'i') // ı
+    .replace(/\u00f6/g, 'o') // ö
+    .replace(/\u00e7/g, 'c'); // ç
+};
+
 export const passwordGenerator = (length: number): string => {
   const charset =
     'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%&*-_=+';

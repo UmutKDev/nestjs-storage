@@ -642,6 +642,29 @@ export class CloudService {
 
   //#region Image Metadata Processing
 
+  private async ProcessFileMetadata(
+    key: string,
+  ): Promise<Record<string, string>> {
+    try {
+      const getObjectCommand = new GetObjectCommand({
+        Bucket: process.env.STORAGE_S3_BUCKET,
+        Key: key,
+      });
+      const object = await this.s3.send(getObjectCommand);
+
+      const existingMetadata = object.Metadata || {};
+      // Add your custom metadata processing logic here
+
+      return existingMetadata;
+    } catch (error) {
+      this.logger.error(
+        `Failed to process file metadata for key ${key}:`,
+        error,
+      );
+      return {};
+    }
+  }
+
   private async ProcessImageMetadata(
     key: string,
   ): Promise<Record<string, string>> {

@@ -1,5 +1,5 @@
 import { CloudBreadcrumbLevelType } from '@common/enums';
-import { ByteToKbyte, CDNPathResolver } from '@common/helpers/cast.helper';
+import { CDNPathResolver, turkishSlugify } from '@common/helpers/cast.helper';
 import { ApiProperty, OmitType } from '@nestjs/swagger';
 import { Expose, Transform, Type } from 'class-transformer';
 import {
@@ -138,6 +138,7 @@ export class CloudKeyRequestModel {
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
+  @Transform(({ value }) => turkishSlugify(value))
   Key: string;
 }
 
@@ -146,6 +147,7 @@ export class CloudDeleteRequestModel {
   @IsNotEmpty()
   @IsArray()
   @IsString({ each: true })
+  @Transform(({ value }) => value.map((v: string) => turkishSlugify(v)))
   Key: Array<string>;
 
   @ApiProperty({ required: false, default: false })
@@ -159,6 +161,7 @@ export class CloudCreateMultipartUploadRequestModel {
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
+  @Transform(({ value }) => turkishSlugify(value))
   Key: string;
 
   @Expose()
@@ -194,6 +197,7 @@ export class CloudGetMultipartPartUrlRequestModel {
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
+  @Transform(({ value }) => turkishSlugify(value))
   Key: string;
 
   @Expose()
@@ -223,6 +227,7 @@ export class CloudUploadPartRequestModel {
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
+  @Transform(({ value }) => turkishSlugify(value))
   Key: string;
 
   @Expose()
@@ -268,6 +273,7 @@ export class CloudCompleteMultipartUploadRequestModel {
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
+  @Transform(({ value }) => turkishSlugify(value))
   Key: string;
 
   @ApiProperty()
@@ -334,6 +340,7 @@ export class CloudAbortMultipartUploadRequestModel {
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
+  @Transform(({ value }) => turkishSlugify(value))
   Key: string;
 
   @ApiProperty()
@@ -346,10 +353,12 @@ export class CloudMoveRequestModel {
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
+  @Transform(({ value }) => turkishSlugify(value))
   SourceKey: string;
 
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
+  @Transform(({ value }) => turkishSlugify(value))
   DestinationKey: string;
 }
