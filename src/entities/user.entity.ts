@@ -33,7 +33,7 @@ export class UserEntity {
   password: string;
 
   @Column({ nullable: true, default: null })
-  avatar: string;
+  image: string;
 
   @Column({
     type: 'enum',

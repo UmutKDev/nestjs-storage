@@ -109,24 +109,24 @@ export class AccountService {
     return true;
   }
 
-  // async UploadAvatar({
+  // async UploadImage({
   //   user,
-  //   avatar,
+  //   image,
   // }: {
   //   user: UserContext;
-  //   avatar: Express.Multer.File;
+  //   image: Express.Multer.File;
   // }): Promise<string> {
   //   const uploadCloud = await this.uploadService
   //     .uploadOne({
   //       userId: user.id,
-  //       name: 'avatar',
+  //       name: 'image',
   //       subPath: `${CloudPaths.USER}/${user.id}`,
-  //       file: avatar,
+  //       file: image,
   //     })
   //     .then(async (e) => {
   //       await this.userRepository.update(
   //         { id: user.id },
-  //         { avatar: e.path.key },
+  //         { image: e.path.key },
   //       );
   //       return e;
   //     });

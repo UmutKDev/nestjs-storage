@@ -46,6 +46,7 @@ export class AuthenticationService {
         'user.password',
         'user.status',
         'user.lastLoginAt',
+        'user.image',
       ])
       .where('user.email = :email', { email });
 
@@ -85,6 +86,7 @@ export class AuthenticationService {
       role: user.role,
       status: user.status,
       lastLogin: loginDate,
+      image: user.image,
     };
 
     if (user.status === Status.PENDING) {
@@ -151,6 +153,7 @@ export class AuthenticationService {
         role: user.role,
         status: user.status,
         lastLogin: user.lastLoginAt,
+        image: user.image,
       };
 
       return this.generateTokens(newPayload, request);
@@ -198,6 +201,7 @@ export class AuthenticationService {
         role: newUser.role,
         status: newUser.status,
         lastLogin: newUser.lastLoginAt,
+        image: newUser.image,
       };
 
       await queryRunner.commitTransaction();
@@ -222,10 +226,18 @@ export class AuthenticationService {
       this.jwtService.signAsync(payload, {
         secret: jwtConstants.secret,
         expiresIn: jwtConstants.accessTokenExpiresIn,
+        // issuer: 'http://localhost:8080',
+        subject: payload.id,
+        // audience: 'Storage',
+        // notBefore: Math.floor(Date.now() / 1000),
       }),
       this.jwtService.signAsync(payload, {
         secret: jwtConstants.refreshSecret,
         expiresIn: jwtConstants.refreshTokenExpiresIn,
+        // issuer: 'http://localhost:8080',
+        subject: payload.id,
+        // audience: 'Storage',
+        // notBefore: Math.floor(Date.now() / 1000),
       }),
     ]);
 

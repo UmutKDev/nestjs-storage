@@ -43,7 +43,7 @@ export class UserViewModel implements UserEntity {
   @Transform(({ value }) => CDNPathResolver(value), {
     toClassOnly: true,
   })
-  avatar: string;
+  image: string;
 
   @Expose()
   @ApiProperty({ enum: Role, default: Role.USER })

@@ -52,6 +52,7 @@ export class RefreshTokenStrategy extends PassportStrategy(
       role: payload.role,
       status: payload.status,
       lastLogin: payload.lastLogin,
+      image: payload.image,
     };
   }
 }

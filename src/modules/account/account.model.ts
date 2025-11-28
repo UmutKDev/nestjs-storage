@@ -42,10 +42,10 @@ export class AccountChangePasswordRequestModel {
   new_password_confirmation: string;
 }
 
-export class AccountUploadAvatarRequestModel {
+export class AccountUploadImageRequestModel {
   @ApiProperty({
     type: 'string',
     format: 'binary',
   })
-  avatar: Express.Multer.File;
+  image: Express.Multer.File;
 }

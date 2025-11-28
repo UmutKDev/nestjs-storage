@@ -258,7 +258,7 @@ export class CloudService {
           Key: Key.replace('' + User.id + '/', ''),
           Url: Key,
         },
-        Metadata: command.Metadata,
+        Metadata: this.DecodeMetadataFromS3(command.Metadata),
         Size: command.ContentLength,
         ETag: command.ETag,
         LastModified: command.LastModified
@@ -436,9 +436,9 @@ export class CloudService {
         Path: {
           Host: process.env.STORAGE_S3_PUBLIC_ENDPOINT,
           Key: content.Key.replace('' + User.id + '/', ''),
-          Url: content.Key,
+          Url: process.env.STORAGE_S3_PUBLIC_ENDPOINT + '/' + content.Key,
         },
-        Metadata: metadata.Metadata,
+        Metadata: this.DecodeMetadataFromS3(metadata.Metadata),
         Size: content.Size,
         ETag: content.ETag,
         LastModified: content.LastModified
@@ -546,7 +546,7 @@ export class CloudService {
         Bucket: process.env.STORAGE_S3_BUCKET,
         Key: KeyCombiner([User.id, Key]),
         ContentType: ContentType,
-        Metadata: Metadata,
+        Metadata: this.SanitizeMetadataForS3(Metadata),
       }),
     );
 
@@ -653,9 +653,16 @@ export class CloudService {
       const object = await this.s3.send(getObjectCommand);
 
       const existingMetadata = object.Metadata || {};
-      // Add your custom metadata processing logic here
 
-      return existingMetadata;
+      const stream = object.Body as Readable;
+      const chunks: Buffer[] = [];
+
+      for await (const chunk of stream) {
+        chunks.push(Buffer.from(chunk));
+      }
+      const buffer = Buffer.concat(chunks);
+
+      return this.DecodeMetadataFromS3(existingMetadata);
     } catch (error) {
       this.logger.error(
         `Failed to process file metadata for key ${key}:`,
@@ -688,11 +695,14 @@ export class CloudService {
       const metadata = await sharp(buffer).metadata();
 
       if (metadata.width && metadata.height) {
-        const newMetadata = {
+        const newMetadataRaw = {
           ...existingMetadata,
           width: metadata.width.toString(),
           height: metadata.height.toString(),
         };
+
+        // sanitize/encode values before writing back to S3
+        const newMetadata = this.SanitizeMetadataForS3(newMetadataRaw);
 
         const copySource = `${process.env.STORAGE_S3_BUCKET}/${key}`;
 
@@ -717,7 +727,8 @@ export class CloudService {
           }),
         );
 
-        return newMetadata;
+        // return decoded metadata for downstream callers
+        return this.DecodeMetadataFromS3(newMetadata);
       } else {
         this.logger.warn('Sharp did not return width/height', metadata);
       }
@@ -729,6 +740,52 @@ export class CloudService {
       );
       return {};
     }
+  }
+
+  // Ensure metadata values are safe for use as HTTP headers (x-amz-meta-*)
+  // - removes CR/LF
+  // - trims
+  // - if contains non-printable/non-ASCII characters, encode as base64 with 'b64:' prefix
+  private SanitizeMetadataForS3(
+    metadata?: Record<string, string>,
+  ): Record<string, string> {
+    if (!metadata) return {};
+    const sanitized: Record<string, string> = {};
+    for (const [rawKey, rawVal] of Object.entries(metadata)) {
+      const key = String(rawKey)
+        .toLowerCase()
+        .replace(/[^a-z0-9-_]/g, '-');
+      let value = rawVal == null ? '' : String(rawVal);
+      // remove any CR/LF characters — these cause Node's http to reject header values
+      value = value.replace(/(\r\n|\r|\n)/g, ' ').trim();
+      // if contains non-printable or non-ascii characters, base64-encode
+      if (/[^\x20-\x7e]/.test(value)) {
+        value = 'b64:' + Buffer.from(value, 'utf8').toString('base64');
+      }
+      sanitized[key] = value;
+    }
+    return sanitized;
+  }
+
+  // Decode metadata values previously encoded with sanitizeMetadataForS3
+  private DecodeMetadataFromS3(
+    metadata?: Record<string, string>,
+  ): Record<string, string> {
+    if (!metadata) return {};
+    const decoded: Record<string, string> = {};
+    for (const [key, value] of Object.entries(metadata)) {
+      if (typeof value === 'string' && value.startsWith('b64:')) {
+        const b64 = value.slice(4);
+        try {
+          decoded[key] = Buffer.from(b64, 'base64').toString('utf8');
+        } catch (err) {
+          decoded[key] = value;
+        }
+      } else {
+        decoded[key] = value as string;
+      }
+    }
+    return decoded;
   }
 
   //#endregion

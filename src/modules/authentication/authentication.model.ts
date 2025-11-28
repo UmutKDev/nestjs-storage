@@ -81,6 +81,7 @@ export class JWTPayloadModel extends PickType(UserViewModel, [
   'email',
   'role',
   'status',
+  'image',
 ]) {
   lastLogin: Date;
 }
@@ -91,4 +92,16 @@ export class JWTTokenDecodeResponseModel extends JWTPayloadModel {
 
   @ApiProperty()
   exp: number;
+
+  @ApiProperty()
+  nbf: number;
+
+  @ApiProperty()
+  iss: string;
+
+  @ApiProperty()
+  aud: string;
+
+  @ApiProperty()
+  sub: string;
 }

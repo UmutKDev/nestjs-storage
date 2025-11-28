@@ -41,14 +41,14 @@ export class AccountController {
     return await this.accountService.ChangePassword({ user, model });
   }
 
-  // @Post('Upload/Avatar')
+  // @Post('Upload/Image')
   // @ApiConsumes('multipart/form-data')
-  // @UseInterceptors(FileInterceptor('avatar'))
+  // @UseInterceptors(FileInterceptor('image'))
   // @ApiBody({
-  //   type: AccountUploadAvatarRequestModel,
+  //   type: AccountUploadImageRequestModel,
   // })
   // @ApiSuccessResponse('string')
-  // async UploadAvatar(
+  // async UploadImage(
   //   @User() user: UserContext,
   //   @UploadedFile(
   //     new ParseFilePipe({
@@ -63,11 +63,11 @@ export class AccountController {
   //       ],
   //     }),
   //   )
-  //   avatar: Express.Multer.File,
+  //   image: Express.Multer.File,
   // ): Promise<string> {
-  //   return await this.accountService.UploadAvatar({
+  //   return await this.accountService.UploadImage({
   //     user,
-  //     avatar,
+  //     image,
   //   });
   // }
 }

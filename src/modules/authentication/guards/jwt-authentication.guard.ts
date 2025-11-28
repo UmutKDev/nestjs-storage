@@ -53,6 +53,8 @@ export class JwtAuthenticationGuard extends AuthGuard('jwt') {
         email: true,
         role: true,
         status: true,
+        lastLoginAt: true,
+        image: true,
       },
     });
 
@@ -66,6 +68,8 @@ export class JwtAuthenticationGuard extends AuthGuard('jwt') {
       email: foundUser.email,
       role: foundUser.role,
       status: foundUser.status,
+      lastLogin: foundUser.lastLoginAt,
+      image: foundUser.image,
     } as UserContext;
 
     return true;

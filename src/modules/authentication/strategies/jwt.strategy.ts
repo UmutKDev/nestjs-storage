@@ -11,6 +11,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
       secretOrKey: jwtConstants.secret,
+      // issuer: 'http://localhost:8080',
+      // audience: 'Storage',
     });
   }
 
@@ -22,6 +24,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       role: payload.role,
       status: payload.status,
       lastLogin: payload.lastLogin,
+      image: payload.image,
     };
   }
 }
