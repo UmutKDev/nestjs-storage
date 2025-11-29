@@ -1,4 +1,5 @@
 import { MimeTypeGroups, Role, UUID } from '@common/enums';
+import { camelCase, startCase } from 'lodash';
 
 export const slugify = (value: string): string =>
   value
@@ -96,3 +97,21 @@ export const KbyteToMB = (kilobytes: number): number => {
 export const ByteToKbyte = (bytes: number): number => {
   return bytes / 1024;
 };
+
+export const PascalizeKeys = (obj) => {
+  if (Array.isArray(obj)) {
+    return obj.map((v) => PascalizeKeys(v));
+  } else if (obj !== null && obj.constructor === Object) {
+    return Object.keys(obj).reduce(
+      (result, key) => ({
+        ...result,
+        [ToPascalCase(key)]: PascalizeKeys(obj[key]),
+      }),
+      {},
+    );
+  }
+  return obj;
+};
+
+export const ToPascalCase = (str) =>
+  startCase(camelCase(str)).replace(/ /g, '');

@@ -42,7 +42,11 @@ import {
   CloudUserStorageUsageResponseModel,
 } from './cloud.model';
 import { plainToInstance } from 'class-transformer';
-import { IsImageFile, KeyCombiner } from '@common/helpers/cast.helper';
+import {
+  IsImageFile,
+  KeyCombiner,
+  PascalizeKeys,
+} from '@common/helpers/cast.helper';
 import { CloudBreadcrumbLevelType } from '@common/enums';
 import { UserSubscriptionEntity } from '@entities/user-subscription.entity';
 import { Repository } from 'typeorm';
@@ -66,6 +70,15 @@ export class CloudService {
   private userSubscriptionRepository: Repository<UserSubscriptionEntity>;
   @InjectAws(S3Client) private readonly s3: S3Client;
   constructor() {}
+
+  // Default download speeds (bytes per second) mapped by subscription slug
+  private readonly DefaultDownloadSpeeds: Record<string, number> = {
+    free: 50 * 1024, // 50 KB/s
+    pro: 500 * 1024, // 500 KB/s
+    enterprise: 5 * 1024 * 1024, // 5 MB/s
+  };
+
+  private readonly DefaultDownloadSpeedBytesPerSec = 50 * 1024; // 50 KB/s fallback
 
   //#region List
 
@@ -103,6 +116,38 @@ export class CloudService {
   }
 
   //#endregion
+
+  async GetDownloadSpeedBytesPerSec(User: UserContext): Promise<number> {
+    const userSubscription = await this.userSubscriptionRepository.findOne({
+      where: {
+        user: {
+          id: User.id,
+        },
+      },
+      relations: ['subscription'],
+    });
+
+    if (!userSubscription || !userSubscription.subscription) {
+      return this.DefaultDownloadSpeedBytesPerSec;
+    }
+
+    const sub = userSubscription.subscription;
+    if (sub.features && typeof sub.features === 'object') {
+      // features might have downloadSpeedBytesPerSec value
+      const raw = (sub.features as Record<string, never>)[
+        'downloadSpeedBytesPerSec'
+      ];
+      if (typeof raw === 'number' && raw > 0) {
+        return raw;
+      }
+    }
+
+    if (sub.slug && this.DefaultDownloadSpeeds[sub.slug]) {
+      return this.DefaultDownloadSpeeds[sub.slug];
+    }
+
+    return this.DefaultDownloadSpeedBytesPerSec;
+  }
 
   //#region Breadcrumb
 
@@ -321,6 +366,31 @@ export class CloudService {
         }),
       );
       return command.Body.transformToWebStream();
+    } catch (error) {
+      if (this.NotFoundErrorCodes.includes(error.name)) {
+        throw new HttpException(Codes.Error.Cloud.FILE_NOT_FOUND, 404);
+      }
+      throw error;
+    }
+  }
+
+  // Return a Node Readable stream for the requested object (useful for piping)
+  async GetObjectReadable(
+    { Key }: CloudKeyRequestModel,
+    User: UserContext,
+  ): Promise<Readable> {
+    try {
+      const command = await this.s3.send(
+        new GetObjectCommand({
+          Bucket: process.env.STORAGE_S3_BUCKET,
+          Key: KeyCombiner([User.id, Key]),
+        }),
+      );
+
+      // AWS SDK v3 can return a node Readable in Body for Node environments
+      // we assert here that it is the Node Readable stream
+      const body = command.Body as unknown as Readable;
+      return body;
     } catch (error) {
       if (this.NotFoundErrorCodes.includes(error.name)) {
         throw new HttpException(Codes.Error.Cloud.FILE_NOT_FOUND, 404);
@@ -742,10 +812,6 @@ export class CloudService {
     }
   }
 
-  // Ensure metadata values are safe for use as HTTP headers (x-amz-meta-*)
-  // - removes CR/LF
-  // - trims
-  // - if contains non-printable/non-ASCII characters, encode as base64 with 'b64:' prefix
   private SanitizeMetadataForS3(
     metadata?: Record<string, string>,
   ): Record<string, string> {
@@ -756,9 +822,7 @@ export class CloudService {
         .toLowerCase()
         .replace(/[^a-z0-9-_]/g, '-');
       let value = rawVal == null ? '' : String(rawVal);
-      // remove any CR/LF characters — these cause Node's http to reject header values
       value = value.replace(/(\r\n|\r|\n)/g, ' ').trim();
-      // if contains non-printable or non-ascii characters, base64-encode
       if (/[^\x20-\x7e]/.test(value)) {
         value = 'b64:' + Buffer.from(value, 'utf8').toString('base64');
       }
@@ -779,13 +843,17 @@ export class CloudService {
         try {
           decoded[key] = Buffer.from(b64, 'base64').toString('utf8');
         } catch (err) {
+          this.logger.warn(
+            `Failed to decode metadata value for key ${key}:`,
+            err,
+          );
           decoded[key] = value;
         }
       } else {
         decoded[key] = value as string;
       }
     }
-    return decoded;
+    return PascalizeKeys(decoded);
   }
 
   //#endregion

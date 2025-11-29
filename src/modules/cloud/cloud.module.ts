@@ -14,7 +14,6 @@ import { TypeOrmModule } from '@nestjs/typeorm';
         forcePathStyle: process.env.STORAGE_S3_FORCE_PATH_STYLE === 'true',
         endpoint: process.env.STORAGE_S3_ENDPOINT,
         region: process.env.STORAGE_S3_REGION,
-
         credentials: {
           accessKeyId: process.env.S3_PROTOCOL_ACCESS_KEY_ID,
           secretAccessKey: process.env.S3_PROTOCOL_ACCESS_KEY_SECRET,

@@ -46,6 +46,20 @@ export class CloudDirectoryModel {
   Prefix: string;
 }
 
+export class CloudMetadataDefaultModel {
+  @Expose()
+  @ApiProperty()
+  Originalfilename?: string;
+
+  @Expose()
+  @ApiProperty()
+  Width?: string;
+
+  @Expose()
+  @ApiProperty()
+  Height?: string;
+}
+
 export class CloudObjectModel {
   @Expose()
   @ApiProperty()
@@ -65,7 +79,8 @@ export class CloudObjectModel {
   Path: CloudPathModel;
 
   @Expose()
-  @ApiProperty()
+  @ApiProperty({ required: false, type: CloudMetadataDefaultModel })
+  @Type(() => CloudMetadataDefaultModel)
   Metadata: Record<string, unknown>;
 
   @Expose()
@@ -80,6 +95,7 @@ export class CloudObjectModel {
   @ApiProperty()
   Size: number;
 }
+
 export class CloudViewModel {
   @Expose()
   @ApiProperty({ type: CloudBreadCrumbModel, isArray: true })
@@ -304,7 +320,9 @@ export class CloudCompleteMultipartUploadResponseModel {
   ETag: string;
 
   @Expose()
-  @ApiProperty({ required: false })
+  @ApiProperty({ required: false, type: CloudMetadataDefaultModel })
+  @IsOptional()
+  @Type(() => CloudMetadataDefaultModel)
   Metadata?: Record<string, string>;
 }
 

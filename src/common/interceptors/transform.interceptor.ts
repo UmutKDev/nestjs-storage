@@ -57,20 +57,3 @@ export class TransformInterceptor implements NestInterceptor {
     return result;
   }
 }
-
-// const pascalizeKeys = (obj) => {
-//   if (Array.isArray(obj)) {
-//     return obj.map((v) => pascalizeKeys(v));
-//   } else if (obj !== null && obj.constructor === Object) {
-//     return Object.keys(obj).reduce(
-//       (result, key) => ({
-//         ...result,
-//         [toPascalCase(key)]: pascalizeKeys(obj[key]),
-//       }),
-//       {},
-//     );
-//   }
-//   return obj;
-// };
-
-// const toPascalCase = (str) => startCase(camelCase(str)).replace(/ /g, '');

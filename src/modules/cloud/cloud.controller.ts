@@ -10,6 +10,7 @@ import {
   Query,
   UploadedFile,
   UseInterceptors,
+  Res,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiBody, ApiConsumes, ApiTags } from '@nestjs/swagger';
 import { CloudService } from './cloud.service';
@@ -43,6 +44,11 @@ import {
 import { User } from '@common/decorators/user.decorator';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ByteToMB } from '@common/helpers/cast.helper';
+import { ThrottleTransform } from '@common/helpers/throttle.transform';
+import { pipeline } from 'stream';
+import { promisify } from 'util';
+import type { Response } from 'express';
+import { ApiOperation, ApiQuery, ApiResponse } from '@nestjs/swagger';
 
 @Controller('Cloud')
 @ApiTags('Cloud')
@@ -201,5 +207,63 @@ export class CloudController {
     @User() user: UserContext,
   ): Promise<void> {
     return this.cloudService.UploadAbortMultipartUpload(model, user);
+  }
+
+  @Get('Download')
+  @ApiOperation({
+    summary: 'Download a file for the authenticated user (streamed)',
+    description:
+      'Streams a file that belongs to the authenticated user. The server enforces a static per-user download speed (bytes/sec).',
+  })
+  @ApiQuery({
+    name: 'Key',
+    required: true,
+    description: 'Path/key to the file (user-scoped)',
+  })
+  @ApiResponse({
+    status: 200,
+    description:
+      'Binary file stream. Content-Type and Content-Length headers set where available.',
+    content: {
+      'application/octet-stream': {
+        schema: { type: 'string', format: 'binary' },
+      },
+    },
+  })
+  @ApiResponse({ status: 404, description: 'File not found' })
+  async Download(
+    @Query() model: CloudKeyRequestModel,
+    @User() user: UserContext,
+    @Res() res: Response,
+  ) {
+    console.log('first');
+    // verify the object exists and get its metadata
+    const obj = await this.cloudService.Find(model, user);
+
+    // set headers
+    res.setHeader('Content-Type', obj.MimeType || 'application/octet-stream');
+    if (obj.Size) res.setHeader('Content-Length', String(obj.Size));
+    const filename =
+      obj.Name || (model.Key ? model.Key.split('/').pop() : 'file');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+    // get node stream and throttle for this user (static per subscription)
+    const rawStream = await this.cloudService.GetObjectReadable(model, user);
+    const bytesPerSec =
+      await this.cloudService.GetDownloadSpeedBytesPerSec(user);
+
+    const throttle = new ThrottleTransform(bytesPerSec);
+
+    const pipe = promisify(pipeline);
+    try {
+      await pipe(rawStream, throttle, res);
+    } catch (err) {
+      // can't modify headers here once started; ensure stream closed
+      try {
+        rawStream.destroy(err as Error);
+      } catch (er) {
+        new HttpException(er, HttpStatus.INTERNAL_SERVER_ERROR);
+      }
+    }
   }
 }
