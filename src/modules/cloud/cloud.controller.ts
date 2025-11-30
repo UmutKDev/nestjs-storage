@@ -23,6 +23,7 @@ import {
   CloudKeyRequestModel,
   CloudGetMultipartPartUrlRequestModel,
   CloudGetMultipartPartUrlResponseModel,
+  CloudUpdateRequestModel,
   CloudListRequestModel,
   CloudListResponseModel,
   CloudDeleteRequestModel,
@@ -207,6 +208,15 @@ export class CloudController {
     @User() user: UserContext,
   ): Promise<void> {
     return this.cloudService.UploadAbortMultipartUpload(model, user);
+  }
+
+  @Put('Update')
+  @ApiSuccessResponse(CloudObjectModel)
+  async Update(
+    @Body() model: CloudUpdateRequestModel,
+    @User() user: UserContext,
+  ): Promise<CloudObjectModel> {
+    return this.cloudService.Update(model, user);
   }
 
   @Get('Download')

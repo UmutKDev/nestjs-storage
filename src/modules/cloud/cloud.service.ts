@@ -34,6 +34,7 @@ import {
   CloudObjectModel,
   CloudDeleteRequestModel,
   CloudMoveRequestModel,
+  CloudUpdateRequestModel,
   CloudDirectoryModel,
   CloudListDirectoriesRequestModel,
   CloudListBreadcrumbRequestModel,
@@ -51,6 +52,7 @@ import { CloudBreadcrumbLevelType } from '@common/enums';
 import { UserSubscriptionEntity } from '@entities/user-subscription.entity';
 import { Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
+import { asyncLocalStorage } from '@common/context/context.service';
 
 @Injectable()
 export class CloudService {
@@ -155,7 +157,14 @@ export class CloudService {
     Path,
     Delimiter,
   }: CloudListBreadcrumbRequestModel): Promise<CloudBreadCrumbModel[]> {
-    return this.ProcessBreadcrumb(Path || '', Delimiter);
+    const store = asyncLocalStorage.getStore();
+    const request: Request = store?.get('request');
+
+    const breadcrumb = await this.ProcessBreadcrumb(Path || '', Delimiter);
+
+    request.totalRowCount = breadcrumb.length;
+
+    return breadcrumb;
   }
 
   //#endregion
@@ -166,6 +175,9 @@ export class CloudService {
     { Path, Delimiter }: CloudListDirectoriesRequestModel,
     User: UserContext,
   ): Promise<CloudDirectoryModel[]> {
+    const store = asyncLocalStorage.getStore();
+    const request: Request = store?.get('request');
+
     const cleanedPath = Path ? Path.replace(/^\/+|\/+$/g, '') : '';
     let prefix = KeyCombiner([User.id, cleanedPath]);
     if (!prefix.endsWith('/')) {
@@ -181,6 +193,8 @@ export class CloudService {
         Prefix: this.Prefix,
       }),
     );
+
+    request.totalRowCount = command.CommonPrefixes?.length ?? 0;
 
     return this.ProcessDirectories(command.CommonPrefixes ?? [], this.Prefix);
   }
@@ -193,6 +207,9 @@ export class CloudService {
     { Path, Delimiter, IsMetadataProcessing }: CloudListRequestModel,
     User: UserContext,
   ): Promise<CloudObjectModel[]> {
+    const store = asyncLocalStorage.getStore();
+    const request: Request = store?.get('request');
+
     const cleanedPath = Path ? Path.replace(/^\/+|\/+$/g, '') : '';
     let prefix = KeyCombiner([User.id, cleanedPath]);
     if (!prefix.endsWith('/')) {
@@ -209,11 +226,15 @@ export class CloudService {
       }),
     );
 
-    return this.ProcessObjects(
+    const objects = await this.ProcessObjects(
       command.Contents ?? [],
       IsMetadataProcessing,
       User,
     );
+
+    request.totalRowCount = objects.length;
+
+    return objects;
   }
 
   //#endregion
@@ -871,6 +892,193 @@ export class CloudService {
         UploadId: UploadId,
       }),
     );
+  }
+
+  //#region Update (rename/metadata)
+
+  async Update(
+    { Key, Name, Metadata }: CloudUpdateRequestModel,
+    User: UserContext,
+  ): Promise<CloudObjectModel> {
+    try {
+      const bucket = process.env.STORAGE_S3_BUCKET;
+
+      const sourceKey = KeyCombiner([User.id, Key]);
+
+      // determine target key (if Name provided, replace file's base name)
+      let targetRelative = Key;
+      let targetKey = sourceKey;
+
+      if (Name) {
+        const parts = Key.split('/');
+        parts[parts.length - 1] = Name;
+        targetRelative = parts.join('/');
+        targetKey = KeyCombiner([User.id, targetRelative]);
+      }
+
+      // prepare metadata replacement only when provided
+      const sanitizedProvidedMetadata = this.SanitizeMetadataForS3(Metadata);
+
+      // If caller provided metadata, merge it with existing metadata instead of
+      // replacing the whole map so we don't lose previously stored keys.
+      let finalMetadataForS3: Record<string, string> = {};
+      // keep track of content type to preserve it when we replace metadata
+      let sourceContentType: string | undefined = undefined;
+      if (Object.keys(sanitizedProvidedMetadata).length) {
+        const head = await this.s3.send(
+          new HeadObjectCommand({
+            Bucket: bucket,
+            Key: sourceKey,
+          }),
+        );
+        const existingMetadata = head.Metadata || {};
+        sourceContentType = head.ContentType as string | undefined;
+        finalMetadataForS3 = {
+          ...existingMetadata,
+          ...sanitizedProvidedMetadata,
+        };
+        // DEBUG: log keys we will send to S3 when replacing metadata
+        this.logger.debug(
+          `CloudService.Update finalMetadata keys: ${Object.keys(
+            finalMetadataForS3,
+          ).join(',')}`,
+        );
+      }
+
+      if (targetKey !== sourceKey) {
+        await this.s3.send(
+          new CopyObjectCommand({
+            Bucket: bucket,
+            CopySource: `${bucket}/${sourceKey}`,
+            Key: targetKey,
+            Metadata: Object.keys(finalMetadataForS3).length
+              ? finalMetadataForS3
+              : undefined,
+            MetadataDirective: Object.keys(finalMetadataForS3).length
+              ? 'REPLACE'
+              : 'COPY',
+            ContentType:
+              Object.keys(finalMetadataForS3).length && sourceContentType
+                ? sourceContentType
+                : undefined,
+          }),
+        );
+
+        // verify the copy actually contains the metadata we asked for
+        if (Object.keys(sanitizedProvidedMetadata).length) {
+          const headAfterCopy = await this.s3.send(
+            new HeadObjectCommand({
+              Bucket: bucket,
+              Key: targetKey,
+            }),
+          );
+
+          const missingKeys = Object.keys(sanitizedProvidedMetadata).filter(
+            (k) => !headAfterCopy.Metadata || !(k in headAfterCopy.Metadata),
+          );
+
+          if (missingKeys.length) {
+            this.logger.warn(
+              `CloudService.Update: metadata keys not persisted after copy: ${missingKeys.join(',')}. Falling back to GetObject+PutObject for ${targetKey}`,
+            );
+
+            const getResp = await this.s3.send(
+              new GetObjectCommand({
+                Bucket: bucket,
+                Key: targetKey,
+              }),
+            );
+
+            const stream = getResp.Body as Readable;
+            const chunks: Buffer[] = [];
+            for await (const chunk of stream) {
+              chunks.push(Buffer.from(chunk));
+            }
+            const buffer = Buffer.concat(chunks);
+
+            await this.s3.send(
+              new PutObjectCommand({
+                Bucket: bucket,
+                Key: targetKey,
+                Body: buffer,
+                ContentType: sourceContentType,
+                Metadata: finalMetadataForS3,
+              }),
+            );
+          }
+        }
+
+        // delete original
+        await this.s3.send(
+          new DeleteObjectCommand({
+            Bucket: bucket,
+            Key: sourceKey,
+          }),
+        );
+      } else if (Object.keys(finalMetadataForS3).length) {
+        // no rename, but metadata replacement requested on same key
+        await this.s3.send(
+          new CopyObjectCommand({
+            Bucket: bucket,
+            CopySource: `${bucket}/${sourceKey}`,
+            Key: sourceKey,
+            Metadata: finalMetadataForS3,
+            MetadataDirective: 'REPLACE',
+            ContentType: sourceContentType ? sourceContentType : undefined,
+          }),
+        );
+
+        // verify metadata persisted; if provider ignored copy metadata, fallback to Get+Put
+        const headAfterReplace = await this.s3.send(
+          new HeadObjectCommand({
+            Bucket: bucket,
+            Key: sourceKey,
+          }),
+        );
+
+        const missingKeys2 = Object.keys(sanitizedProvidedMetadata).filter(
+          (k) =>
+            !headAfterReplace.Metadata || !(k in headAfterReplace.Metadata),
+        );
+
+        if (missingKeys2.length) {
+          this.logger.warn(
+            `CloudService.Update: metadata keys not persisted after REPLACE for ${sourceKey}, missing: ${missingKeys2.join(',')}. Falling back to GetObject+PutObject`,
+          );
+
+          const getResp = await this.s3.send(
+            new GetObjectCommand({
+              Bucket: bucket,
+              Key: sourceKey,
+            }),
+          );
+          const stream = getResp.Body as Readable;
+          const chunks: Buffer[] = [];
+          for await (const chunk of stream) {
+            chunks.push(Buffer.from(chunk));
+          }
+          const buffer = Buffer.concat(chunks);
+
+          await this.s3.send(
+            new PutObjectCommand({
+              Bucket: bucket,
+              Key: sourceKey,
+              Body: buffer,
+              ContentType: sourceContentType,
+              Metadata: finalMetadataForS3,
+            }),
+          );
+        }
+      }
+
+      // return the updated object info (note: Key for Find should be relative to user)
+      return this.Find({ Key: targetRelative }, User);
+    } catch (error) {
+      if (this.NotFoundErrorCodes.includes(error.name)) {
+        throw new HttpException(Codes.Error.Cloud.FILE_NOT_FOUND, 404);
+      }
+      throw error;
+    }
   }
 
   //#endregion

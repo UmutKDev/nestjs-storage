@@ -380,3 +380,24 @@ export class CloudMoveRequestModel {
   @Transform(({ value }) => turkishSlugify(value))
   DestinationKey: string;
 }
+
+export class CloudUpdateRequestModel {
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  @Transform(({ value }) => turkishSlugify(value))
+  Key: string;
+
+  // Only a filename (no slashes) is expected for Name. If provided, the object
+  // will be renamed (within the same directory) to this name.
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  @Transform(({ value }) => turkishSlugify(value))
+  Name?: string;
+
+  // Arbitrary metadata key/value pairs to replace for the object (optional)
+  @ApiProperty({ required: false })
+  @IsOptional()
+  Metadata?: Record<string, string>;
+}

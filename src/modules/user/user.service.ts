@@ -15,7 +15,7 @@ import { Brackets, Repository } from 'typeorm';
 import { UserEntity } from '@entities/user.entity';
 import { UserSubscriptionEntity } from '@entities/user-subscription.entity';
 
-import { Role, Status, SubscriptionStatus } from '@common/enums';
+import { Role, Status } from '@common/enums';
 import { plainToInstance } from 'class-transformer';
 import { asyncLocalStorage } from '../../common/context/context.service';
 
@@ -25,7 +25,6 @@ export class UserService {
     @InjectRepository(UserEntity)
     private userRepository: Repository<UserEntity>,
     @InjectRepository(UserSubscriptionEntity)
-    private userSubscriptionRepository: Repository<UserSubscriptionEntity>,
     private mailService: MailService,
   ) {}
 
@@ -62,23 +61,7 @@ export class UserService {
 
     request.totalRowCount = count;
 
-    // attach current active subscription (if any)
-    const enhanced = await Promise.all(
-      result.map(async (u) => {
-        const active = await this.userSubscriptionRepository.findOne({
-          where: {
-            user: { id: u.id },
-            status: SubscriptionStatus.ACTIVE || SubscriptionStatus.TRIALING,
-          },
-          relations: ['subscription'],
-        });
-
-        if (active) u['subscription'] = active;
-        return u;
-      }),
-    );
-
-    return plainToInstance(UserResponseModel, enhanced);
+    return plainToInstance(UserResponseModel, result);
   }
 
   async Find({
@@ -91,26 +74,14 @@ export class UserService {
       .select(['user'])
       .where('user.id = :id', { id: model.id });
 
-    const userEntity = await queryBuilder.getOneOrFail().catch((error) => {
+    const query = await queryBuilder.getOneOrFail().catch((error) => {
       if (error.name === Codes.Error.Database.EntityNotFoundError)
         throw new HttpException(Codes.Error.User.NOT_FOUND, 400);
 
       throw error;
     });
 
-    const active = await this.userSubscriptionRepository.findOne({
-      where: {
-        user: {
-          id: userEntity.id,
-          status: SubscriptionStatus.ACTIVE || SubscriptionStatus.TRIALING,
-        },
-      },
-      relations: ['subscription'],
-    });
-
-    if (active) userEntity['subscription'] = active;
-
-    return plainToInstance(UserResponseModel, userEntity);
+    return plainToInstance(UserResponseModel, query);
   }
 
   async Create({
