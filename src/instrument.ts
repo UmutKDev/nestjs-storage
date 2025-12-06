@@ -1,24 +1,27 @@
+import 'dotenv/config';
 import * as Sentry from '@sentry/nestjs';
 import {
   getAutoPerformanceIntegrations,
   postgresIntegration,
   nestIntegration,
-  anrIntegration,
+  consoleLoggingIntegration,
 } from '@sentry/nestjs';
 import { nodeProfilingIntegration } from '@sentry/profiling-node';
 
 Sentry.init({
-  dsn: process.env.SENTRY_DSN,
-  integrations: [
-    nestIntegration,
-    nodeProfilingIntegration(),
-    postgresIntegration(),
-    anrIntegration({ captureStackTrace: true }),
-    ...getAutoPerformanceIntegrations(),
-  ],
   enabled: process.env.NODE_ENV === 'production',
   environment: process.env.NODE_ENV,
-  tracesSampleRate: 1.0,
-  profilesSampleRate: 1.0,
-  sampleRate: 0.25,
+  dsn: process.env.SENTRY_DSN,
+  integrations: [
+    nodeProfilingIntegration(),
+    postgresIntegration(),
+    nestIntegration(),
+    consoleLoggingIntegration({ levels: ['log', 'warn', 'error'] }),
+    ...getAutoPerformanceIntegrations(),
+  ],
+  enableLogs: true,
+  tracesSampleRate: 1.0, //  Capture 100% of the transactions
+  profileSessionSampleRate: 1.0,
+  profileLifecycle: 'trace',
+  sendDefaultPii: true,
 });
