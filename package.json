@@ -10,6 +10,7 @@
   },
   "scripts": {
     "build": "nest build",
+    "build:digitalocean": "yarn install --production=false && yarn run build && rm -rf node_modules && yarn install --production --frozen-lockfile && yarn run sentry:sourcemaps",
     "format": "prettier --write \"src/**/*.ts\"",
     "start": "nest start",
     "start:dev": "nest start --watch",
