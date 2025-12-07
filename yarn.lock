@@ -2895,14 +2895,6 @@
     detect-libc "^2.0.3"
     node-abi "^3.73.0"
 
-"@sentry/bun@^10.27.0":
-  version "10.27.0"
-  resolved "https://registry.yarnpkg.com/@sentry/bun/-/bun-10.27.0.tgz#edb5dbc4ab234551078134b2ba46e2ec506651c4"
-  integrity sha512-sSk36xFpQsEbsWF+wNmTP+5nOALW3V6McsSiyRzFcIgIyIiQbNm/f2eAr4R0A6baZU4+5hxIKMvTlXkN99vWUw==
-  dependencies:
-    "@sentry/core" "10.27.0"
-    "@sentry/node" "10.27.0"
-
 "@sentry/cli-darwin@2.58.2":
   version "2.58.2"
   resolved "https://registry.yarnpkg.com/@sentry/cli-darwin/-/cli-darwin-2.58.2.tgz#61f6f836de8ac2e1992ccadc0368bc403f23c609"
@@ -5537,13 +5529,6 @@ buffer@^6.0.3:
   dependencies:
     base64-js "^1.3.1"
     ieee754 "^1.2.1"
-
-bun-types@^1.3.3:
-  version "1.3.3"
-  resolved "https://registry.yarnpkg.com/bun-types/-/bun-types-1.3.3.tgz#af16a1b23ddf6ec3bddd2539c70cec4e8ddbc487"
-  integrity sha512-z3Xwlg7j2l9JY27x5Qn3Wlyos8YAp0kKRlrePAOjgjMGS5IG6E7Jnlx736vH9UVI4wUICwwhC9anYL++XeOgTQ==
-  dependencies:
-    "@types/node" "*"
 
 busboy@^1.6.0:
   version "1.6.0"
