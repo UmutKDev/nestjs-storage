@@ -23,7 +23,6 @@ export declare global {
       S3_PROTOCOL_ACCESS_KEY_ID?: string;
       S3_PROTOCOL_ACCESS_KEY_SECRET?: string;
 
-      STORAGE_S3_BUCKET?: string;
       STORAGE_S3_MAX_SOCKETS?: string;
       STORAGE_S3_ENDPOINT?: string;
       STORAGE_S3_PUBLIC_ENDPOINT?: string;

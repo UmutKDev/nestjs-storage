@@ -9,6 +9,7 @@ import {
   IsOptional,
   IsArray,
   IsNumber,
+  ValidateNested,
 } from 'class-validator';
 
 export class CloudBreadCrumbModel {
@@ -299,6 +300,9 @@ export class CloudCompleteMultipartUploadRequestModel {
 
   @ApiProperty({ type: CloudMultipartPartModel, isArray: true })
   @IsNotEmpty()
+  @IsArray()
+  @Type(() => CloudMultipartPartModel)
+  @ValidateNested({ each: true })
   Parts: Array<CloudMultipartPartModel>;
 }
 

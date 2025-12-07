@@ -57,6 +57,11 @@ import { ApiOperation, ApiQuery, ApiResponse } from '@nestjs/swagger';
 export class CloudController {
   constructor(private readonly cloudService: CloudService) {}
 
+  @ApiOperation({
+    summary: 'List files and directories',
+    description:
+      'Returns a view (breadcrumbs, directories and objects) for the given user-scoped path. Supports delimiter and metadata processing flags.',
+  })
   @Get('List')
   @ApiSuccessResponse(CloudListResponseModel)
   async List(
@@ -66,6 +71,11 @@ export class CloudController {
     return this.cloudService.List(model, user);
   }
 
+  @ApiOperation({
+    summary: 'Get breadcrumb for a path',
+    description:
+      'Returns breadcrumb entries (path pieces) for the supplied path.',
+  })
   @Get('List/Breadcrumb')
   @ApiSuccessArrayResponse(CloudBreadCrumbModel)
   async ListBreadcrumb(
@@ -74,6 +84,10 @@ export class CloudController {
     return this.cloudService.ListBreadcrumb(model);
   }
 
+  @ApiOperation({
+    summary: 'List directories inside a path',
+    description: 'Returns directory prefixes (folders) for a given path.',
+  })
   @Get('List/Directories')
   @ApiSuccessArrayResponse(CloudDirectoryModel)
   async ListDirectories(
@@ -83,6 +97,10 @@ export class CloudController {
     return this.cloudService.ListDirectories(model, user);
   }
 
+  @ApiOperation({
+    summary: 'List objects (files) inside a path',
+    description: 'Returns files at a given path for the authenticated user.',
+  })
   @Get('List/Objects')
   @ApiSuccessArrayResponse(CloudObjectModel)
   async ListObjects(
@@ -92,6 +110,10 @@ export class CloudController {
     return this.cloudService.ListObjects(model, user);
   }
 
+  @ApiOperation({
+    summary: "Get user's storage usage",
+    description: 'Returns the authenticated user storage usage and limits.',
+  })
   @Get('User/StorageUsage')
   @ApiSuccessResponse(CloudUserStorageUsageResponseModel)
   async UserStorageUsage(
@@ -100,11 +122,21 @@ export class CloudController {
     return this.cloudService.UserStorageUsage(user);
   }
 
+  @ApiOperation({
+    summary: 'Get object metadata',
+    description:
+      'Find a single object by key (user scoped) and return its metadata.',
+  })
   @Get('Find')
   async Find(@Query() model: CloudKeyRequestModel, @User() user: UserContext) {
     return this.cloudService.Find(model, user);
   }
 
+  @ApiOperation({
+    summary: 'Get a presigned URL for upload/download',
+    description:
+      'Returns a presigned URL for a specific object key to allow direct client access.',
+  })
   @Get('PresignedUrl')
   async GetPresignedUrl(
     @Query() model: CloudKeyRequestModel,
@@ -113,6 +145,16 @@ export class CloudController {
     return this.cloudService.GetPresignedUrl(model, user);
   }
 
+  @ApiOperation({
+    summary: 'Move/rename an object',
+    description:
+      'Move an object from SourceKey to DestinationKey within the user scope.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Move succeeded',
+    schema: { type: 'boolean' },
+  })
   @Put('Move')
   async Move(
     @Body() model: CloudMoveRequestModel,
@@ -121,6 +163,16 @@ export class CloudController {
     return this.cloudService.Move(model, user);
   }
 
+  @ApiOperation({
+    summary: 'Delete objects',
+    description:
+      'Deletes one or more objects (or directories) belonging to the authenticated user.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Delete succeeded',
+    schema: { type: 'boolean' },
+  })
   @Delete('Delete')
   async Delete(
     @Body() model: CloudDeleteRequestModel,
@@ -129,6 +181,15 @@ export class CloudController {
     return this.cloudService.Delete(model, user);
   }
 
+  @ApiOperation({
+    summary: 'Create directory (prefix)',
+    description: 'Creates a directory/prefix within the user scoped storage.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Directory created',
+    schema: { type: 'boolean' },
+  })
   @Post('CreateDirectory')
   async CreateDirectory(
     @Body() model: CloudKeyRequestModel,
@@ -137,6 +198,10 @@ export class CloudController {
     return this.cloudService.CreateDirectory(model, user);
   }
 
+  @ApiOperation({
+    summary: 'Create a multipart upload session',
+    description: 'Creates an UploadId and starts a multipart upload flow.',
+  })
   @Post('Upload/CreateMultipartUpload')
   @ApiSuccessResponse(CloudCreateMultipartUploadResponseModel)
   async UploadCreateMultipartUpload(
@@ -169,6 +234,11 @@ export class CloudController {
     return this.cloudService.UploadCreateMultipartUpload(model, user);
   }
 
+  @ApiOperation({
+    summary: 'Get a multipart upload part URL',
+    description:
+      'Returns an expiring URL to upload a single part for the provided UploadId and PartNumber.',
+  })
   @Post('Upload/GetMultipartPartUrl')
   @ApiSuccessResponse(CloudGetMultipartPartUrlResponseModel)
   async UploadGetMultipartPartUrl(
@@ -178,6 +248,11 @@ export class CloudController {
     return this.cloudService.UploadGetMultipartPartUrl(model, user);
   }
 
+  @ApiOperation({
+    summary: 'Upload a multipart part',
+    description:
+      'Accepts a single file part for a multipart upload. The request must be multipart/form-data.',
+  })
   @Post('Upload/UploadPart')
   @ApiConsumes('multipart/form-data')
   @ApiBody({
@@ -193,6 +268,11 @@ export class CloudController {
     return this.cloudService.UploadPart(model, file, user);
   }
 
+  @ApiOperation({
+    summary: 'Complete multipart upload',
+    description:
+      'Completes a multipart upload by providing the list of parts and finalizes the object.',
+  })
   @Post('Upload/CompleteMultipartUpload')
   @ApiSuccessResponse(CloudCompleteMultipartUploadResponseModel)
   async UploadCompleteMultipartUpload(
@@ -202,6 +282,11 @@ export class CloudController {
     return this.cloudService.UploadCompleteMultipartUpload(model, user);
   }
 
+  @ApiOperation({
+    summary: 'Abort a multipart upload',
+    description:
+      'Abort an ongoing multipart upload and clean up temporary state.',
+  })
   @Delete('Upload/AbortMultipartUpload')
   async UploadAbortMultipartUpload(
     @Body() model: CloudAbortMultipartUploadRequestModel,
@@ -210,6 +295,11 @@ export class CloudController {
     return this.cloudService.UploadAbortMultipartUpload(model, user);
   }
 
+  @ApiOperation({
+    summary: 'Update object metadata or rename',
+    description:
+      'Update an existing object by changing metadata or renaming the file (name only).',
+  })
   @Put('Update')
   @ApiSuccessResponse(CloudObjectModel)
   async Update(

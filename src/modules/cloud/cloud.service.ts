@@ -57,6 +57,12 @@ import { asyncLocalStorage } from '@common/context/context.service';
 @Injectable()
 export class CloudService {
   private readonly logger = new Logger(CloudService.name);
+  private readonly Buckets = {
+    Storage: 'Storage',
+    Photos: 'Photos',
+  };
+  private readonly PublicEndpoint =
+    process.env.STORAGE_S3_PUBLIC_ENDPOINT + this.Buckets.Storage;
   private readonly NotFoundErrorCodes = ['NoSuchKey', 'NotFound'];
   private readonly MaxProcessMetadataObjects = 1000;
   private readonly MaxListObjects = 1000;
@@ -97,7 +103,7 @@ export class CloudService {
 
     const command = await this.s3.send(
       new ListObjectsV2Command({
-        Bucket: process.env.STORAGE_S3_BUCKET,
+        Bucket: this.Buckets.Storage,
         MaxKeys: this.MaxListObjects,
         Delimiter: Delimiter ? '/' : undefined,
         Prefix: this.Prefix,
@@ -187,7 +193,7 @@ export class CloudService {
 
     const command = await this.s3.send(
       new ListObjectsV2Command({
-        Bucket: process.env.STORAGE_S3_BUCKET,
+        Bucket: this.Buckets.Storage,
         MaxKeys: this.MaxListObjects,
         Delimiter: Delimiter ? '/' : undefined,
         Prefix: this.Prefix,
@@ -219,7 +225,7 @@ export class CloudService {
 
     const command = await this.s3.send(
       new ListObjectsV2Command({
-        Bucket: process.env.STORAGE_S3_BUCKET,
+        Bucket: this.Buckets.Storage,
         MaxKeys: this.MaxListObjects,
         Delimiter: Delimiter ? '/' : undefined,
         Prefix: this.Prefix,
@@ -258,7 +264,7 @@ export class CloudService {
     do {
       const command = await this.s3.send(
         new ListObjectsV2Command({
-          Bucket: process.env.STORAGE_S3_BUCKET,
+          Bucket: this.Buckets.Storage,
           Prefix: KeyCombiner([User.id, '']),
           ContinuationToken: continuationToken,
         }),
@@ -310,7 +316,7 @@ export class CloudService {
     try {
       const command = await this.s3.send(
         new HeadObjectCommand({
-          Bucket: process.env.STORAGE_S3_BUCKET,
+          Bucket: this.Buckets.Storage,
           Key: KeyCombiner([User.id, Key]),
         }),
       );
@@ -320,7 +326,7 @@ export class CloudService {
         Extension: Key?.includes('.') ? Key.split('.').pop() : undefined,
         MimeType: command.ContentType,
         Path: {
-          Host: process.env.STORAGE_S3_PUBLIC_ENDPOINT,
+          Host: this.PublicEndpoint,
           Key: Key.replace('' + User.id + '/', ''),
           Url: Key,
         },
@@ -350,13 +356,13 @@ export class CloudService {
     try {
       await this.s3.send(
         new HeadObjectCommand({
-          Bucket: process.env.STORAGE_S3_BUCKET,
+          Bucket: this.Buckets.Storage,
           Key: KeyCombiner([User.id, Key]),
         }),
       );
 
       const command = new GetObjectCommand({
-        Bucket: process.env.STORAGE_S3_BUCKET,
+        Bucket: this.Buckets.Storage,
         Key: KeyCombiner([User.id, Key]),
       });
 
@@ -382,7 +388,7 @@ export class CloudService {
     try {
       const command = await this.s3.send(
         new GetObjectCommand({
-          Bucket: process.env.STORAGE_S3_BUCKET,
+          Bucket: this.Buckets.Storage,
           Key: KeyCombiner([User.id, Key]),
         }),
       );
@@ -403,7 +409,7 @@ export class CloudService {
     try {
       const command = await this.s3.send(
         new GetObjectCommand({
-          Bucket: process.env.STORAGE_S3_BUCKET,
+          Bucket: this.Buckets.Storage,
           Key: KeyCombiner([User.id, Key]),
         }),
       );
@@ -512,7 +518,7 @@ export class CloudService {
       if (IsMetadataProcessing) {
         metadata = await this.s3.send(
           new HeadObjectCommand({
-            Bucket: process.env.STORAGE_S3_BUCKET,
+            Bucket: this.Buckets.Storage,
             Key: content.Key,
           }),
         );
@@ -525,9 +531,9 @@ export class CloudService {
           : undefined,
         MimeType: metadata.ContentType,
         Path: {
-          Host: process.env.STORAGE_S3_PUBLIC_ENDPOINT,
+          Host: this.PublicEndpoint,
           Key: content.Key.replace('' + User.id + '/', ''),
-          Url: process.env.STORAGE_S3_PUBLIC_ENDPOINT + '/' + content.Key,
+          Url: this.PublicEndpoint + '/' + content.Key,
         },
         Metadata: this.DecodeMetadataFromS3(metadata.Metadata),
         Size: content.Size,
@@ -549,11 +555,11 @@ export class CloudService {
     User: UserContext,
   ): Promise<boolean> {
     try {
-      const copySource = `${process.env.STORAGE_S3_BUCKET}/${SourceKey}`;
+      const copySource = `${this.Buckets.Storage}/${SourceKey}`;
 
       await this.s3.send(
         new CopyObjectCommand({
-          Bucket: process.env.STORAGE_S3_BUCKET,
+          Bucket: this.Buckets.Storage,
           CopySource: copySource,
           Key: KeyCombiner([User.id, DestinationKey]),
         }),
@@ -561,7 +567,7 @@ export class CloudService {
 
       await this.s3.send(
         new DeleteObjectCommand({
-          Bucket: process.env.STORAGE_S3_BUCKET,
+          Bucket: this.Buckets.Storage,
           Key: KeyCombiner([User.id, SourceKey]),
         }),
       );
@@ -586,7 +592,7 @@ export class CloudService {
       for await (const key of Key) {
         await this.s3.send(
           new DeleteObjectCommand({
-            Bucket: process.env.STORAGE_S3_BUCKET,
+            Bucket: this.Buckets.Storage,
             Key: KeyCombiner([
               User.id,
               key + (IsDirectory ? '/' + this.EmptyFolderPlaceholder : ''),
@@ -616,7 +622,7 @@ export class CloudService {
 
     await this.s3.send(
       new PutObjectCommand({
-        Bucket: process.env.STORAGE_S3_BUCKET,
+        Bucket: this.Buckets.Storage,
         Key: KeyCombiner([User.id, directoryKey]),
         Body: '',
       }),
@@ -634,7 +640,7 @@ export class CloudService {
   ): Promise<CloudCreateMultipartUploadResponseModel> {
     const command = await this.s3.send(
       new CreateMultipartUploadCommand({
-        Bucket: process.env.STORAGE_S3_BUCKET,
+        Bucket: this.Buckets.Storage,
         Key: KeyCombiner([User.id, Key]),
         ContentType: ContentType,
         Metadata: this.SanitizeMetadataForS3(Metadata),
@@ -656,7 +662,7 @@ export class CloudService {
     User: UserContext,
   ): Promise<CloudGetMultipartPartUrlResponseModel> {
     const command = new UploadPartCommand({
-      Bucket: process.env.STORAGE_S3_BUCKET,
+      Bucket: this.Buckets.Storage,
       Key: KeyCombiner([User.id, Key]),
       UploadId: UploadId,
       PartNumber: PartNumber,
@@ -682,7 +688,7 @@ export class CloudService {
     User: UserContext,
   ): Promise<CloudUploadPartResponseModel> {
     const command = new UploadPartCommand({
-      Bucket: process.env.STORAGE_S3_BUCKET,
+      Bucket: this.Buckets.Storage,
       Key: KeyCombiner([User.id, Key]),
       UploadId: UploadId,
       PartNumber: PartNumber,
@@ -706,7 +712,7 @@ export class CloudService {
   ): Promise<CloudCompleteMultipartUploadResponseModel> {
     const command = await this.s3.send(
       new CompleteMultipartUploadCommand({
-        Bucket: process.env.STORAGE_S3_BUCKET,
+        Bucket: this.Buckets.Storage,
         Key: KeyCombiner([User.id, Key]),
         UploadId: UploadId,
         MultipartUpload: {
@@ -738,7 +744,7 @@ export class CloudService {
   ): Promise<Record<string, string>> {
     try {
       const getObjectCommand = new GetObjectCommand({
-        Bucket: process.env.STORAGE_S3_BUCKET,
+        Bucket: this.Buckets.Storage,
         Key: key,
       });
       const object = await this.s3.send(getObjectCommand);
@@ -751,7 +757,7 @@ export class CloudService {
       for await (const chunk of stream) {
         chunks.push(Buffer.from(chunk));
       }
-      const buffer = Buffer.concat(chunks);
+      // const buffer = Buffer.concat(chunks);
 
       return this.DecodeMetadataFromS3(existingMetadata);
     } catch (error) {
@@ -768,7 +774,7 @@ export class CloudService {
   ): Promise<Record<string, string>> {
     try {
       const getObjectCommand = new GetObjectCommand({
-        Bucket: process.env.STORAGE_S3_BUCKET,
+        Bucket: this.Buckets.Storage,
         Key: key,
       });
       const object = await this.s3.send(getObjectCommand);
@@ -795,11 +801,11 @@ export class CloudService {
         // sanitize/encode values before writing back to S3
         const newMetadata = this.SanitizeMetadataForS3(newMetadataRaw);
 
-        const copySource = `${process.env.STORAGE_S3_BUCKET}/${key}`;
+        const copySource = `${this.Buckets.Storage}/${key}`;
 
         await this.s3.send(
           new PutObjectCommand({
-            Bucket: process.env.STORAGE_S3_BUCKET,
+            Bucket: this.Buckets.Storage,
             Key: key,
             Body: buffer,
             ContentType: object.ContentType,
@@ -809,7 +815,7 @@ export class CloudService {
 
         await this.s3.send(
           new CopyObjectCommand({
-            Bucket: process.env.STORAGE_S3_BUCKET,
+            Bucket: this.Buckets.Storage,
             CopySource: copySource,
             Key: key,
             Metadata: newMetadata,
@@ -887,7 +893,7 @@ export class CloudService {
   ): Promise<void> {
     await this.s3.send(
       new AbortMultipartUploadCommand({
-        Bucket: process.env.STORAGE_S3_BUCKET,
+        Bucket: this.Buckets.Storage,
         Key: KeyCombiner([User.id, Key]),
         UploadId: UploadId,
       }),
@@ -901,7 +907,7 @@ export class CloudService {
     User: UserContext,
   ): Promise<CloudObjectModel> {
     try {
-      const bucket = process.env.STORAGE_S3_BUCKET;
+      const bucket = this.Buckets.Storage;
 
       const sourceKey = KeyCombiner([User.id, Key]);
 
