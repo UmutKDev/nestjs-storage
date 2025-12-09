@@ -37,6 +37,7 @@ import {
   CloudUploadPartRequestModel,
   CloudUploadPartResponseModel,
   CloudUserStorageUsageResponseModel,
+  CloudPreSignedUrlRequestModel,
 } from './cloud.model';
 import {
   ApiSuccessArrayResponse,
@@ -137,9 +138,10 @@ export class CloudController {
     description:
       'Returns a presigned URL for a specific object key to allow direct client access.',
   })
+  @ApiSuccessResponse('string')
   @Get('PresignedUrl')
   async GetPresignedUrl(
-    @Query() model: CloudKeyRequestModel,
+    @Query() model: CloudPreSignedUrlRequestModel,
     @User() user: UserContext,
   ) {
     return this.cloudService.GetPresignedUrl(model, user);

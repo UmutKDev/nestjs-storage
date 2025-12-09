@@ -42,6 +42,7 @@ import {
   CloudUploadPartRequestModel,
   CloudUploadPartResponseModel,
   CloudUserStorageUsageResponseModel,
+  CloudPreSignedUrlRequestModel,
 } from './cloud.model';
 import { plainToInstance } from 'class-transformer';
 import {
@@ -484,7 +485,7 @@ export class CloudService {
   //#region PresignedURL
 
   async GetPresignedUrl(
-    { Key }: CloudKeyRequestModel,
+    { Key, ExpiresInSeconds }: CloudPreSignedUrlRequestModel,
     User: UserContext,
   ): Promise<string> {
     try {
@@ -501,7 +502,7 @@ export class CloudService {
       });
 
       const url = await getSignedUrl(this.s3, command, {
-        expiresIn: this.PresignedUrlExpirySeconds,
+        expiresIn: ExpiresInSeconds || this.PresignedUrlExpirySeconds,
       });
 
       return url;

@@ -161,6 +161,19 @@ export class CloudKeyRequestModel {
   Key: string;
 }
 
+export class CloudPreSignedUrlRequestModel {
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  @Transform(({ value }) => turkishSlugify(value))
+  Key: string;
+
+  @ApiProperty({ required: false })
+  @IsNumber()
+  @IsOptional()
+  ExpiresInSeconds?: number;
+}
+
 export class CloudDeleteRequestModel {
   @ApiProperty()
   @IsNotEmpty()
