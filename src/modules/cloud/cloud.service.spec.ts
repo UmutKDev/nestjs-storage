@@ -11,6 +11,7 @@ import { CloudService } from './cloud.service';
 import { Readable } from 'stream';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { UserSubscriptionEntity } from '@entities/user-subscription.entity';
+import { ListObjectsV2Command } from '@aws-sdk/client-s3';
 
 describe('CloudService Update', () => {
   let service: CloudService;
@@ -209,5 +210,89 @@ describe('CloudService Update', () => {
     // Since we simulated provider not persisting metadata, code should fallback to PutObject
     expect(putCmd).not.toBeNull();
     expect(putCmd.input.Metadata).toHaveProperty('zort');
+  });
+
+  it('should return sliced directories using skip/take', async () => {
+    const user = { id: 'user-id' } as any;
+
+    // Prepare two pages of common prefixes, simulating paged S3 responses
+    const page1 = {
+      CommonPrefixes: [{ Prefix: 'user-id/a/' }, { Prefix: 'user-id/b/' }],
+      IsTruncated: true,
+      NextContinuationToken: 'token-1',
+    } as any;
+
+    const page2 = {
+      CommonPrefixes: [{ Prefix: 'user-id/c/' }, { Prefix: 'user-id/d/' }],
+      IsTruncated: false,
+      NextContinuationToken: undefined,
+    } as any;
+
+    let call = 0;
+    s3.send.mockImplementation((cmd: any) => {
+      if (cmd instanceof ListObjectsV2Command) {
+        call++;
+        if (call === 1) return Promise.resolve(page1);
+        return Promise.resolve(page2);
+      }
+      return Promise.resolve({});
+    });
+
+    const result = await service.ListDirectories(
+      { Path: '', Delimiter: true, search: '', skip: 1, take: 2 },
+      user,
+    );
+
+    expect(result).toBeDefined();
+    expect(result.length).toBe(2);
+    expect(result[0].Prefix).toBe('b');
+    expect(result[1].Prefix).toBe('c');
+  });
+
+  it('should return sliced objects using skip/take', async () => {
+    const user = { id: 'user-id' } as any;
+
+    const page1 = {
+      Contents: [
+        { Key: 'user-id/a.txt', Size: 1 },
+        { Key: 'user-id/b.txt', Size: 2 },
+      ],
+      IsTruncated: true,
+      NextContinuationToken: 'token-1',
+    } as any;
+
+    const page2 = {
+      Contents: [
+        { Key: 'user-id/c.txt', Size: 3 },
+        { Key: 'user-id/d.txt', Size: 4 },
+      ],
+      IsTruncated: false,
+    } as any;
+
+    let call = 0;
+    s3.send.mockImplementation((cmd: any) => {
+      const name = cmd.constructor.name;
+      if (name === 'ListObjectsV2Command') {
+        call++;
+        return Promise.resolve(call === 1 ? page1 : page2);
+      }
+      return Promise.resolve({});
+    });
+
+    const list = await service.ListObjects(
+      {
+        Path: '',
+        Delimiter: false,
+        IsMetadataProcessing: false,
+        search: '',
+        skip: 1,
+        take: 2,
+      },
+      user,
+    );
+
+    expect(list.length).toBe(2);
+    expect(list[0].Name).toBe('b.txt');
+    expect(list[1].Name).toBe('c.txt');
   });
 });

@@ -10,6 +10,7 @@ import {
   HeadObjectCommand,
   HeadObjectCommandOutput,
   ListObjectsV2Command,
+  ListObjectsV2CommandInput,
   PutObjectCommand,
   S3Client,
   UploadPartCommand,
@@ -178,7 +179,7 @@ export class CloudService {
   //#region Directories
 
   async ListDirectories(
-    { Path, Delimiter }: CloudListDirectoriesRequestModel,
+    { Path, Delimiter, search, skip, take }: CloudListDirectoriesRequestModel,
     User: UserContext,
   ): Promise<CloudDirectoryModel[]> {
     const store = asyncLocalStorage.getStore();
@@ -191,18 +192,77 @@ export class CloudService {
     }
     this.Prefix = prefix;
 
-    const command = await this.s3.send(
-      new ListObjectsV2Command({
+    // If no delimiter requested, CommonPrefixes will be empty; maintain previous behavior.
+    if (!Delimiter) {
+      const command = await this.s3.send(
+        new ListObjectsV2Command({
+          Bucket: this.Buckets.Storage,
+          Prefix: this.Prefix,
+        }),
+      );
+      request.totalRowCount = command.CommonPrefixes?.length ?? 0;
+      return this.ProcessDirectories(command.CommonPrefixes ?? [], this.Prefix);
+    }
+
+    // Implement skip/take pagination for directories. We'll aggregate CommonPrefixes
+    // from pages until we've gathered skip + take items (or no more pages), then
+    // slice the array to return the requested window.
+    const skipValue = typeof skip === 'number' && skip > 0 ? skip : 0;
+    const takeValue =
+      typeof take === 'number' && take > 0 ? take : this.MaxListObjects;
+
+    const aggregated: CommonPrefix[] = [];
+    let continuationToken: string | undefined = undefined;
+    let isFirstRequest = true;
+    let lastResponseCommonPrefixesLength = 0;
+
+    while (true) {
+      const maxKeys = Math.min(
+        this.MaxListObjects,
+        Math.max(1, skipValue + takeValue - aggregated.length),
+      );
+      const params: ListObjectsV2CommandInput = {
         Bucket: this.Buckets.Storage,
-        MaxKeys: this.MaxListObjects,
-        Delimiter: Delimiter ? '/' : undefined,
+        Delimiter: '/',
         Prefix: this.Prefix,
-      }),
-    );
+        MaxKeys: maxKeys,
+      };
 
-    request.totalRowCount = command.CommonPrefixes?.length ?? 0;
+      if (isFirstRequest && search) {
+        params.StartAfter = search;
+      }
+      if (continuationToken) {
+        params.ContinuationToken = continuationToken;
+      }
 
-    return this.ProcessDirectories(command.CommonPrefixes ?? [], this.Prefix);
+      const command = await this.s3.send(new ListObjectsV2Command(params));
+
+      const commonPrefixes = command.CommonPrefixes ?? [];
+      lastResponseCommonPrefixesLength = commonPrefixes.length;
+      aggregated.push(...commonPrefixes);
+
+      if (aggregated.length >= skipValue + takeValue) {
+        break;
+      }
+
+      if (!command.IsTruncated) {
+        break;
+      }
+
+      continuationToken = command.NextContinuationToken;
+      isFirstRequest = false;
+    }
+
+    const sliced = aggregated.slice(skipValue, skipValue + takeValue);
+
+    // totalRowCount is best-effort. If we fetched all pages, aggregated length is accurate;
+    // otherwise we give aggregated.length as approximation.
+    if (request) {
+      request.totalRowCount =
+        aggregated.length || lastResponseCommonPrefixesLength || 0;
+    }
+
+    return this.ProcessDirectories(sliced, this.Prefix);
   }
 
   //#endregion
@@ -210,7 +270,14 @@ export class CloudService {
   //#region Objects
 
   async ListObjects(
-    { Path, Delimiter, IsMetadataProcessing }: CloudListRequestModel,
+    {
+      Path,
+      Delimiter,
+      IsMetadataProcessing,
+      search,
+      skip,
+      take,
+    }: CloudListRequestModel,
     User: UserContext,
   ): Promise<CloudObjectModel[]> {
     const store = asyncLocalStorage.getStore();
@@ -223,22 +290,89 @@ export class CloudService {
     }
     this.Prefix = prefix;
 
-    const command = await this.s3.send(
-      new ListObjectsV2Command({
+    // If skip/take not supplied, default to MaxListObjects and single request behavior (legacy)
+    const skipValue = typeof skip === 'number' && skip > 0 ? skip : 0;
+    const takeValue =
+      typeof take === 'number' && take > 0 ? take : this.MaxListObjects;
+
+    // If both skip and take are defaults (0), preserve previous behavior for a single page
+    if (!skipValue && takeValue === this.MaxListObjects) {
+      const command = await this.s3.send(
+        new ListObjectsV2Command({
+          Bucket: this.Buckets.Storage,
+          MaxKeys: this.MaxListObjects,
+          Delimiter: Delimiter ? '/' : undefined,
+          Prefix: this.Prefix,
+        }),
+      );
+
+      const objects = await this.ProcessObjects(
+        command.Contents ?? [],
+        IsMetadataProcessing,
+        User,
+      );
+
+      if (request) {
+        request.totalRowCount = objects.length;
+      }
+      return objects;
+    }
+
+    // Aggregate and page through S3 objects until we have skip + take
+    const aggregated: _Object[] = [];
+    let continuationToken: string | undefined = undefined;
+    let isFirstRequest = true;
+    let lastResponseContentsLength = 0;
+
+    while (true) {
+      const maxKeys = Math.min(
+        this.MaxListObjects,
+        Math.max(1, skipValue + takeValue - aggregated.length),
+      );
+      const params: ListObjectsV2CommandInput = {
         Bucket: this.Buckets.Storage,
-        MaxKeys: this.MaxListObjects,
         Delimiter: Delimiter ? '/' : undefined,
         Prefix: this.Prefix,
-      }),
-    );
+        MaxKeys: maxKeys,
+      };
+
+      if (isFirstRequest && search) {
+        params.StartAfter = search;
+      }
+      if (continuationToken) {
+        params.ContinuationToken = continuationToken;
+      }
+
+      const command = await this.s3.send(new ListObjectsV2Command(params));
+
+      const contents = command.Contents ?? [];
+      lastResponseContentsLength = contents.length;
+      aggregated.push(...contents);
+
+      if (aggregated.length >= skipValue + takeValue) {
+        break;
+      }
+
+      if (!command.IsTruncated) {
+        break;
+      }
+
+      continuationToken = command.NextContinuationToken;
+      isFirstRequest = false;
+    }
+
+    const sliced = aggregated.slice(skipValue, skipValue + takeValue);
 
     const objects = await this.ProcessObjects(
-      command.Contents ?? [],
+      sliced,
       IsMetadataProcessing,
       User,
     );
 
-    request.totalRowCount = objects.length;
+    if (request) {
+      request.totalRowCount =
+        aggregated.length || lastResponseContentsLength || 0;
+    }
 
     return objects;
   }
@@ -551,26 +685,36 @@ export class CloudService {
   //#region Move
 
   async Move(
-    { SourceKey, DestinationKey }: CloudMoveRequestModel,
+    { SourceKeys, DestinationKey }: CloudMoveRequestModel,
     User: UserContext,
   ): Promise<boolean> {
     try {
-      const copySource = `${this.Buckets.Storage}/${SourceKey}`;
+      for await (const sourceKey of SourceKeys) {
+        const sourceFullKey = KeyCombiner([User.id, sourceKey]);
 
-      await this.s3.send(
-        new CopyObjectCommand({
-          Bucket: this.Buckets.Storage,
-          CopySource: copySource,
-          Key: KeyCombiner([User.id, DestinationKey]),
-        }),
-      );
+        const targetFullKey = KeyCombiner([User.id, DestinationKey]);
+        const copySource = `${this.Buckets.Storage}/${sourceFullKey}`;
 
-      await this.s3.send(
-        new DeleteObjectCommand({
-          Bucket: this.Buckets.Storage,
-          Key: KeyCombiner([User.id, SourceKey]),
-        }),
-      );
+        await this.CreateDirectory(
+          { Key: KeyCombiner([User.id, DestinationKey]) },
+          User,
+        );
+
+        await this.s3.send(
+          new CopyObjectCommand({
+            Bucket: this.Buckets.Storage,
+            CopySource: copySource,
+            Key: targetFullKey,
+          }),
+        );
+
+        await this.s3.send(
+          new DeleteObjectCommand({
+            Bucket: this.Buckets.Storage,
+            Key: sourceFullKey,
+          }),
+        );
+      }
     } catch (error) {
       if (this.NotFoundErrorCodes.includes(error.name)) {
         throw new HttpException(Codes.Error.Cloud.FILE_NOT_FOUND, 404);

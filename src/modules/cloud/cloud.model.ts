@@ -1,5 +1,6 @@
 import { CloudBreadcrumbLevelType } from '@common/enums';
 import { CDNPathResolver, turkishSlugify } from '@common/helpers/cast.helper';
+import { PaginationRequestModel } from '@common/models/pagination.model';
 import { ApiProperty, OmitType } from '@nestjs/swagger';
 import { Expose, Transform, Type } from 'class-transformer';
 import {
@@ -11,6 +12,7 @@ import {
   IsNumber,
   ValidateNested,
 } from 'class-validator';
+import e from 'express';
 
 export class CloudBreadCrumbModel {
   @Expose()
@@ -116,7 +118,7 @@ export class CloudViewModel {
 
 export class CloudListResponseModel extends CloudViewModel {}
 
-export class CloudListRequestModel {
+export class CloudListRequestModel extends PaginationRequestModel {
   @ApiProperty({ required: false })
   @IsString()
   @IsOptional()
@@ -373,10 +375,11 @@ export class CloudAbortMultipartUploadRequestModel {
 
 export class CloudMoveRequestModel {
   @ApiProperty()
-  @IsString()
   @IsNotEmpty()
-  @Transform(({ value }) => turkishSlugify(value))
-  SourceKey: string;
+  @IsArray()
+  @IsString({ each: true })
+  @Transform(({ value }) => value.map((v: string) => turkishSlugify(v)))
+  SourceKeys: Array<string>;
 
   @ApiProperty()
   @IsString()
