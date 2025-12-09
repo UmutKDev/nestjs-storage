@@ -55,7 +55,6 @@ import { UserSubscriptionEntity } from '@entities/user-subscription.entity';
 import { Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { asyncLocalStorage } from '@common/context/context.service';
-import { RedisService } from '@modules/redis/redis.service';
 
 @Injectable()
 export class CloudService {
@@ -77,17 +76,10 @@ export class CloudService {
   private readonly IsDirectory = (key: string) =>
     key.includes(this.EmptyFolderPlaceholder);
   private Prefix = null;
-
-  // Cache TTL constants (in seconds)
-  private readonly CACHE_TTL_LIST = 60; // 1 minute for list operations
-  private readonly CACHE_TTL_STORAGE_USAGE = 300; // 5 minutes for storage usage
-  private readonly CACHE_TTL_FIND = 120; // 2 minutes for find operations
-
   @InjectRepository(UserSubscriptionEntity)
   private userSubscriptionRepository: Repository<UserSubscriptionEntity>;
   @InjectAws(S3Client) private readonly s3: S3Client;
-
-  constructor(private readonly redisService: RedisService) {}
+  constructor() {}
 
   // Default download speeds (bytes per second) mapped by subscription slug
   private readonly DefaultDownloadSpeeds: Record<string, number> = {
@@ -104,21 +96,6 @@ export class CloudService {
     { Path, Delimiter, IsMetadataProcessing }: CloudListRequestModel,
     User: UserContext,
   ): Promise<CloudListResponseModel> {
-    // Generate cache key based on user and request parameters
-    const cacheKey = this.redisService.generateCloudCacheKey(User.id, 'list', {
-      path: Path,
-      delimiter: Delimiter,
-      metadata: IsMetadataProcessing,
-    });
-
-    // Try to get from cache first
-    const cached =
-      await this.redisService.get<CloudListResponseModel>(cacheKey);
-    if (cached) {
-      this.logger.debug(`Cache hit for List: ${cacheKey}`);
-      return plainToInstance(CloudListResponseModel, cached);
-    }
-
     const cleanedPath = Path ? Path.replace(/^\/+|\/+$/g, '') : '';
     let prefix = KeyCombiner([User.id, cleanedPath]);
     if (!prefix.endsWith('/')) {
@@ -141,16 +118,11 @@ export class CloudService {
       this.ProcessObjects(command.Contents ?? [], IsMetadataProcessing, User),
     ]);
 
-    const result = plainToInstance(CloudListResponseModel, {
+    return plainToInstance(CloudListResponseModel, {
       Breadcrumb,
       Directories,
       Contents,
     });
-
-    // Cache the result
-    await this.redisService.set(cacheKey, result, this.CACHE_TTL_LIST);
-
-    return result;
   }
 
   //#endregion
@@ -221,37 +193,6 @@ export class CloudService {
     }
     this.Prefix = prefix;
 
-    // Prepare pagination values and cache key for directories
-    const skipValue = typeof skip === 'number' && skip > 0 ? skip : 0;
-    const takeValue =
-      typeof take === 'number' && take > 0 ? take : this.MaxListObjects;
-
-    const cacheKey = this.redisService.generateCloudCacheKey(
-      User.id,
-      'listDirectories',
-      {
-        path: Path,
-        delimiter: Delimiter,
-        search,
-        skip: skipValue,
-        take: takeValue,
-      },
-    );
-
-    try {
-      const cachedDirs =
-        await this.redisService.get<CloudDirectoryModel[]>(cacheKey);
-      if (cachedDirs) {
-        this.logger.debug(`Cache hit for ListDirectories: ${cacheKey}`);
-        if (request) request.totalRowCount = cachedDirs.length;
-        return plainToInstance(CloudDirectoryModel, cachedDirs);
-      }
-    } catch (err) {
-      this.logger.debug(
-        `Cache read failed for ListDirectories (${cacheKey}): ${err}`,
-      );
-    }
-
     // If no delimiter requested, CommonPrefixes will be empty; maintain previous behavior.
     if (!Delimiter) {
       const command = await this.s3.send(
@@ -261,26 +202,15 @@ export class CloudService {
         }),
       );
       request.totalRowCount = command.CommonPrefixes?.length ?? 0;
-      const result = await this.ProcessDirectories(
-        command.CommonPrefixes ?? [],
-        this.Prefix,
-      );
-
-      try {
-        await this.redisService.set(cacheKey, result, this.CACHE_TTL_LIST);
-      } catch (err) {
-        this.logger.debug(
-          `Cache set failed for ListDirectories (${cacheKey}): ${err}`,
-        );
-      }
-
-      return result;
+      return this.ProcessDirectories(command.CommonPrefixes ?? [], this.Prefix);
     }
 
     // Implement skip/take pagination for directories. We'll aggregate CommonPrefixes
     // from pages until we've gathered skip + take items (or no more pages), then
     // slice the array to return the requested window.
-    // skipValue/takeValue already computed above for caching
+    const skipValue = typeof skip === 'number' && skip > 0 ? skip : 0;
+    const takeValue =
+      typeof take === 'number' && take > 0 ? take : this.MaxListObjects;
 
     const aggregated: CommonPrefix[] = [];
     let continuationToken: string | undefined = undefined;
@@ -333,17 +263,7 @@ export class CloudService {
         aggregated.length || lastResponseCommonPrefixesLength || 0;
     }
 
-    const result = await this.ProcessDirectories(sliced, this.Prefix);
-
-    try {
-      await this.redisService.set(cacheKey, result, this.CACHE_TTL_LIST);
-    } catch (err) {
-      this.logger.debug(
-        `Cache set failed for ListDirectories (${cacheKey}): ${err}`,
-      );
-    }
-
-    return result;
+    return this.ProcessDirectories(sliced, this.Prefix);
   }
 
   //#endregion
@@ -364,41 +284,6 @@ export class CloudService {
     const store = asyncLocalStorage.getStore();
     const request: Request = store?.get('request');
 
-    // Prepare pagination values for cache key
-    const skipValue = typeof skip === 'number' && skip > 0 ? skip : 0;
-    const takeValue =
-      typeof take === 'number' && take > 0 ? take : this.MaxListObjects;
-
-    // Generate cache key for list objects (includes pagination/search/metadata)
-    const cacheKey = this.redisService.generateCloudCacheKey(
-      User.id,
-      'listObjects',
-      {
-        path: Path,
-        delimiter: Delimiter,
-        metadata: IsMetadataProcessing,
-        search,
-        skip: skipValue,
-        take: takeValue,
-      },
-    );
-
-    // try cache only on full queries (avoid caching partial streaming or large aggregated ops?)
-    // We still cache paginated queries (skip/take provided or defaults)
-    try {
-      const cached = await this.redisService.get<CloudObjectModel[]>(cacheKey);
-      if (cached) {
-        this.logger.debug(`Cache hit for ListObjects: ${cacheKey}`);
-        if (request) request.totalRowCount = cached.length;
-        return cached;
-      }
-    } catch (err) {
-      // Log cache read errors but continue with normal flow
-      this.logger.debug(
-        `Cache read failed for ListObjects (${cacheKey}): ${err}`,
-      );
-    }
-
     const cleanedPath = Path ? Path.replace(/^\/+|\/+$/g, '') : '';
     let prefix = KeyCombiner([User.id, cleanedPath]);
     if (!prefix.endsWith('/')) {
@@ -407,7 +292,9 @@ export class CloudService {
     this.Prefix = prefix;
 
     // If skip/take not supplied, default to MaxListObjects and single request behavior (legacy)
-    // note: skipValue/takeValue already computed above for caching
+    const skipValue = typeof skip === 'number' && skip > 0 ? skip : 0;
+    const takeValue =
+      typeof take === 'number' && take > 0 ? take : this.MaxListObjects;
 
     // If both skip and take are defaults (0), preserve previous behavior for a single page
     if (!skipValue && takeValue === this.MaxListObjects) {
@@ -429,16 +316,6 @@ export class CloudService {
       if (request) {
         request.totalRowCount = objects.length;
       }
-
-      // cache single-page listing
-      try {
-        await this.redisService.set(cacheKey, objects, this.CACHE_TTL_LIST);
-      } catch (err) {
-        this.logger.debug(
-          `Cache set failed for ListObjects (${cacheKey}): ${err}`,
-        );
-      }
-
       return objects;
     }
 
@@ -498,15 +375,6 @@ export class CloudService {
         aggregated.length || lastResponseContentsLength || 0;
     }
 
-    // cache the paginated result slice
-    try {
-      await this.redisService.set(cacheKey, objects, this.CACHE_TTL_LIST);
-    } catch (err) {
-      this.logger.debug(
-        `Cache set failed for ListObjects (${cacheKey}): ${err}`,
-      );
-    }
-
     return objects;
   }
 
@@ -517,20 +385,6 @@ export class CloudService {
   async UserStorageUsage(
     User: UserContext,
   ): Promise<CloudUserStorageUsageResponseModel> {
-    // Generate cache key for user storage usage
-    const cacheKey = this.redisService.generateCloudCacheKey(
-      User.id,
-      'storageUsage',
-    );
-
-    // Try to get from cache first
-    const cached =
-      await this.redisService.get<CloudUserStorageUsageResponseModel>(cacheKey);
-    if (cached) {
-      this.logger.debug(`Cache hit for UserStorageUsage: ${cacheKey}`);
-      return plainToInstance(CloudUserStorageUsageResponseModel, cached);
-    }
-
     let continuationToken: string | undefined = undefined;
     let totalSize = 0;
 
@@ -567,7 +421,7 @@ export class CloudService {
       throw new HttpException(Codes.Error.Subscription.NOT_FOUND, 404);
     }
 
-    const result = plainToInstance(CloudUserStorageUsageResponseModel, {
+    return plainToInstance(CloudUserStorageUsageResponseModel, {
       UsedStorageInBytes: totalSize,
       MaxStorageInBytes: userSubscription
         ? userSubscription.subscription.storageLimitBytes
@@ -584,11 +438,6 @@ export class CloudService {
         userSubscription.subscription.maxUploadSizeBytes ||
         this.MaxObjectSizeBytes,
     });
-
-    // Cache the result
-    await this.redisService.set(cacheKey, result, this.CACHE_TTL_STORAGE_USAGE);
-
-    return result;
   }
 
   //#endregion
@@ -599,18 +448,6 @@ export class CloudService {
     { Key }: CloudKeyRequestModel,
     User: UserContext,
   ): Promise<CloudObjectModel> {
-    // Generate cache key for find operation
-    const cacheKey = this.redisService.generateCloudCacheKey(User.id, 'find', {
-      key: Key,
-    });
-
-    // Try to get from cache first
-    const cached = await this.redisService.get<CloudObjectModel>(cacheKey);
-    if (cached) {
-      this.logger.debug(`Cache hit for Find: ${cacheKey}`);
-      return plainToInstance(CloudObjectModel, cached);
-    }
-
     try {
       const command = await this.s3.send(
         new HeadObjectCommand({
@@ -619,7 +456,7 @@ export class CloudService {
         }),
       );
 
-      const result = plainToInstance(CloudObjectModel, {
+      return plainToInstance(CloudObjectModel, {
         Name: Key?.split('/').pop(),
         Extension: Key?.includes('.') ? Key.split('.').pop() : undefined,
         MimeType: command.ContentType,
@@ -635,11 +472,6 @@ export class CloudService {
           ? command.LastModified.toISOString()
           : '',
       });
-
-      // Cache the result
-      await this.redisService.set(cacheKey, result, this.CACHE_TTL_FIND);
-
-      return result;
     } catch (error) {
       if (this.NotFoundErrorCodes.includes(error.name)) {
         throw new HttpException(Codes.Error.Cloud.FILE_NOT_FOUND, 404);
@@ -883,9 +715,6 @@ export class CloudService {
           }),
         );
       }
-
-      // Invalidate user cache after move operation
-      await this.redisService.invalidateUserCloudCache(User.id);
     } catch (error) {
       if (this.NotFoundErrorCodes.includes(error.name)) {
         throw new HttpException(Codes.Error.Cloud.FILE_NOT_FOUND, 404);
@@ -915,9 +744,6 @@ export class CloudService {
           }),
         );
       }
-
-      // Invalidate user cache after delete operation
-      await this.redisService.invalidateUserCloudCache(User.id);
     } catch (error) {
       if (this.NotFoundErrorCodes.includes(error.name)) {
         throw new HttpException(Codes.Error.Cloud.FILE_NOT_FOUND, 404);
@@ -945,10 +771,6 @@ export class CloudService {
         Body: '',
       }),
     );
-
-    // Invalidate user cache after creating directory
-    await this.redisService.invalidateUserCloudCache(User.id);
-
     return true;
   }
 
@@ -1047,9 +869,6 @@ export class CloudService {
     if (IsImageFile(Key)) {
       metadata = await this.ProcessImageMetadata(KeyCombiner([User.id, Key]));
     }
-
-    // Invalidate user cache after completing multipart upload
-    await this.redisService.invalidateUserCloudCache(User.id);
 
     return plainToInstance(CloudCompleteMultipartUploadResponseModel, {
       Location: command.Location,
@@ -1401,9 +1220,6 @@ export class CloudService {
           );
         }
       }
-
-      // Invalidate user cache after update operation
-      await this.redisService.invalidateUserCloudCache(User.id);
 
       // return the updated object info (note: Key for Find should be relative to user)
       return this.Find({ Key: targetRelative }, User);
