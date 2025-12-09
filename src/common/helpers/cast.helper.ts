@@ -83,7 +83,23 @@ export const IsImageFile = (name: string): boolean => {
 };
 
 export const KeyCombiner = (keys: string[]): string => {
-  return keys.filter((key) => key && key.length > 0).join('/');
+  // Normalize each segment by removing leading/trailing slashes so joining
+  // always produces a single '/' between parts. Also ignore empty segments.
+  const combined = keys
+    .filter((key) => key && key.length > 0)
+    .map((key) => key.replace(/^\/+|\/+$/g, ''))
+    .filter((key) => key.length > 0)
+    .join('/');
+
+  // If there's nothing left, return empty string
+  if (!combined) return '';
+
+  // If the final segment contains a file extension (dot followed by chars),
+  // keep it as-is. Otherwise ensure the combined path ends with a single '/'.
+  const lastSegment = combined.split('/').pop() || '';
+  const hasExtension = /\.[^/]+$/.test(lastSegment);
+
+  return hasExtension ? combined : combined + '/';
 };
 
 export const ByteToMB = (bytes: number): number => {

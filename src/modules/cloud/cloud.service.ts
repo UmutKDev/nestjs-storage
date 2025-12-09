@@ -692,13 +692,12 @@ export class CloudService {
       for await (const sourceKey of SourceKeys) {
         const sourceFullKey = KeyCombiner([User.id, sourceKey]);
 
-        const targetFullKey = KeyCombiner([User.id, DestinationKey]);
+        const targetFullKey = KeyCombiner([
+          User.id,
+          DestinationKey,
+          sourceKey.split('/').pop() || '',
+        ]);
         const copySource = `${this.Buckets.Storage}/${sourceFullKey}`;
-
-        await this.CreateDirectory(
-          { Key: KeyCombiner([User.id, DestinationKey]) },
-          User,
-        );
 
         await this.s3.send(
           new CopyObjectCommand({
