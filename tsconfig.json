@@ -24,7 +24,8 @@
       "@decorators/*": ["src/common/decorators/*"],
       "@schemas/*": ["src/schemas/*"],
       "@entities/*": ["src/entities/*"],
-      "@modules": ["src/modules"]
+      "@modules": ["src/modules"],
+      "@modules/*": ["src/modules/*"]
     },
 
     "typeRoots": ["./node_modules/@types", "./@types", "./src/@types"],

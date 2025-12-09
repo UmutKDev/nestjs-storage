@@ -32,6 +32,11 @@ services:
       - NODE_ENV=${NODE_ENV}
       - PORT=${PORT}
       - APP_URL=${APP_URL}
+
+      - REDIS_HOST=${REDIS_HOST:-redis}
+      - REDIS_PORT=${REDIS_PORT:-6379}
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+      - REDIS_TTL=${REDIS_TTL:-300}
     networks:
       - sqr_network
     volumes:
@@ -40,6 +45,7 @@ services:
     restart: unless-stopped
     depends_on:
       - database
+      - redis
 
   database:
     container_name: database
@@ -54,12 +60,29 @@ services:
       - sqr_network
     restart: unless-stopped
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U ${PG_USERNAME}']
+      test: ["CMD-SHELL", "pg_isready -U ${PG_USERNAME}"]
       interval: 10s
       timeout: 5s
       retries: 5
     volumes:
       - ./src/database/seeds/init.sql:/docker-entrypoint-initdb.d/init.sql
+
+  redis:
+    container_name: redis
+    image: redis:7-alpine
+    ports:
+      - ${REDIS_PORT:-6379}:6379
+    command: redis-server --appendonly yes ${REDIS_PASSWORD:+--requirepass ${REDIS_PASSWORD}}
+    networks:
+      - sqr_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - redis_data:/data
 
 networks:
   sqr_network:
@@ -67,3 +90,4 @@ networks:
 
 volumes:
   postgres_data: {}
+  redis_data: {}

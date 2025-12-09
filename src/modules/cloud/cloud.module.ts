@@ -6,9 +6,11 @@ import { CloudController } from './cloud.controller';
 import { CloudService } from './cloud.service';
 import { UserSubscriptionEntity } from '@entities/user-subscription.entity';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { RedisModule } from '@modules/redis/redis.module';
 
 @Module({
   imports: [
+    RedisModule,
     AwsSdkModule.register({
       client: new S3Client({
         forcePathStyle: process.env.STORAGE_S3_FORCE_PATH_STYLE === 'true',

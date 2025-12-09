@@ -29,6 +29,12 @@ export declare global {
       STORAGE_S3_FORCE_PATH_STYLE?: string;
       STORAGE_S3_REGION?: string;
 
+      // Redis Configuration
+      REDIS_HOSTNAME: string;
+      REDIS_PORT: string;
+      REDIS_PASSWORD: string;
+      REDIS_TTL: string;
+
       // Mail Configuration
       MAIL_HOST: string;
       MAIL_SECURE: string;
