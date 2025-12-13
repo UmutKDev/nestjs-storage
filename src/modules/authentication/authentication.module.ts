@@ -26,7 +26,11 @@ import { UserSubscriber } from 'src/subscribers/user.subscriber';
     JwtModule.register({
       global: true,
       secret: jwtConstants.secret,
-      signOptions: { expiresIn: jwtConstants.accessTokenExpiresIn },
+      signOptions: {
+        expiresIn: jwtConstants.accessTokenExpiresIn,
+        issuer: process.env.APP_URL,
+        audience: 'Storage',
+      },
     }),
   ],
   controllers: [AuthenticationController],

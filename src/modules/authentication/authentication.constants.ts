@@ -1,6 +1,6 @@
 export const jwtConstants = {
-  secret: 'F64AC86B25E9AD2BE288BBA8C68BC',
-  refreshSecret: 'F64AC86B25E9AD2BE288BBA8C68BC_REFRESH',
-  accessTokenExpiresIn: 3600000, // 1 hour
-  refreshTokenExpiresIn: 604800000, // 7 days
+  secret: process.env.JWT_SECRET,
+  refreshSecret: process.env.JWT_REFRESH_SECRET,
+  accessTokenExpiresIn: parseInt(process.env.JWT_EXPIRES_IN, 10),
+  refreshTokenExpiresIn: parseInt(process.env.JWT_REFRESH_EXPIRES_IN, 10),
 };

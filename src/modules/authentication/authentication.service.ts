@@ -112,10 +112,19 @@ export class AuthenticationService {
         secret: jwtConstants.refreshSecret,
       });
 
-      // Check if refresh token exists and is not revoked
-      const storedRefreshToken = await this.refreshTokenRepository.findOne({
-        where: { token: refreshToken, isRevoked: false },
+      // Get all non-revoked tokens for this user and verify hash
+      const storedTokens = await this.refreshTokenRepository.find({
+        where: { userId: payload.id, isRevoked: false },
       });
+
+      let storedRefreshToken = null;
+      for (const token of storedTokens) {
+        const isValid = await argon2.verify(token.token, refreshToken);
+        if (isValid) {
+          storedRefreshToken = token;
+          break;
+        }
+      }
 
       if (!storedRefreshToken) {
         throw new HttpException('Invalid refresh token', 401);
@@ -226,24 +235,20 @@ export class AuthenticationService {
       this.jwtService.signAsync(payload, {
         secret: jwtConstants.secret,
         expiresIn: jwtConstants.accessTokenExpiresIn,
-        // issuer: 'http://localhost:8080',
         subject: payload.id,
-        // audience: 'Storage',
-        // notBefore: Math.floor(Date.now() / 1000),
       }),
       this.jwtService.signAsync(payload, {
         secret: jwtConstants.refreshSecret,
         expiresIn: jwtConstants.refreshTokenExpiresIn,
-        // issuer: 'http://localhost:8080',
         subject: payload.id,
-        // audience: 'Storage',
-        // notBefore: Math.floor(Date.now() / 1000),
       }),
     ]);
 
-    // Store refresh token in database
+    // Store refresh token hash in database for security
+    const hashedToken = await argon2.hash(refreshToken);
+
     const refreshTokenEntity = new RefreshTokenEntity({
-      token: refreshToken,
+      token: hashedToken,
       userId: payload.id,
       expiresAt: new Date(Date.now() + jwtConstants.refreshTokenExpiresIn),
       userAgent: request?.headers['user-agent'],
@@ -262,16 +267,25 @@ export class AuthenticationService {
   }
 
   async RevokeRefreshToken(refreshToken: string): Promise<boolean> {
-    const storedRefreshToken = await this.refreshTokenRepository.findOne({
-      where: { token: refreshToken, isRevoked: false },
+    // Get all non-revoked tokens and find matching hash
+    const storedTokens = await this.refreshTokenRepository.find({
+      where: { isRevoked: false },
     });
 
-    if (storedRefreshToken) {
-      await this.refreshTokenRepository.update(
-        { id: storedRefreshToken.id },
-        { isRevoked: true },
-      );
-      return true;
+    for (const token of storedTokens) {
+      try {
+        const isValid = await argon2.verify(token.token, refreshToken);
+        if (isValid) {
+          await this.refreshTokenRepository.update(
+            { id: token.id },
+            { isRevoked: true },
+          );
+          return true;
+        }
+      } catch (error) {
+        // Invalid hash format, skip
+        continue;
+      }
     }
 
     return false;

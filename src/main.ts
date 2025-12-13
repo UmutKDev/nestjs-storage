@@ -23,9 +23,17 @@ import utc from 'dayjs/plugin/utc';
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
+const corsOrigins =
+  process.env.NODE_ENV === 'development'
+    ? ['*']
+    : ['https://api.storage.umutk.me', 'https://storage.umutk.me'];
+
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(CoreModule, {
-    cors: true,
+    cors: {
+      origin: corsOrigins,
+      credentials: true,
+    },
     logger: ['error', 'warn', 'log', 'fatal'],
   });
   app.set('query parser', 'extended');
@@ -67,7 +75,10 @@ async function bootstrap() {
   if (process.env.NODE_ENV === 'production') {
     app.use(
       ['/swagger', '/swagger-json', '/reference'],
-      basicAuth({ challenge: true, users: { admin: 'j?H8.Ekv2B8X' } }),
+      basicAuth({
+        challenge: true,
+        users: { [process.env.SWAGGER_USER]: process.env.SWAGGER_PASSWORD },
+      }),
     );
   }
 

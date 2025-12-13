@@ -46,4 +46,3 @@ export class RefreshTokenEntity {
     Object.assign(this, partial);
   }
 }
-

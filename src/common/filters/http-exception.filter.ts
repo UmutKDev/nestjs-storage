@@ -53,13 +53,14 @@ export class HttpExceptionFilter implements ExceptionFilter {
       httpStatus,
     );
 
-    Sentry.captureException(exception);
-    Sentry.logger.error(exception, {
-      action: 'ExceptionHandler',
-    });
-
     if (httpStatus === 500) {
-      if (process.env.NODE_ENV === 'development') {
+      if (process.env.NODE_ENV === 'production') {
+        Sentry.captureException(exception);
+        Sentry.logger.error(exception, {
+          action: 'ExceptionHandler',
+        });
+      } else if (process.env.NODE_ENV === 'development') {
+        // console.error(exception);
         this.logger.error(exception, 'ExceptionHandler');
       }
     }

@@ -338,7 +338,6 @@ export class CloudController {
     @User() user: UserContext,
     @Res() res: Response,
   ) {
-    console.log('first');
     // verify the object exists and get its metadata
     const obj = await this.cloudService.Find(model, user);
 

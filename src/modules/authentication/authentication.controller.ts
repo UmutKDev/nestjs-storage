@@ -3,21 +3,21 @@ import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AuthenticationService } from './authentication.service';
 import { ApiSuccessResponse } from '@common/decorators/response.decorator';
 import {
-  AuthenticationDecodeTokenBodyRequestModel,
   AuthenticationRefreshTokenRequestModel,
   AuthenticationResetPasswordRequestModel,
   AuthenticationSignInRequestModel,
   AuthenticationSignUpRequestModel,
   AuthenticationTokenResponseModel,
-  JWTTokenDecodeResponseModel,
 } from './authentication.model';
 import { Public } from '@common/decorators/public.decorator';
 import { Request } from 'express';
 import { JwtAuthenticationGuard } from './guards/jwt-authentication.guard';
+import { Throttle } from '@nestjs/throttler';
 
 @Controller('Authentication')
 @ApiTags('Authentication')
 @Public()
+@Throttle({ default: { ttl: 60, limit: 10 } })
 export class AuthenticationController {
   constructor(private readonly authenticationService: AuthenticationService) {}
 
@@ -73,15 +73,6 @@ export class AuthenticationController {
     @Body() { refreshToken }: AuthenticationRefreshTokenRequestModel,
   ): Promise<boolean> {
     return this.authenticationService.RevokeRefreshToken(refreshToken);
-  }
-
-  @Post('DecodeToken')
-  @Public()
-  @ApiSuccessResponse(JWTTokenDecodeResponseModel)
-  async DecodeToken(
-    @Body() { token }: AuthenticationDecodeTokenBodyRequestModel,
-  ) {
-    return this.authenticationService.DecodeToken({ token });
   }
 
   @Post('ResetPassword')

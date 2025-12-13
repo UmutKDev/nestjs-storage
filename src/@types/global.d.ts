@@ -15,6 +15,16 @@ export declare global {
       PG_SYNCHRONIZE: string;
       PG_CACERT?: string;
 
+      // Swagger Configuration
+      SWAGGER_USER: string;
+      SWAGGER_PASSWORD: string;
+
+      // JWT Configuration
+      JWT_SECRET: string;
+      JWT_EXPIRES_IN: string;
+      JWT_REFRESH_SECRET: string;
+      JWT_REFRESH_EXPIRES_IN: string;
+
       // Sentry
       SENTRY_DSN?: string;
       SENTRY_AUTH_TOKEN?: string;
@@ -41,7 +51,7 @@ export declare global {
       MAIL_FROM: string;
       MAIL_PORT: string;
       MAIL_USER: string;
-      MAIL_PASS: string;
+      MAIL_PASSWORD: string;
 
       // Application Configuration
       TZ: string;
