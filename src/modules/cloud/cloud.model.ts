@@ -1,5 +1,5 @@
 import { CloudBreadcrumbLevelType } from '@common/enums';
-import { CDNPathResolver, turkishSlugify } from '@common/helpers/cast.helper';
+import { CDNPathResolver, slugify, slugify } from '@common/helpers/cast.helper';
 import { PaginationRequestModel } from '@common/models/pagination.model';
 import { ApiProperty, OmitType } from '@nestjs/swagger';
 import { Expose, Transform, Type } from 'class-transformer';
@@ -157,7 +157,7 @@ export class CloudKeyRequestModel {
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
-  @Transform(({ value }) => turkishSlugify(value))
+  @Transform(({ value }) => slugify(value))
   Key: string;
 }
 
@@ -165,7 +165,7 @@ export class CloudPreSignedUrlRequestModel {
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
-  @Transform(({ value }) => turkishSlugify(value))
+  @Transform(({ value }) => slugify(value))
   Key: string;
 
   @ApiProperty({ required: false })
@@ -179,7 +179,7 @@ export class CloudDeleteRequestModel {
   @IsNotEmpty()
   @IsArray()
   @IsString({ each: true })
-  @Transform(({ value }) => value.map((v: string) => turkishSlugify(v)))
+  @Transform(({ value }) => value.map((v: string) => slugify(v)))
   Key: Array<string>;
 
   @ApiProperty({ required: false, default: false })
@@ -193,7 +193,7 @@ export class CloudCreateMultipartUploadRequestModel {
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
-  @Transform(({ value }) => turkishSlugify(value))
+  @Transform(({ value }) => slugify(value))
   Key: string;
 
   @Expose()
@@ -229,7 +229,7 @@ export class CloudGetMultipartPartUrlRequestModel {
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
-  @Transform(({ value }) => turkishSlugify(value))
+  @Transform(({ value }) => slugify(value))
   Key: string;
 
   @Expose()
@@ -259,7 +259,7 @@ export class CloudUploadPartRequestModel {
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
-  @Transform(({ value }) => turkishSlugify(value))
+  @Transform(({ value }) => slugify(value))
   Key: string;
 
   @Expose()
@@ -305,7 +305,7 @@ export class CloudCompleteMultipartUploadRequestModel {
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
-  @Transform(({ value }) => turkishSlugify(value))
+  @Transform(({ value }) => slugify(value))
   Key: string;
 
   @ApiProperty()
@@ -377,7 +377,7 @@ export class CloudAbortMultipartUploadRequestModel {
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
-  @Transform(({ value }) => turkishSlugify(value))
+  @Transform(({ value }) => slugify(value))
   Key: string;
 
   @ApiProperty()
@@ -391,13 +391,13 @@ export class CloudMoveRequestModel {
   @IsNotEmpty()
   @IsArray()
   @IsString({ each: true })
-  @Transform(({ value }) => value.map((v: string) => turkishSlugify(v)))
+  @Transform(({ value }) => value.map((v: string) => slugify(v)))
   SourceKeys: Array<string>;
 
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
-  @Transform(({ value }) => turkishSlugify(value))
+  @Transform(({ value }) => slugify(value))
   DestinationKey: string;
 }
 
@@ -405,7 +405,7 @@ export class CloudUpdateRequestModel {
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
-  @Transform(({ value }) => turkishSlugify(value))
+  @Transform(({ value }) => slugify(value))
   Key: string;
 
   // Only a filename (no slashes) is expected for Name. If provided, the object
@@ -413,7 +413,7 @@ export class CloudUpdateRequestModel {
   @ApiProperty({ required: false })
   @IsOptional()
   @IsString()
-  @Transform(({ value }) => turkishSlugify(value))
+  @Transform(({ value }) => slugify(value))
   Name?: string;
 
   // Arbitrary metadata key/value pairs to replace for the object (optional)
