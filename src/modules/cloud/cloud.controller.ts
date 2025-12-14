@@ -45,12 +45,12 @@ import {
 } from '@common/decorators/response.decorator';
 import { User } from '@common/decorators/user.decorator';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { ByteToMB } from '@common/helpers/cast.helper';
 import { ThrottleTransform } from '@common/helpers/throttle.transform';
 import { pipeline } from 'stream';
 import { promisify } from 'util';
 import type { Response } from 'express';
 import { ApiOperation, ApiQuery, ApiResponse } from '@nestjs/swagger';
+import { SizeFormatter } from '@common/helpers/cast.helper';
 
 @Controller('Cloud')
 @ApiTags('Cloud')
@@ -212,15 +212,25 @@ export class CloudController {
   ): Promise<CloudCreateMultipartUploadResponseModel> {
     if (model.TotalSize) {
       const UserStorage = await this.cloudService.UserStorageUsage(user);
-      const usedStorageInMB = ByteToMB(UserStorage.UsedStorageInBytes);
-      const maxStoragePerUserInMB = ByteToMB(UserStorage.MaxStorageInBytes);
-      const newTotalStorageInMB = ByteToMB(model.TotalSize);
+      const usedStorageInMB = SizeFormatter({
+        From: UserStorage.UsedStorageInBytes,
+        FromUnit: 'B',
+        ToUnit: 'MB',
+      });
+      const maxStoragePerUserInMB = SizeFormatter({
+        From: UserStorage.MaxStorageInBytes,
+        FromUnit: 'B',
+        ToUnit: 'MB',
+      });
+      const newTotalStorageInMB = SizeFormatter({
+        From: model.TotalSize,
+        FromUnit: 'B',
+        ToUnit: 'MB',
+      });
 
       if (model.TotalSize > UserStorage.MaxUploadSizeBytes) {
         throw new HttpException(
-          `File size exceeds the maximum upload size of ${ByteToMB(
-            UserStorage.MaxUploadSizeBytes,
-          )} MB.`,
+          `File size exceeds the maximum upload size of ${SizeFormatter({ From: UserStorage.MaxUploadSizeBytes, FromUnit: 'B', ToUnit: 'MB' })} MB.`,
           HttpStatus.BAD_REQUEST,
         );
       }

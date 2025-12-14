@@ -47,7 +47,7 @@ import {
 import { plainToInstance } from 'class-transformer';
 import {
   IsImageFile,
-  KeyCombiner,
+  KeyBuilder,
   PascalizeKeys,
 } from '@common/helpers/cast.helper';
 import { CloudBreadcrumbLevelType } from '@common/enums';
@@ -97,7 +97,7 @@ export class CloudService {
     User: UserContext,
   ): Promise<CloudListResponseModel> {
     const cleanedPath = Path ? Path.replace(/^\/+|\/+$/g, '') : '';
-    let prefix = KeyCombiner([User.id, cleanedPath]);
+    let prefix = KeyBuilder([User.id, cleanedPath]);
     if (!prefix.endsWith('/')) {
       prefix = prefix + '/';
     }
@@ -187,7 +187,7 @@ export class CloudService {
     const request: Request = store?.get('request');
 
     const cleanedPath = Path ? Path.replace(/^\/+|\/+$/g, '') : '';
-    let prefix = KeyCombiner([User.id, cleanedPath]);
+    let prefix = KeyBuilder([User.id, cleanedPath]);
     if (!prefix.endsWith('/')) {
       prefix = prefix + '/';
     }
@@ -285,7 +285,7 @@ export class CloudService {
     const request: Request = store?.get('request');
 
     const cleanedPath = Path ? Path.replace(/^\/+|\/+$/g, '') : '';
-    let prefix = KeyCombiner([User.id, cleanedPath]);
+    let prefix = KeyBuilder([User.id, cleanedPath]);
     if (!prefix.endsWith('/')) {
       prefix = prefix + '/';
     }
@@ -400,7 +400,7 @@ export class CloudService {
       const command = await this.s3.send(
         new ListObjectsV2Command({
           Bucket: this.Buckets.Storage,
-          Prefix: KeyCombiner([User.id, '']),
+          Prefix: KeyBuilder([User.id, '']),
           ContinuationToken: continuationToken,
         }),
       );
@@ -452,7 +452,7 @@ export class CloudService {
       const command = await this.s3.send(
         new HeadObjectCommand({
           Bucket: this.Buckets.Storage,
-          Key: KeyCombiner([User.id, Key]),
+          Key: KeyBuilder([User.id, Key]),
         }),
       );
 
@@ -492,13 +492,13 @@ export class CloudService {
       await this.s3.send(
         new HeadObjectCommand({
           Bucket: this.Buckets.Storage,
-          Key: KeyCombiner([User.id, Key]),
+          Key: KeyBuilder([User.id, Key]),
         }),
       );
 
       const command = new GetObjectCommand({
         Bucket: this.Buckets.Storage,
-        Key: KeyCombiner([User.id, Key]),
+        Key: KeyBuilder([User.id, Key]),
       });
 
       const url = await getSignedUrl(this.s3, command, {
@@ -524,7 +524,7 @@ export class CloudService {
       const command = await this.s3.send(
         new GetObjectCommand({
           Bucket: this.Buckets.Storage,
-          Key: KeyCombiner([User.id, Key]),
+          Key: KeyBuilder([User.id, Key]),
         }),
       );
       return command.Body.transformToWebStream();
@@ -545,7 +545,7 @@ export class CloudService {
       const command = await this.s3.send(
         new GetObjectCommand({
           Bucket: this.Buckets.Storage,
-          Key: KeyCombiner([User.id, Key]),
+          Key: KeyBuilder([User.id, Key]),
         }),
       );
 
@@ -691,9 +691,9 @@ export class CloudService {
   ): Promise<boolean> {
     try {
       for await (const sourceKey of SourceKeys) {
-        const sourceFullKey = KeyCombiner([User.id, sourceKey]);
+        const sourceFullKey = KeyBuilder([User.id, sourceKey]);
 
-        const targetFullKey = KeyCombiner([
+        const targetFullKey = KeyBuilder([
           User.id,
           DestinationKey,
           sourceKey.split('/').pop() || '',
@@ -737,7 +737,7 @@ export class CloudService {
         await this.s3.send(
           new DeleteObjectCommand({
             Bucket: this.Buckets.Storage,
-            Key: KeyCombiner([
+            Key: KeyBuilder([
               User.id,
               key + (IsDirectory ? '/' + this.EmptyFolderPlaceholder : ''),
             ]),
@@ -767,7 +767,7 @@ export class CloudService {
     await this.s3.send(
       new PutObjectCommand({
         Bucket: this.Buckets.Storage,
-        Key: KeyCombiner([User.id, directoryKey]),
+        Key: KeyBuilder([User.id, directoryKey]),
         Body: '',
       }),
     );
@@ -785,7 +785,7 @@ export class CloudService {
     const command = await this.s3.send(
       new CreateMultipartUploadCommand({
         Bucket: this.Buckets.Storage,
-        Key: KeyCombiner([User.id, Key]),
+        Key: KeyBuilder([User.id, Key]),
         ContentType: ContentType,
         Metadata: this.SanitizeMetadataForS3(Metadata),
       }),
@@ -807,7 +807,7 @@ export class CloudService {
   ): Promise<CloudGetMultipartPartUrlResponseModel> {
     const command = new UploadPartCommand({
       Bucket: this.Buckets.Storage,
-      Key: KeyCombiner([User.id, Key]),
+      Key: KeyBuilder([User.id, Key]),
       UploadId: UploadId,
       PartNumber: PartNumber,
     });
@@ -833,7 +833,7 @@ export class CloudService {
   ): Promise<CloudUploadPartResponseModel> {
     const command = new UploadPartCommand({
       Bucket: this.Buckets.Storage,
-      Key: KeyCombiner([User.id, Key]),
+      Key: KeyBuilder([User.id, Key]),
       UploadId: UploadId,
       PartNumber: PartNumber,
       Body: file.buffer,
@@ -857,7 +857,7 @@ export class CloudService {
     const command = await this.s3.send(
       new CompleteMultipartUploadCommand({
         Bucket: this.Buckets.Storage,
-        Key: KeyCombiner([User.id, Key]),
+        Key: KeyBuilder([User.id, Key]),
         UploadId: UploadId,
         MultipartUpload: {
           Parts: Parts,
@@ -867,7 +867,7 @@ export class CloudService {
 
     let metadata = {};
     if (IsImageFile(Key)) {
-      metadata = await this.ProcessImageMetadata(KeyCombiner([User.id, Key]));
+      metadata = await this.ProcessImageMetadata(KeyBuilder([User.id, Key]));
     }
 
     return plainToInstance(CloudCompleteMultipartUploadResponseModel, {
@@ -1038,7 +1038,7 @@ export class CloudService {
     await this.s3.send(
       new AbortMultipartUploadCommand({
         Bucket: this.Buckets.Storage,
-        Key: KeyCombiner([User.id, Key]),
+        Key: KeyBuilder([User.id, Key]),
         UploadId: UploadId,
       }),
     );
@@ -1053,7 +1053,7 @@ export class CloudService {
     try {
       const bucket = this.Buckets.Storage;
 
-      const sourceKey = KeyCombiner([User.id, Key]);
+      const sourceKey = KeyBuilder([User.id, Key]);
 
       // determine target key (if Name provided, replace file's base name)
       let targetRelative = Key;
@@ -1063,7 +1063,7 @@ export class CloudService {
         const parts = Key.split('/');
         parts[parts.length - 1] = Name;
         targetRelative = parts.join('/');
-        targetKey = KeyCombiner([User.id, targetRelative]);
+        targetKey = KeyBuilder([User.id, targetRelative]);
       }
 
       // prepare metadata replacement only when provided

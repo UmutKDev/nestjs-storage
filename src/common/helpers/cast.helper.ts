@@ -1,4 +1,4 @@
-import { MimeTypeGroups, Role, UUID } from '@common/enums';
+import { MimeTypeGroups } from '@common/enums';
 import { camelCase, startCase } from 'lodash';
 
 export const slugify = (value: string): string =>
@@ -50,28 +50,28 @@ export const uuidGenerator = (): string => {
   });
 };
 
-export const mbToBytes = (mb: number): number => {
-  return mb * 1024 * 1024;
+export const SizeFormatter = ({
+  From,
+  FromUnit,
+  ToUnit,
+}: {
+  From: number;
+  FromUnit: 'B' | 'KB' | 'MB' | 'GB';
+  ToUnit: 'B' | 'KB' | 'MB' | 'GB';
+}): number => {
+  const unitMap = {
+    B: 1,
+    KB: 1024,
+    MB: 1024 * 1024,
+    GB: 1024 * 1024 * 1024,
+  };
+
+  const bytes = From * unitMap[FromUnit];
+  return bytes / unitMap[ToUnit];
 };
 
 export const CDNPathResolver = (path: string): string => {
   return path ? process.env.STORAGE_S3_PUBLIC_ENDPOINT + '/' + path : path;
-};
-
-export const isManager = (user: UserContext, cursor: keyof UserContext) => {
-  return user.role === Role.USER
-    ? user[cursor]
-      ? user[cursor]
-      : UUID.EMPTY
-    : undefined;
-};
-
-export const isAdmin = (user: UserContext, cursor: keyof UserContext) => {
-  return user.role !== Role.ADMIN
-    ? user[cursor]
-      ? user[cursor]
-      : UUID.EMPTY
-    : undefined;
 };
 
 export const IsImageFile = (name: string): boolean => {
@@ -82,7 +82,7 @@ export const IsImageFile = (name: string): boolean => {
   return imageExtensions.some((ext) => lowerName.endsWith(ext));
 };
 
-export const KeyCombiner = (keys: string[]): string => {
+export const KeyBuilder = (keys: string[]): string => {
   // Normalize each segment by removing leading/trailing slashes so joining
   // always produces a single '/' between parts. Also ignore empty segments.
   const combined = keys
@@ -102,18 +102,6 @@ export const KeyCombiner = (keys: string[]): string => {
   return hasExtension ? combined : combined + '/';
 };
 
-export const ByteToMB = (bytes: number): number => {
-  return bytes / (1024 * 1024);
-};
-
-export const KbyteToMB = (kilobytes: number): number => {
-  return kilobytes / 1024;
-};
-
-export const ByteToKbyte = (bytes: number): number => {
-  return bytes / 1024;
-};
-
 export const PascalizeKeys = (obj) => {
   if (Array.isArray(obj)) {
     return obj.map((v) => PascalizeKeys(v));
@@ -131,3 +119,9 @@ export const PascalizeKeys = (obj) => {
 
 export const ToPascalCase = (str) =>
   startCase(camelCase(str)).replace(/ /g, '');
+
+export const S3KeyConverter = (url: string): string =>
+  decodeURIComponent(url) // URL'deki %20 gibi kodlamaları çöz
+    .replace(/^https?:\/\/[^/]+\//, '') // domain kısmını kaldır
+    .replace(/[?#].*$/, '') // query string ve fragment'i temizle
+    .trim(); // baştaki ve sondaki boşlukları at

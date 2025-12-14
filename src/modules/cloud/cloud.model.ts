@@ -1,5 +1,5 @@
 import { CloudBreadcrumbLevelType } from '@common/enums';
-import { CDNPathResolver, slugify } from '@common/helpers/cast.helper';
+import { CDNPathResolver, S3KeyConverter } from '@common/helpers/cast.helper';
 import { PaginationRequestModel } from '@common/models/pagination.model';
 import { ApiProperty, OmitType } from '@nestjs/swagger';
 import { Expose, Transform, Type } from 'class-transformer';
@@ -156,7 +156,7 @@ export class CloudKeyRequestModel {
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
-  @Transform(({ value }) => slugify(value))
+  @Transform(({ value }) => S3KeyConverter(value))
   Key: string;
 }
 
@@ -164,7 +164,7 @@ export class CloudPreSignedUrlRequestModel {
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
-  @Transform(({ value }) => slugify(value))
+  @Transform(({ value }) => S3KeyConverter(value))
   Key: string;
 
   @ApiProperty({ required: false })
@@ -178,7 +178,7 @@ export class CloudDeleteRequestModel {
   @IsNotEmpty()
   @IsArray()
   @IsString({ each: true })
-  @Transform(({ value }) => value.map((v: string) => slugify(v)))
+  @Transform(({ value }) => value.map((v: string) => S3KeyConverter(v)))
   Key: Array<string>;
 
   @ApiProperty({ required: false, default: false })
@@ -192,7 +192,7 @@ export class CloudCreateMultipartUploadRequestModel {
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
-  @Transform(({ value }) => slugify(value))
+  @Transform(({ value }) => S3KeyConverter(value))
   Key: string;
 
   @Expose()
@@ -228,7 +228,7 @@ export class CloudGetMultipartPartUrlRequestModel {
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
-  @Transform(({ value }) => slugify(value))
+  @Transform(({ value }) => S3KeyConverter(value))
   Key: string;
 
   @Expose()
@@ -258,7 +258,7 @@ export class CloudUploadPartRequestModel {
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
-  @Transform(({ value }) => slugify(value))
+  @Transform(({ value }) => S3KeyConverter(value))
   Key: string;
 
   @Expose()
@@ -304,7 +304,7 @@ export class CloudCompleteMultipartUploadRequestModel {
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
-  @Transform(({ value }) => slugify(value))
+  @Transform(({ value }) => S3KeyConverter(value))
   Key: string;
 
   @ApiProperty()
@@ -376,7 +376,7 @@ export class CloudAbortMultipartUploadRequestModel {
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
-  @Transform(({ value }) => slugify(value))
+  @Transform(({ value }) => S3KeyConverter(value))
   Key: string;
 
   @ApiProperty()
@@ -390,13 +390,13 @@ export class CloudMoveRequestModel {
   @IsNotEmpty()
   @IsArray()
   @IsString({ each: true })
-  @Transform(({ value }) => value.map((v: string) => slugify(v)))
+  @Transform(({ value }) => value.map((v: string) => S3KeyConverter(v)))
   SourceKeys: Array<string>;
 
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
-  @Transform(({ value }) => slugify(value))
+  @Transform(({ value }) => S3KeyConverter(value))
   DestinationKey: string;
 }
 
@@ -404,7 +404,7 @@ export class CloudUpdateRequestModel {
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
-  @Transform(({ value }) => slugify(value))
+  @Transform(({ value }) => S3KeyConverter(value))
   Key: string;
 
   // Only a filename (no slashes) is expected for Name. If provided, the object
@@ -412,7 +412,7 @@ export class CloudUpdateRequestModel {
   @ApiProperty({ required: false })
   @IsOptional()
   @IsString()
-  @Transform(({ value }) => slugify(value))
+  @Transform(({ value }) => S3KeyConverter(value))
   Name?: string;
 
   // Arbitrary metadata key/value pairs to replace for the object (optional)
