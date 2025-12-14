@@ -45,6 +45,10 @@ export class CloudPathModel {
 export class CloudDirectoryModel {
   @Expose()
   @ApiProperty()
+  Name: string;
+
+  @Expose()
+  @ApiProperty()
   Prefix: string;
 }
 

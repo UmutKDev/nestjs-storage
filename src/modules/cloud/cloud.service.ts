@@ -49,6 +49,7 @@ import {
   IsImageFile,
   KeyBuilder,
   PascalizeKeys,
+  MimeTypeFromExtension,
 } from '@common/helpers/cast.helper';
 import { CloudBreadcrumbLevelType } from '@common/enums';
 import { UserSubscriptionEntity } from '@entities/user-subscription.entity';
@@ -114,7 +115,7 @@ export class CloudService {
 
     const [Breadcrumb, Directories, Contents] = await Promise.all([
       this.ProcessBreadcrumb(Path || '', Delimiter),
-      this.ProcessDirectories(command.CommonPrefixes ?? [], this.Prefix),
+      this.ProcessDirectories(command.CommonPrefixes ?? [], this.Prefix, User),
       this.ProcessObjects(command.Contents ?? [], IsMetadataProcessing, User),
     ]);
 
@@ -202,7 +203,11 @@ export class CloudService {
         }),
       );
       request.totalRowCount = command.CommonPrefixes?.length ?? 0;
-      return this.ProcessDirectories(command.CommonPrefixes ?? [], this.Prefix);
+      return this.ProcessDirectories(
+        command.CommonPrefixes ?? [],
+        this.Prefix,
+        User,
+      );
     }
 
     // Implement skip/take pagination for directories. We'll aggregate CommonPrefixes
@@ -263,7 +268,7 @@ export class CloudService {
         aggregated.length || lastResponseCommonPrefixesLength || 0;
     }
 
-    return this.ProcessDirectories(sliced, this.Prefix);
+    return this.ProcessDirectories(sliced, this.Prefix, User);
   }
 
   //#endregion
@@ -607,6 +612,7 @@ export class CloudService {
   private async ProcessDirectories(
     CommonPrefixes: CommonPrefix[],
     Prefix: string,
+    User: UserContext,
   ): Promise<CloudDirectoryModel[]> {
     if (CommonPrefixes.length === 0) {
       return [];
@@ -615,12 +621,17 @@ export class CloudService {
     const directories: CloudDirectoryModel[] = [];
     for (const commonPrefix of CommonPrefixes) {
       if (commonPrefix.Prefix) {
-        const dirName = commonPrefix.Prefix.replace(Prefix, '').replace(
+        const DirectoryName = commonPrefix.Prefix.replace(Prefix, '').replace(
           '/',
           '',
         );
+        const DirectoryPrefix: string = commonPrefix.Prefix.replace(
+          User.id + '/',
+          '',
+        );
         directories.push({
-          Prefix: dirName,
+          Name: DirectoryName,
+          Prefix: DirectoryPrefix,
         });
       }
     }
@@ -659,12 +670,15 @@ export class CloudService {
         );
       }
 
+      const Name = content.Key?.split('/').pop();
+      const Extension = Name?.includes('.') ? Name.split('.').pop() : '';
+
       processedContents.push({
-        Name: content.Key?.split('/').pop(),
-        Extension: content.Key?.includes('.')
-          ? content.Key.split('.').pop()
-          : undefined,
-        MimeType: metadata.ContentType,
+        Name: Name,
+        Extension: Extension,
+        MimeType:
+          (metadata.ContentType ?? MimeTypeFromExtension(Extension)) ||
+          'application/octet-stream',
         Path: {
           Host: this.PublicEndpoint,
           Key: content.Key.replace('' + User.id + '/', ''),

@@ -1,4 +1,4 @@
-import { MimeTypeGroups } from '@common/enums';
+import { AllMimeTypesExtensions, MimeTypeGroups } from '@common/enums';
 import { camelCase, startCase } from 'lodash';
 
 export const slugify = (value: string): string =>
@@ -102,11 +102,11 @@ export const KeyBuilder = (keys: string[]): string => {
   return hasExtension ? combined : combined + '/';
 };
 
-export const PascalizeKeys = (obj) => {
+export const PascalizeKeys = (obj: any): any => {
   if (Array.isArray(obj)) {
     return obj.map((v) => PascalizeKeys(v));
   } else if (obj !== null && obj.constructor === Object) {
-    return Object.keys(obj).reduce(
+    return Object.keys(obj).reduce<Record<string, any>>(
       (result, key) => ({
         ...result,
         [ToPascalCase(key)]: PascalizeKeys(obj[key]),
@@ -117,7 +117,7 @@ export const PascalizeKeys = (obj) => {
   return obj;
 };
 
-export const ToPascalCase = (str) =>
+export const ToPascalCase = (str: string): string =>
   startCase(camelCase(str)).replace(/ /g, '');
 
 export const S3KeyConverter = (url: string): string =>
@@ -125,3 +125,33 @@ export const S3KeyConverter = (url: string): string =>
     .replace(/^https?:\/\/[^/]+\//, '') // domain kısmını kaldır
     .replace(/[?#].*$/, '') // query string ve fragment'i temizle
     .trim(); // baştaki ve sondaki boşlukları at
+
+export const ExtensionFromMimeType = (mimeType: string): string | null => {
+  for (const ext of AllMimeTypesExtensions) {
+    const base = ext.slice(1).toLowerCase();
+    const key = base.charAt(0).toUpperCase() + base.slice(1);
+    const type =
+      MimeTypeGroups.Images[key] ||
+      MimeTypeGroups.Audio[key] ||
+      MimeTypeGroups.Video[key] ||
+      MimeTypeGroups.Documents[key] ||
+      MimeTypeGroups.Archives[key];
+    if (type === mimeType) return ext;
+  }
+  return null;
+};
+
+export const MimeTypeFromExtension = (extension: string): string | null => {
+  const ext = (
+    extension.startsWith('.') ? extension : '.' + extension
+  ).toLowerCase();
+  const base = ext.slice(1).toLowerCase();
+  const key = base.charAt(0).toUpperCase() + base.slice(1);
+  const type =
+    MimeTypeGroups.Images[key] ||
+    MimeTypeGroups.Audio[key] ||
+    MimeTypeGroups.Video[key] ||
+    MimeTypeGroups.Documents[key] ||
+    MimeTypeGroups.Archives[key];
+  return type || null;
+};

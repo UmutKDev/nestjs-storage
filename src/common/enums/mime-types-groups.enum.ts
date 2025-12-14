@@ -1,6 +1,7 @@
 export namespace MimeTypeGroups {
   export enum Images {
     Jpeg = 'image/jpeg',
+    Jpg = 'image/jpg',
     Png = 'image/png',
     Gif = 'image/gif',
     Bmp = 'image/bmp',
@@ -45,3 +46,54 @@ export namespace MimeTypeGroups {
     Gzip = 'application/gzip',
   }
 }
+
+export namespace MimeTypesExtensions {
+  export const Images = [
+    '.jpeg',
+    '.jpg',
+    '.png',
+    '.gif',
+    '.bmp',
+    '.webp',
+    '.tiff',
+  ];
+
+  export const Audio = [
+    '.mp3',
+    '.wav',
+    '.ogg',
+    '.aac',
+    '.webm',
+    '.flac',
+    '.wma',
+  ];
+
+  export const Video = ['.mp4', '.webm', '.ogg', '.mov', '.wmv', '.flv'];
+
+  export const Documents = [
+    '.pdf',
+    '.doc',
+    '.docx',
+    '.xls',
+    '.xlsx',
+    '.ppt',
+    '.pptx',
+  ];
+  export const Archives = ['.zip', '.rar', '.7z', '.tar', '.gz'];
+}
+
+export const AllMimeTypesExtensions = [
+  ...MimeTypesExtensions.Images,
+  ...MimeTypesExtensions.Audio,
+  ...MimeTypesExtensions.Video,
+  ...MimeTypesExtensions.Documents,
+  ...MimeTypesExtensions.Archives,
+];
+
+export const AllMimeTypes = [
+  ...Object.values(MimeTypeGroups.Images),
+  ...Object.values(MimeTypeGroups.Audio),
+  ...Object.values(MimeTypeGroups.Video),
+  ...Object.values(MimeTypeGroups.Documents),
+  ...Object.values(MimeTypeGroups.Archives),
+];
