@@ -24,6 +24,8 @@ export declare global {
       JWT_EXPIRES_IN: string;
       JWT_REFRESH_SECRET: string;
       JWT_REFRESH_EXPIRES_IN: string;
+      JWT_TWO_FACTOR_SECRET?: string;
+      JWT_TWO_FACTOR_EXPIRES_IN?: string;
 
       // Sentry
       SENTRY_DSN?: string;
@@ -58,6 +60,7 @@ export declare global {
       NODE_ENV: string;
       PORT: string;
       APP_URL: string;
+      APP_NAME?: string;
     }
   }
 
@@ -67,6 +70,7 @@ export declare global {
     email: string;
     role: Role;
     status: Status;
+    isTwoFactorEnabled?: boolean;
   }
 
   interface Request {
@@ -121,6 +125,17 @@ export declare global {
 
       const enum Subscription {
         NOT_FOUND = 'SU-001',
+      }
+
+      const enum TwoFactor {
+        REQUIRED = 'TF-001',
+        INVALID = 'TF-002',
+        NOT_SETUP = 'TF-003',
+        ALREADY_ENABLED = 'TF-004',
+        NOT_ENABLED = 'TF-005',
+        SECRET_NOT_FOUND = 'TF-006',
+        INVALID_CODE_FORMAT = 'TF-007',
+        INVALID_CHALLENGE = 'TF-008',
       }
     }
   }

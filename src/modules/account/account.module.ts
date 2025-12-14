@@ -5,12 +5,14 @@ import { CloudModule } from '../cloud/cloud.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { UserEntity } from '@entities//user.entity';
 import { UserSubscriber } from 'src/subscribers/user.subscriber';
+import { AuthenticationModule } from '../authentication/authentication.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([UserEntity]),
     UserSubscriber,
     CloudModule,
+    AuthenticationModule,
   ],
   controllers: [AccountController],
   providers: [AccountService],

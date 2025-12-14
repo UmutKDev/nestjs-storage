@@ -48,5 +48,6 @@ import { UserSubscriber } from 'src/subscribers/user.subscriber';
       useClass: RoleGuard,
     },
   ],
+  exports: [AuthenticationService],
 })
 export class AuthenticationModule {}

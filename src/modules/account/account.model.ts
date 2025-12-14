@@ -1,11 +1,24 @@
-import { ApiProperty, PickType } from '@nestjs/swagger';
+import { ApiProperty, OmitType, PickType } from '@nestjs/swagger';
 import { UserBodyRequestModel, UserResponseModel } from '../user/user.model';
 import { IsNotEmpty, IsOptional, IsStrongPassword } from 'class-validator';
 import { Match } from '@common/decorators/match.decorator';
+import {
+  SubscriptionFindResponseModel,
+  SubscriptionResponseModel,
+  UserSubscriptionResponseModel,
+} from '@modules/subscription/subscription.model';
+import { Expose, Type } from 'class-transformer';
 
 export class AccountViewModel extends UserResponseModel {}
 
-export class AccountResponseModel extends AccountViewModel {}
+export class AccountResponseModel extends OmitType(AccountViewModel, [
+  'subscription',
+] as const) {
+  @Expose()
+  // @ApiProperty({ type: () => SubscriptionResponseModel })
+  // @Type(() => SubscriptionResponseModel)
+  subscription?: any;
+}
 
 export class AccountProfileResponseModel extends AccountResponseModel {}
 

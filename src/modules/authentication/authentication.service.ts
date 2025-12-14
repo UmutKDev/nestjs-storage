@@ -1,6 +1,7 @@
 import { HttpException, Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as argon2 from 'argon2';
+import { authenticator } from 'otplib';
 import { jwtConstants } from './authentication.constants';
 import {
   AuthenticationDecodeTokenBodyRequestModel,
@@ -8,6 +9,9 @@ import {
   AuthenticationSignInRequestModel,
   AuthenticationSignUpRequestModel,
   AuthenticationTokenResponseModel,
+  AuthenticationTwoFactorGenerateResponseModel,
+  AuthenticationTwoFactorLoginRequestModel,
+  AuthenticationTwoFactorVerifyRequestModel,
   JWTPayloadModel,
   JWTTokenDecodeResponseModel,
 } from './authentication.model';
@@ -32,8 +36,110 @@ export class AuthenticationService {
     private mailService: MailService,
   ) {}
 
+  private getTwoFactorIssuer(): string {
+    return process.env.APP_NAME || 'Storage';
+  }
+
+  private ensureTwoFactorCodeIfRequired(
+    user: Pick<UserEntity, 'isTwoFactorEnabled' | 'twoFactorSecret'>,
+    token?: string,
+  ): void {
+    if (!user.isTwoFactorEnabled) {
+      return;
+    }
+
+    if (!user.twoFactorSecret) {
+      throw new HttpException(Codes.Error.TwoFactor.NOT_SETUP, 400);
+    }
+
+    if (!token) {
+      throw new HttpException(Codes.Error.TwoFactor.REQUIRED, 403);
+    }
+
+    const isValid = authenticator.verify({
+      token,
+      secret: user.twoFactorSecret,
+    });
+
+    if (!isValid) {
+      throw new HttpException(Codes.Error.TwoFactor.INVALID, 403);
+    }
+  }
+
+  private async getUserWithTwoFactorSecret(
+    userId: string,
+  ): Promise<UserEntity> {
+    return this.userRepository
+      .createQueryBuilder('user')
+      .select([
+        'user.id',
+        'user.email',
+        'user.isTwoFactorEnabled',
+        'user.role',
+        'user.status',
+      ])
+      .addSelect('user.twoFactorSecret')
+      .where('user.id = :userId', { userId })
+      .getOneOrFail()
+      .catch((error: Error) => {
+        if (
+          error.name === Codes.Error.Database.EntityMetadataNotFoundError ||
+          error.name === Codes.Error.Database.EntityNotFoundError
+        ) {
+          throw new HttpException(Codes.Error.User.NOT_FOUND, 404);
+        }
+
+        throw error;
+      });
+  }
+
+  private buildJwtPayload(
+    user: Pick<
+      UserEntity,
+      | 'id'
+      | 'fullName'
+      | 'email'
+      | 'role'
+      | 'status'
+      | 'lastLoginAt'
+      | 'image'
+      | 'isTwoFactorEnabled'
+    >,
+    loginDate?: Date | null,
+  ): JWTPayloadModel {
+    return {
+      id: user.id,
+      fullName: user.fullName,
+      email: user.email,
+      role: user.role,
+      status: user.status,
+      lastLogin: loginDate ?? user.lastLoginAt,
+      image: user.image,
+      isTwoFactorEnabled: user.isTwoFactorEnabled,
+    };
+  }
+
+  private async createTwoFactorChallengeResponse(
+    user: Pick<UserEntity, 'id' | 'email'>,
+  ): Promise<AuthenticationTokenResponseModel> {
+    const token = await this.jwtService.signAsync(
+      { id: user.id, email: user.email },
+      {
+        secret: jwtConstants.twoFactorSecret,
+        expiresIn: jwtConstants.twoFactorTokenExpiresIn,
+        subject: user.id,
+      },
+    );
+
+    return plainToInstance(AuthenticationTokenResponseModel, {
+      twoFactorRequired: true,
+      twoFactorToken: token,
+      twoFactorTokenExpiresIn: jwtConstants.twoFactorTokenExpiresIn,
+    });
+  }
+
   async Login(
-    { email, password }: AuthenticationSignInRequestModel,
+    { email, password, twoFactorCode }: AuthenticationSignInRequestModel,
     request?: Request,
   ): Promise<AuthenticationTokenResponseModel> {
     const queryBuilder = this.userRepository
@@ -47,7 +153,9 @@ export class AuthenticationService {
         'user.status',
         'user.lastLoginAt',
         'user.image',
+        'user.isTwoFactorEnabled',
       ])
+      .addSelect('user.twoFactorSecret')
       .where('user.email = :email', { email });
 
     const user = await queryBuilder.getOneOrFail().catch((error: Error) => {
@@ -70,6 +178,12 @@ export class AuthenticationService {
       throw new HttpException(Codes.Error.User.SUSPENDED, 403);
     }
 
+    if (user.isTwoFactorEnabled && !twoFactorCode) {
+      return this.createTwoFactorChallengeResponse(user);
+    }
+
+    this.ensureTwoFactorCodeIfRequired(user, twoFactorCode);
+
     const loginDate = user.role !== Role.ADMIN ? null : new Date();
 
     if (loginDate) {
@@ -77,24 +191,18 @@ export class AuthenticationService {
         { id: user.id },
         { lastLoginAt: loginDate },
       );
+      user.lastLoginAt = loginDate;
     }
-
-    const payload: JWTPayloadModel = {
-      id: user.id,
-      fullName: user.fullName,
-      email: user.email,
-      role: user.role,
-      status: user.status,
-      lastLogin: loginDate,
-      image: user.image,
-    };
 
     if (user.status === Status.PENDING) {
       await this.userRepository.update(
         { id: user.id },
         { status: Status.ACTIVE },
       );
+      user.status = Status.ACTIVE;
     }
+
+    const payload = this.buildJwtPayload(user, loginDate);
 
     return this.generateTokens(payload, request);
   }
@@ -163,6 +271,7 @@ export class AuthenticationService {
         status: user.status,
         lastLogin: user.lastLoginAt,
         image: user.image,
+        isTwoFactorEnabled: user.isTwoFactorEnabled,
       };
 
       return this.generateTokens(newPayload, request);
@@ -190,6 +299,7 @@ export class AuthenticationService {
         password: password,
         status: Status.ACTIVE,
         role: Role.USER,
+        isTwoFactorEnabled: false,
       });
 
       // await this.mailService.sendMail({
@@ -211,6 +321,7 @@ export class AuthenticationService {
         status: newUser.status,
         lastLogin: newUser.lastLoginAt,
         image: newUser.image,
+        isTwoFactorEnabled: newUser.isTwoFactorEnabled,
       };
 
       await queryRunner.commitTransaction();
@@ -261,9 +372,89 @@ export class AuthenticationService {
       accessToken,
       refreshToken,
       expiresIn: jwtConstants.accessTokenExpiresIn,
+      twoFactorRequired: false,
     };
 
     return plainToInstance(AuthenticationTokenResponseModel, response);
+  }
+
+  async VerifyTwoFactorLogin({
+    token,
+    code,
+    request,
+  }: {
+    token: string;
+    code: string;
+    request?: Request;
+  }): Promise<AuthenticationTokenResponseModel> {
+    let challengePayload: JWTPayloadModel | null = null;
+
+    try {
+      challengePayload = (await this.jwtService.verifyAsync(token, {
+        secret: jwtConstants.twoFactorSecret,
+      })) as JWTPayloadModel;
+    } catch {
+      throw new HttpException(Codes.Error.TwoFactor.INVALID_CHALLENGE, 400);
+    }
+
+    const user = await this.userRepository
+      .createQueryBuilder('user')
+      .select([
+        'user.id',
+        'user.role',
+        'user.fullName',
+        'user.email',
+        'user.status',
+        'user.lastLoginAt',
+        'user.image',
+        'user.isTwoFactorEnabled',
+      ])
+      .addSelect('user.twoFactorSecret')
+      .where('user.id = :id', {
+        id: challengePayload.id,
+      })
+      .getOneOrFail()
+      .catch((error: Error) => {
+        if (
+          error.name === Codes.Error.Database.EntityMetadataNotFoundError ||
+          error.name === Codes.Error.Database.EntityNotFoundError
+        )
+          throw new HttpException(Codes.Error.User.NOT_FOUND, 400);
+
+        throw error;
+      });
+
+    if (!user.isTwoFactorEnabled) {
+      throw new HttpException(Codes.Error.TwoFactor.NOT_ENABLED, 400);
+    }
+
+    if (user.status === Status.SUSPENDED) {
+      throw new HttpException(Codes.Error.User.SUSPENDED, 403);
+    }
+
+    this.ensureTwoFactorCodeIfRequired(user, code);
+
+    const loginDate = user.role !== Role.ADMIN ? null : new Date();
+
+    if (loginDate) {
+      await this.userRepository.update(
+        { id: user.id },
+        { lastLoginAt: loginDate },
+      );
+      user.lastLoginAt = loginDate;
+    }
+
+    if (user.status === Status.PENDING) {
+      await this.userRepository.update(
+        { id: user.id },
+        { status: Status.ACTIVE },
+      );
+      user.status = Status.ACTIVE;
+    }
+
+    const payload = this.buildJwtPayload(user, loginDate);
+
+    return this.generateTokens(payload, request);
   }
 
   async RevokeRefreshToken(refreshToken: string): Promise<boolean> {
@@ -379,5 +570,105 @@ export class AuthenticationService {
     }
 
     return user;
+  }
+
+  async GenerateTwoFactorSecret({
+    user,
+  }: {
+    user: UserContext;
+  }): Promise<AuthenticationTwoFactorGenerateResponseModel> {
+    const existingUser = await this.getUserWithTwoFactorSecret(user.id);
+
+    if (existingUser.isTwoFactorEnabled) {
+      throw new HttpException(Codes.Error.TwoFactor.ALREADY_ENABLED, 400);
+    }
+
+    const secret = authenticator.generateSecret();
+    const otpauthUrl = authenticator.keyuri(
+      existingUser.email,
+      this.getTwoFactorIssuer(),
+      secret,
+    );
+
+    await this.userRepository.update(existingUser.id, {
+      twoFactorSecret: secret,
+      isTwoFactorEnabled: false,
+    });
+
+    return plainToInstance(AuthenticationTwoFactorGenerateResponseModel, {
+      secret,
+      otpauthUrl,
+    });
+  }
+
+  async EnableTwoFactor({
+    user,
+    body,
+  }: {
+    user: UserContext;
+    body: AuthenticationTwoFactorVerifyRequestModel;
+  }): Promise<boolean> {
+    const existingUser = await this.getUserWithTwoFactorSecret(user.id);
+
+    if (existingUser.isTwoFactorEnabled) {
+      throw new HttpException(Codes.Error.TwoFactor.ALREADY_ENABLED, 400);
+    }
+
+    if (!existingUser.twoFactorSecret) {
+      throw new HttpException(Codes.Error.TwoFactor.SECRET_NOT_FOUND, 400);
+    }
+
+    const isValid = authenticator.verify({
+      token: body.code,
+      secret: existingUser.twoFactorSecret,
+    });
+
+    if (!isValid) {
+      throw new HttpException(Codes.Error.TwoFactor.INVALID, 400);
+    }
+
+    await this.userRepository.update(existingUser.id, {
+      isTwoFactorEnabled: true,
+    });
+
+    await this.RevokeAllUserTokens(existingUser.id);
+
+    return true;
+  }
+
+  async DisableTwoFactor({
+    user,
+    body,
+  }: {
+    user: UserContext;
+    body: AuthenticationTwoFactorVerifyRequestModel;
+  }): Promise<boolean> {
+    const existingUser = await this.getUserWithTwoFactorSecret(user.id);
+
+    if (!existingUser.isTwoFactorEnabled) {
+      throw new HttpException(Codes.Error.TwoFactor.NOT_ENABLED, 400);
+    }
+
+    if (!existingUser.twoFactorSecret) {
+      throw new HttpException(Codes.Error.TwoFactor.SECRET_NOT_FOUND, 400);
+    }
+
+    const isValid = authenticator.verify({
+      token: body.code,
+      secret: existingUser.twoFactorSecret,
+    });
+
+    if (!isValid) {
+      throw new HttpException(Codes.Error.TwoFactor.INVALID, 400);
+    }
+
+    await this.userRepository.update(existingUser.id, {
+      isTwoFactorEnabled: false,
+      twoFactorSecret: null,
+    });
+
+    await this.RevokeAllUserTokens(existingUser.id);
+
+    return true;
   }
 }

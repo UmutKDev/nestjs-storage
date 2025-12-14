@@ -8,6 +8,7 @@ import {
   AuthenticationSignInRequestModel,
   AuthenticationSignUpRequestModel,
   AuthenticationTokenResponseModel,
+  AuthenticationTwoFactorLoginRequestModel,
 } from './authentication.model';
 import { Public } from '@common/decorators/public.decorator';
 import { Request } from 'express';
@@ -16,30 +17,24 @@ import { Throttle } from '@nestjs/throttler';
 
 @Controller('Authentication')
 @ApiTags('Authentication')
-@Public()
 @Throttle({ default: { ttl: 60, limit: 10 } })
 export class AuthenticationController {
   constructor(private readonly authenticationService: AuthenticationService) {}
 
   @Post('Login')
   @ApiSuccessResponse(AuthenticationTokenResponseModel)
+  @Public()
   async Login(
-    @Body() { email, password }: AuthenticationSignInRequestModel,
+    @Body() body: AuthenticationSignInRequestModel,
     @Req() request: Request,
   ): Promise<AuthenticationTokenResponseModel> {
-    return this.authenticationService.Login(
-      {
-        email,
-        password,
-      },
-      request,
-    );
+    return this.authenticationService.Login(body, request);
   }
 
   @Post('Register')
-  @Public()
   @ApiSuccessResponse(AuthenticationTokenResponseModel)
   @ApiOperation({ deprecated: false })
+  @Public()
   async Register(
     @Body()
     { email, password }: AuthenticationSignUpRequestModel,
@@ -55,9 +50,9 @@ export class AuthenticationController {
   }
 
   @Post('RefreshToken')
-  @Public()
   @ApiSuccessResponse(AuthenticationTokenResponseModel)
   @ApiOperation({ summary: 'Refresh access token using refresh token' })
+  @Public()
   async RefreshToken(
     @Body() { refreshToken }: AuthenticationRefreshTokenRequestModel,
     @Req() request: Request,
@@ -76,12 +71,27 @@ export class AuthenticationController {
   }
 
   @Post('ResetPassword')
-  @Public()
   @ApiSuccessResponse('boolean')
+  @Public()
   async ResetPassword(
     @Body()
     { email }: AuthenticationResetPasswordRequestModel,
   ): Promise<boolean> {
     return this.authenticationService.ResetPassword({ email });
+  }
+
+  @Post('TwoFactor/Login')
+  @ApiSuccessResponse(AuthenticationTokenResponseModel)
+  @ApiOperation({ summary: 'Complete login by verifying 2FA challenge code' })
+  @Public()
+  async VerifyTwoFactorLogin(
+    @Body() { token, code }: AuthenticationTwoFactorLoginRequestModel,
+    @Req() request: Request,
+  ): Promise<AuthenticationTokenResponseModel> {
+    return this.authenticationService.VerifyTwoFactorLogin({
+      token,
+      code,
+      request,
+    });
   }
 }

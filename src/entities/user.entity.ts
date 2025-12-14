@@ -35,6 +35,12 @@ export class UserEntity {
   @Column({ nullable: true, default: null })
   image: string;
 
+  @Column({ default: false })
+  isTwoFactorEnabled: boolean;
+
+  @Column({ nullable: true, select: false, default: null })
+  twoFactorSecret?: string;
+
   @Column({
     type: 'enum',
     enum: Role,
