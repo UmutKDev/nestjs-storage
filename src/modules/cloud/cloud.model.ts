@@ -1,5 +1,5 @@
 import { CloudBreadcrumbLevelType } from '@common/enums';
-import { CDNPathResolver, slugify, slugify } from '@common/helpers/cast.helper';
+import { CDNPathResolver, slugify } from '@common/helpers/cast.helper';
 import { PaginationRequestModel } from '@common/models/pagination.model';
 import { ApiProperty, OmitType } from '@nestjs/swagger';
 import { Expose, Transform, Type } from 'class-transformer';
@@ -12,7 +12,6 @@ import {
   IsNumber,
   ValidateNested,
 } from 'class-validator';
-import e from 'express';
 
 export class CloudBreadCrumbModel {
   @Expose()
