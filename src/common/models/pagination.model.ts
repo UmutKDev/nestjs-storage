@@ -20,7 +20,6 @@ export class PaginationRequestModel {
   @IsOptional()
   @IsNumber()
   @Min(0)
-  @Max(100)
   skip: number = 0;
 
   @ApiProperty({ required: false, maximum: 100 })

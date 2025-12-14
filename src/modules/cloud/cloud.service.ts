@@ -220,7 +220,6 @@ export class CloudService {
     const aggregated: CommonPrefix[] = [];
     let continuationToken: string | undefined = undefined;
     let isFirstRequest = true;
-    let lastResponseCommonPrefixesLength = 0;
 
     while (true) {
       const maxKeys = Math.min(
@@ -244,28 +243,51 @@ export class CloudService {
       const command = await this.s3.send(new ListObjectsV2Command(params));
 
       const commonPrefixes = command.CommonPrefixes ?? [];
-      lastResponseCommonPrefixesLength = commonPrefixes.length;
       aggregated.push(...commonPrefixes);
+
+      // Always capture the continuation token before breaking
+      const isTruncated = command.IsTruncated;
+      continuationToken = isTruncated
+        ? command.NextContinuationToken
+        : undefined;
 
       if (aggregated.length >= skipValue + takeValue) {
         break;
       }
 
-      if (!command.IsTruncated) {
+      if (!isTruncated) {
         break;
       }
 
-      continuationToken = command.NextContinuationToken;
       isFirstRequest = false;
     }
 
     const sliced = aggregated.slice(skipValue, skipValue + takeValue);
 
-    // totalRowCount is best-effort. If we fetched all pages, aggregated length is accurate;
-    // otherwise we give aggregated.length as approximation.
+    // Continue fetching to get accurate total count
+    let totalCount = aggregated.length;
+    while (continuationToken) {
+      const countParams: ListObjectsV2CommandInput = {
+        Bucket: this.Buckets.Storage,
+        Delimiter: '/',
+        Prefix: this.Prefix,
+        MaxKeys: this.MaxListObjects,
+        ContinuationToken: continuationToken,
+      };
+
+      const countCommand = await this.s3.send(
+        new ListObjectsV2Command(countParams),
+      );
+      totalCount += (countCommand.CommonPrefixes ?? []).length;
+
+      if (!countCommand.IsTruncated) {
+        break;
+      }
+      continuationToken = countCommand.NextContinuationToken;
+    }
+
     if (request) {
-      request.totalRowCount =
-        aggregated.length || lastResponseCommonPrefixesLength || 0;
+      request.totalRowCount = totalCount;
     }
 
     return this.ProcessDirectories(sliced, this.Prefix, User);
@@ -328,7 +350,6 @@ export class CloudService {
     const aggregated: _Object[] = [];
     let continuationToken: string | undefined = undefined;
     let isFirstRequest = true;
-    let lastResponseContentsLength = 0;
 
     while (true) {
       const maxKeys = Math.min(
@@ -352,18 +373,22 @@ export class CloudService {
       const command = await this.s3.send(new ListObjectsV2Command(params));
 
       const contents = command.Contents ?? [];
-      lastResponseContentsLength = contents.length;
       aggregated.push(...contents);
+
+      // Always capture the continuation token before breaking
+      const isTruncated = command.IsTruncated;
+      continuationToken = isTruncated
+        ? command.NextContinuationToken
+        : undefined;
 
       if (aggregated.length >= skipValue + takeValue) {
         break;
       }
 
-      if (!command.IsTruncated) {
+      if (!isTruncated) {
         break;
       }
 
-      continuationToken = command.NextContinuationToken;
       isFirstRequest = false;
     }
 
@@ -375,9 +400,30 @@ export class CloudService {
       User,
     );
 
+    // Continue fetching to get accurate total count
+    let totalCount = aggregated.length;
+    while (continuationToken) {
+      const countParams: ListObjectsV2CommandInput = {
+        Bucket: this.Buckets.Storage,
+        Delimiter: Delimiter ? '/' : undefined,
+        Prefix: this.Prefix,
+        MaxKeys: this.MaxListObjects,
+        ContinuationToken: continuationToken,
+      };
+
+      const countCommand = await this.s3.send(
+        new ListObjectsV2Command(countParams),
+      );
+      totalCount += (countCommand.Contents ?? []).length;
+
+      if (!countCommand.IsTruncated) {
+        break;
+      }
+      continuationToken = countCommand.NextContinuationToken;
+    }
+
     if (request) {
-      request.totalRowCount =
-        aggregated.length || lastResponseContentsLength || 0;
+      request.totalRowCount = totalCount;
     }
 
     return objects;

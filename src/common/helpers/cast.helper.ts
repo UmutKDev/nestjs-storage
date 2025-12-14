@@ -120,11 +120,28 @@ export const PascalizeKeys = (obj: any): any => {
 export const ToPascalCase = (str: string): string =>
   startCase(camelCase(str)).replace(/ /g, '');
 
-export const S3KeyConverter = (url: string): string =>
-  decodeURIComponent(url) // URL'deki %20 gibi kodlamaları çöz
-    .replace(/^https?:\/\/[^/]+\//, '') // domain kısmını kaldır
-    .replace(/[?#].*$/, '') // query string ve fragment'i temizle
-    .trim(); // baştaki ve sondaki boşlukları at
+export const S3KeyConverter = (input: string): string => {
+  const trMap: Record<string, string> = {
+    ç: 'c',
+    ğ: 'g',
+    ı: 'i',
+    ö: 'o',
+    ş: 's',
+    ü: 'u',
+    Ç: 'C',
+    Ğ: 'G',
+    İ: 'I',
+    Ö: 'O',
+    Ş: 'S',
+    Ü: 'U',
+  };
+
+  return decodeURIComponent(input)
+    .replace(/^https?:\/\/[^/]+\//, '') // domain'i at
+    .replace(/[?#].*$/, '') // query ve fragment'i sil
+    .replace(/[çğıöşüÇĞİÖŞÜ]/g, (c) => trMap[c]) // Türkçe karakterleri dönüştür
+    .trim();
+};
 
 export const ExtensionFromMimeType = (mimeType: string): string | null => {
   for (const ext of AllMimeTypesExtensions) {
