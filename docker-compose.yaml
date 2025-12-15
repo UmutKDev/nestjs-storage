@@ -23,15 +23,35 @@ services:
       - SENTRY_DSN=${SENTRY_DSN}
       - SENTRY_AUTH_TOKEN=${SENTRY_AUTH_TOKEN}
 
-      - AWS_S3_BUCKET=${AWS_S3_BUCKET}
-      - AWS_CLOUDFRONT_ENDPOINT=${AWS_CLOUDFRONT_ENDPOINT}
-      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - S3_PROTOCOL_ACCESS_KEY_ID=${S3_PROTOCOL_ACCESS_KEY_ID}
+      - S3_PROTOCOL_ACCESS_KEY_SECRET=${S3_PROTOCOL_ACCESS_KEY_SECRET}
 
-      - TZ=${TZ}
+      - STORAGE_S3_MAX_SOCKETS=${STORAGE_S3_MAX_SOCKETS}
+      - STORAGE_S3_ENDPOINT=${STORAGE_S3_ENDPOINT}
+      - STORAGE_S3_PUBLIC_ENDPOINT=${STORAGE_S3_PUBLIC_ENDPOINT}
+      - STORAGE_S3_FORCE_PATH_STYLE=${STORAGE_S3_FORCE_PATH_STYLE}
+      - STORAGE_S3_REGION=${STORAGE_S3_REGION}
+
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN}
+      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
+      - JWT_REFRESH_EXPIRES_IN=${JWT_REFRESH_EXPIRES_IN}
+
+      - SWAGGER_USER=${SWAGGER_USER}
+      - SWAGGER_PASSWORD=${SWAGGER_PASSWORD}
+
+      - MAIL_HOST=${MAIL_HOST}
+      - MAIL_SECURE=${MAIL_SECURE}
+      - MAIL_FROM=${MAIL_FROM}
+      - MAIL_PORT=${MAIL_PORT}
+      - MAIL_USER=${MAIL_USER}
+      - MAIL_PASSWORD=${MAIL_PASSWORD}
+
       - NODE_ENV=${NODE_ENV}
       - PORT=${PORT}
+      - APP_NAME=${APP_NAME}
       - APP_URL=${APP_URL}
+      - TZ=${TZ}
 
       - REDIS_HOST=${REDIS_HOST:-redis}
       - REDIS_PORT=${REDIS_PORT:-6379}
@@ -46,6 +66,7 @@ services:
     depends_on:
       - database
       - redis
+      - minio
 
   database:
     container_name: database
@@ -69,7 +90,7 @@ services:
 
   redis:
     container_name: redis
-    image: redis:7-alpine
+    image: redis:latest
     ports:
       - ${REDIS_PORT:-6379}:6379
     command: redis-server --appendonly yes ${REDIS_PASSWORD:+--requirepass ${REDIS_PASSWORD}}
@@ -84,6 +105,27 @@ services:
     volumes:
       - redis_data:/data
 
+  minio:
+    container_name: minio
+    image: minio/minio:latest
+    ports:
+      - ${MINIO_PORT:-9000}:9000
+      - ${MINIO_CONSOLE_PORT:-9001}:9001
+    environment:
+      - MINIO_ROOT_USER=${S3_PROTOCOL_ACCESS_KEY_ID:-minioadmin}
+      - MINIO_ROOT_PASSWORD=${S3_PROTOCOL_ACCESS_KEY_SECRET:-minioadmin}
+    command: server /data --console-address ":9001"
+    networks:
+      - sqr_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    volumes:
+      - minio_data:/data
+
 networks:
   sqr_network:
     driver: bridge
@@ -91,3 +133,4 @@ networks:
 volumes:
   postgres_data: {}
   redis_data: {}
+  minio_data: {}

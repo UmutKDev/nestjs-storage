@@ -59,8 +59,8 @@ export declare global {
       TZ: string;
       NODE_ENV: string;
       PORT: string;
-      APP_URL: string;
       APP_NAME?: string;
+      APP_URL: string;
     }
   }
 
