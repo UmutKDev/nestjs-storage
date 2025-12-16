@@ -11,6 +11,8 @@ import {
   IsArray,
   IsNumber,
   ValidateNested,
+  MinLength,
+  ValidateIf,
 } from 'class-validator';
 
 export class CloudBreadCrumbModel {
@@ -50,6 +52,10 @@ export class CloudDirectoryModel {
   @Expose()
   @ApiProperty()
   Prefix: string;
+
+  @Expose()
+  @ApiProperty({ default: false })
+  IsEncrypted?: boolean = false;
 }
 
 export class CloudMetadataDefaultModel {
@@ -177,18 +183,24 @@ export class CloudPreSignedUrlRequestModel {
   ExpiresInSeconds?: number;
 }
 
-export class CloudDeleteRequestModel {
+export class CloudDeleteModel {
   @ApiProperty()
   @IsNotEmpty()
-  @IsArray()
-  @IsString({ each: true })
-  @Transform(({ value }) => value.map((v: string) => S3KeyConverter(v)))
-  Keys: Array<string>;
+  @Transform(({ value }) => S3KeyConverter(value))
+  Key: string;
 
   @ApiProperty({ required: false, default: false })
   @IsBoolean()
   @IsOptional()
   IsDirectory: boolean = false;
+}
+export class CloudDeleteRequestModel {
+  @ApiProperty()
+  @IsNotEmpty()
+  @IsArray()
+  @Type(() => CloudDeleteModel)
+  @ValidateNested({ each: true })
+  Items: Array<CloudDeleteModel>;
 }
 
 export class CloudCreateMultipartUploadRequestModel {
@@ -423,4 +435,85 @@ export class CloudUpdateRequestModel {
   @ApiProperty({ required: false })
   @IsOptional()
   Metadata?: Record<string, string>;
+}
+
+export class CloudEncryptedFolderSummaryModel {
+  @Expose()
+  @ApiProperty()
+  Path: string;
+
+  @Expose()
+  @ApiProperty()
+  CreatedAt: string;
+
+  @Expose()
+  @ApiProperty()
+  UpdatedAt: string;
+}
+
+export class CloudEncryptedFolderListResponseModel {
+  @Expose()
+  @ApiProperty({ type: CloudEncryptedFolderSummaryModel, isArray: true })
+  @Type(() => CloudEncryptedFolderSummaryModel)
+  Folders: CloudEncryptedFolderSummaryModel[];
+}
+
+export class CloudEncryptedFolderCreateRequestModel {
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  Path: string;
+
+  @ApiProperty({ minLength: 8 })
+  @IsString()
+  @IsNotEmpty()
+  @MinLength(8)
+  Passphrase: string;
+}
+
+export class CloudEncryptedFolderUnlockRequestModel {
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  Path: string;
+
+  @ApiProperty({ minLength: 8 })
+  @IsString()
+  @IsNotEmpty()
+  @MinLength(8)
+  Passphrase: string;
+}
+
+export class CloudEncryptedFolderUnlockResponseModel {
+  @Expose()
+  @ApiProperty()
+  Path: string;
+
+  @Expose()
+  @ApiProperty({
+    description: 'Base64 encoded symmetric key for the folder',
+  })
+  FolderKey: string;
+}
+
+export class CloudEncryptedFolderDeleteRequestModel {
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  Path: string;
+
+  @ApiProperty({ required: false, default: false })
+  @IsBoolean()
+  @IsOptional()
+  ShouldDeleteContents?: boolean = false;
+
+  @ApiProperty({
+    required: false,
+    description: 'Required when ShouldDeleteContents is true',
+    minLength: 8,
+  })
+  @ValidateIf((o) => o.ShouldDeleteContents === true)
+  @IsString()
+  @MinLength(8)
+  Passphrase?: string;
 }

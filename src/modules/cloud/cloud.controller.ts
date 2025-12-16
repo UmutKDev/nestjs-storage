@@ -38,6 +38,12 @@ import {
   CloudUploadPartResponseModel,
   CloudUserStorageUsageResponseModel,
   CloudPreSignedUrlRequestModel,
+  CloudEncryptedFolderCreateRequestModel,
+  CloudEncryptedFolderSummaryModel,
+  CloudEncryptedFolderListResponseModel,
+  CloudEncryptedFolderUnlockRequestModel,
+  CloudEncryptedFolderUnlockResponseModel,
+  CloudEncryptedFolderDeleteRequestModel,
 } from './cloud.model';
 import {
   ApiSuccessArrayResponse,
@@ -198,6 +204,65 @@ export class CloudController {
     @User() user: UserContext,
   ): Promise<boolean> {
     return this.cloudService.CreateDirectory(model, user);
+  }
+
+  @ApiOperation({
+    summary: 'List encrypted folders',
+    description: 'Returns encrypted folders metadata scoped to the user.',
+  })
+  @Get('EncryptedFolder')
+  @ApiSuccessResponse(CloudEncryptedFolderListResponseModel)
+  async ListEncryptedFolders(
+    @User() user: UserContext,
+  ): Promise<CloudEncryptedFolderListResponseModel> {
+    return this.cloudService.ListEncryptedFolders(user);
+  }
+
+  @ApiOperation({
+    summary: 'Create an encrypted folder',
+    description:
+      'Creates or marks a folder as encrypted using a client-provided passphrase.',
+  })
+  @Post('EncryptedFolder')
+  @ApiSuccessResponse(CloudEncryptedFolderSummaryModel)
+  async CreateEncryptedFolder(
+    @Body() model: CloudEncryptedFolderCreateRequestModel,
+    @User() user: UserContext,
+  ): Promise<CloudEncryptedFolderSummaryModel> {
+    return this.cloudService.CreateEncryptedFolder(model, user);
+  }
+
+  @ApiOperation({
+    summary: 'Unlock an encrypted folder',
+    description:
+      'Validates the passphrase and returns the encrypted folder key for client-side encryption.',
+  })
+  @Post('EncryptedFolder/Unlock')
+  @ApiSuccessResponse(CloudEncryptedFolderUnlockResponseModel)
+  async UnlockEncryptedFolder(
+    @Body() model: CloudEncryptedFolderUnlockRequestModel,
+    @User() user: UserContext,
+  ): Promise<CloudEncryptedFolderUnlockResponseModel> {
+    return this.cloudService.UnlockEncryptedFolder(model, user);
+  }
+
+  @ApiOperation({
+    summary: 'Delete an encrypted folder definition',
+    description:
+      'Removes encrypted-folder metadata and optionally deletes folder contents.',
+  })
+  @Delete('EncryptedFolder')
+  @ApiResponse({
+    status: 200,
+    description: 'Encrypted folder removed',
+    schema: { type: 'boolean' },
+  })
+  @ApiBody({ type: CloudEncryptedFolderDeleteRequestModel })
+  async DeleteEncryptedFolder(
+    @Body() model: CloudEncryptedFolderDeleteRequestModel,
+    @User() user: UserContext,
+  ): Promise<boolean> {
+    return this.cloudService.DeleteEncryptedFolder(model, user);
   }
 
   @ApiOperation({

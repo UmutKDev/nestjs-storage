@@ -15,7 +15,13 @@ import {
   S3Client,
   UploadPartCommand,
 } from '@aws-sdk/client-s3';
-import { HttpException, Injectable, Logger } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
+import {
+  createCipheriv,
+  createDecipheriv,
+  pbkdf2Sync,
+  randomBytes,
+} from 'crypto';
 import { InjectAws } from 'aws-sdk-v3-nest';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import sharp from 'sharp';
@@ -43,6 +49,12 @@ import {
   CloudUploadPartResponseModel,
   CloudUserStorageUsageResponseModel,
   CloudPreSignedUrlRequestModel,
+  CloudEncryptedFolderCreateRequestModel,
+  CloudEncryptedFolderSummaryModel,
+  CloudEncryptedFolderListResponseModel,
+  CloudEncryptedFolderUnlockRequestModel,
+  CloudEncryptedFolderUnlockResponseModel,
+  CloudEncryptedFolderDeleteRequestModel,
 } from './cloud.model';
 import { plainToInstance } from 'class-transformer';
 import {
@@ -56,6 +68,19 @@ import { UserSubscriptionEntity } from '@entities/user-subscription.entity';
 import { Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { asyncLocalStorage } from '@common/context/context.service';
+
+type EncryptedFolderRecord = {
+  ciphertext: string;
+  iv: string;
+  authTag: string;
+  salt: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+type EncryptedFolderManifest = {
+  folders: Record<string, EncryptedFolderRecord>;
+};
 
 @Injectable()
 export class CloudService {
@@ -76,6 +101,12 @@ export class CloudService {
   private readonly EmptyFolderPlaceholder = '.emptyFolderPlaceholder';
   private readonly IsDirectory = (key: string) =>
     key.includes(this.EmptyFolderPlaceholder);
+  private readonly EncryptedFoldersManifestKey =
+    '.secure/encrypted-folders.json';
+  private readonly EncryptedFolderKeyBytes = 32;
+  private readonly EncryptedFolderIvLength = 12;
+  private readonly EncryptedFolderKdfIterations = 120000;
+  private readonly EncryptedFolderAlgorithm = 'aes-256-gcm';
   private Prefix = null;
   @InjectRepository(UserSubscriptionEntity)
   private userSubscriptionRepository: Repository<UserSubscriptionEntity>;
@@ -113,9 +144,16 @@ export class CloudService {
       }),
     );
 
+    const encryptedFolders = await this.GetEncryptedFolderSet(User);
+
     const [Breadcrumb, Directories, Contents] = await Promise.all([
       this.ProcessBreadcrumb(Path || '', Delimiter),
-      this.ProcessDirectories(command.CommonPrefixes ?? [], this.Prefix, User),
+      this.ProcessDirectories(
+        command.CommonPrefixes ?? [],
+        this.Prefix,
+        User,
+        encryptedFolders,
+      ),
       this.ProcessObjects(command.Contents ?? [], IsMetadataProcessing, User),
     ]);
 
@@ -194,6 +232,8 @@ export class CloudService {
     }
     this.Prefix = prefix;
 
+    const encryptedFolders = await this.GetEncryptedFolderSet(User);
+
     // If no delimiter requested, CommonPrefixes will be empty; maintain previous behavior.
     if (!Delimiter) {
       const command = await this.s3.send(
@@ -207,6 +247,7 @@ export class CloudService {
         command.CommonPrefixes ?? [],
         this.Prefix,
         User,
+        encryptedFolders,
       );
     }
 
@@ -290,7 +331,7 @@ export class CloudService {
       request.totalRowCount = totalCount;
     }
 
-    return this.ProcessDirectories(sliced, this.Prefix, User);
+    return this.ProcessDirectories(sliced, this.Prefix, User, encryptedFolders);
   }
 
   //#endregion
@@ -659,13 +700,18 @@ export class CloudService {
     CommonPrefixes: CommonPrefix[],
     Prefix: string,
     User: UserContext,
+    encryptedFolders?: Set<string>,
   ): Promise<CloudDirectoryModel[]> {
+    const CommonPrefixesFiltered = CommonPrefixes.filter(
+      (cp) => !cp.Prefix.includes('.secure/'),
+    );
+
     if (CommonPrefixes.length === 0) {
       return [];
     }
 
     const directories: CloudDirectoryModel[] = [];
-    for (const commonPrefix of CommonPrefixes) {
+    for (const commonPrefix of CommonPrefixesFiltered) {
       if (commonPrefix.Prefix) {
         const DirectoryName = commonPrefix.Prefix.replace(Prefix, '').replace(
           '/',
@@ -675,9 +721,11 @@ export class CloudService {
           User.id + '/',
           '',
         );
+        const normalizedPrefix = this.NormalizeDirectoryPath(DirectoryPrefix);
         directories.push({
           Name: DirectoryName,
           Prefix: DirectoryPrefix,
+          IsEncrypted: encryptedFolders?.has(normalizedPrefix) ?? false,
         });
       }
     }
@@ -789,13 +837,28 @@ export class CloudService {
   //#region Delete
 
   async Delete(
-    { Keys, IsDirectory }: CloudDeleteRequestModel,
+    { Items }: CloudDeleteRequestModel,
     User: UserContext,
+    options?: { allowEncryptedDirectories?: boolean },
   ): Promise<boolean> {
     try {
-      for await (const key of Keys) {
-        if (IsDirectory) {
-          const directoryKey = key.replace(/^\/+|\/+$/g, '') + '/';
+      const encryptedFolders = await this.GetEncryptedFolderSet(User);
+
+      for await (const item of Items) {
+        if (item.IsDirectory) {
+          const normalizedKey = this.NormalizeDirectoryPath(item.Key);
+          if (
+            normalizedKey &&
+            encryptedFolders.has(normalizedKey) &&
+            !options?.allowEncryptedDirectories
+          ) {
+            throw new HttpException(
+              'Encrypted folders must be deleted via the encrypted-folder endpoint.',
+              HttpStatus.FORBIDDEN,
+            );
+          }
+
+          const directoryKey = item.Key.replace(/^\/+|\/+$/g, '') + '/';
           // List all objects with the directory prefix
           let continuationToken: string | undefined = undefined;
           do {
@@ -824,7 +887,7 @@ export class CloudService {
           await this.s3.send(
             new DeleteObjectCommand({
               Bucket: this.Buckets.Storage,
-              Key: KeyBuilder([User.id, key]),
+              Key: KeyBuilder([User.id, item.Key]),
             }),
           );
         }
@@ -857,6 +920,332 @@ export class CloudService {
       }),
     );
     return true;
+  }
+
+  //#endregion
+
+  //#region Encrypted Folders
+
+  async ListEncryptedFolders(
+    User: UserContext,
+  ): Promise<CloudEncryptedFolderListResponseModel> {
+    const manifest = await this.GetEncryptedFolderManifest(User);
+    const folders = Object.entries(manifest.folders || {})
+      .map(([path, record]) => ({
+        Path: this.NormalizeDirectoryPath(path),
+        CreatedAt: record.createdAt,
+        UpdatedAt: record.updatedAt,
+      }))
+      .filter((folder) => !!folder.Path)
+      .sort((a, b) => a.Path.localeCompare(b.Path));
+
+    return plainToInstance(CloudEncryptedFolderListResponseModel, {
+      Folders: folders,
+    });
+  }
+
+  async CreateEncryptedFolder(
+    { Path, Passphrase }: CloudEncryptedFolderCreateRequestModel,
+    User: UserContext,
+  ): Promise<CloudEncryptedFolderSummaryModel> {
+    const normalizedPath = this.NormalizeDirectoryPath(Path);
+    if (!normalizedPath) {
+      throw new HttpException(
+        'Folder path is required',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const manifest = await this.GetEncryptedFolderManifest(User);
+    if (manifest.folders[normalizedPath]) {
+      throw new HttpException(
+        'Encrypted folder already exists',
+        HttpStatus.CONFLICT,
+      );
+    }
+
+    await this.CreateDirectory(
+      { Key: normalizedPath } as CloudKeyRequestModel,
+      User,
+    );
+
+    const folderKey = randomBytes(this.EncryptedFolderKeyBytes).toString(
+      'base64',
+    );
+    const encrypted = this.EncryptFolderKey(Passphrase, folderKey);
+
+    const now = new Date().toISOString();
+
+    manifest.folders[normalizedPath] = {
+      ...encrypted,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    await this.SaveEncryptedFolderManifest(User, manifest);
+
+    return plainToInstance(CloudEncryptedFolderSummaryModel, {
+      Path: normalizedPath,
+      CreatedAt: now,
+      UpdatedAt: now,
+    });
+  }
+
+  async UnlockEncryptedFolder(
+    { Path, Passphrase }: CloudEncryptedFolderUnlockRequestModel,
+    User: UserContext,
+  ): Promise<CloudEncryptedFolderUnlockResponseModel> {
+    const normalizedPath = this.NormalizeDirectoryPath(Path);
+    if (!normalizedPath) {
+      throw new HttpException(
+        'Folder path is required',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const manifest = await this.GetEncryptedFolderManifest(User);
+    const entry = manifest.folders[normalizedPath];
+
+    if (!entry) {
+      throw new HttpException(
+        Codes.Error.Cloud.FILE_NOT_FOUND,
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    try {
+      const folderKey = this.DecryptFolderKey(Passphrase, entry);
+      return plainToInstance(CloudEncryptedFolderUnlockResponseModel, {
+        Path: normalizedPath,
+        FolderKey: folderKey,
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Failed to unlock encrypted folder ${normalizedPath} for user ${User.id}`,
+      );
+      throw new HttpException('Invalid passphrase', HttpStatus.BAD_REQUEST);
+    }
+  }
+
+  async DeleteEncryptedFolder(
+    {
+      Path,
+      ShouldDeleteContents,
+      Passphrase,
+    }: CloudEncryptedFolderDeleteRequestModel,
+    User: UserContext,
+  ): Promise<boolean> {
+    const normalizedPath = this.NormalizeDirectoryPath(Path);
+    if (!normalizedPath) {
+      throw new HttpException(
+        'Folder path is required',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const manifest = await this.GetEncryptedFolderManifest(User);
+    const entry = manifest.folders[normalizedPath];
+    if (!entry) {
+      throw new HttpException(
+        Codes.Error.Cloud.FILE_NOT_FOUND,
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    if (ShouldDeleteContents) {
+      if (!Passphrase) {
+        throw new HttpException(
+          'Passphrase is required to delete encrypted folders.',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      try {
+        this.DecryptFolderKey(Passphrase, entry);
+      } catch (error) {
+        throw new HttpException('Invalid passphrase', HttpStatus.BAD_REQUEST);
+      }
+
+      await this.Delete(
+        {
+          Items: [
+            {
+              Key: normalizedPath,
+              IsDirectory: true,
+            },
+          ],
+        } as CloudDeleteRequestModel,
+        User,
+        { allowEncryptedDirectories: true },
+      );
+    }
+
+    delete manifest.folders[normalizedPath];
+    await this.SaveEncryptedFolderManifest(User, manifest);
+
+    return true;
+  }
+
+  private async GetEncryptedFolderSet(User: UserContext): Promise<Set<string>> {
+    const manifest = await this.GetEncryptedFolderManifest(User);
+    return this.BuildEncryptedFolderSet(manifest);
+  }
+
+  private BuildEncryptedFolderSet(
+    manifest: EncryptedFolderManifest,
+  ): Set<string> {
+    const folders = manifest.folders || {};
+    const set = new Set<string>();
+    for (const path of Object.keys(folders)) {
+      const normalized = this.NormalizeDirectoryPath(path);
+      if (normalized) {
+        set.add(normalized);
+      }
+    }
+    return set;
+  }
+
+  private NormalizeDirectoryPath(path: string): string {
+    return (path || '').replace(/^\/+|\/+$/g, '');
+  }
+
+  private async GetEncryptedFolderManifest(
+    User: UserContext,
+  ): Promise<EncryptedFolderManifest> {
+    const manifestKey = KeyBuilder([User.id, this.EncryptedFoldersManifestKey]);
+
+    try {
+      const command = await this.s3.send(
+        new GetObjectCommand({
+          Bucket: this.Buckets.Storage,
+          Key: manifestKey,
+        }),
+      );
+
+      const body = command.Body as Readable;
+      if (!body) {
+        return { folders: {} };
+      }
+
+      const json = await this.ReadStreamToString(body);
+      if (!json) {
+        return { folders: {} };
+      }
+
+      let raw: any = {};
+      try {
+        raw = JSON.parse(json);
+      } catch (parseError) {
+        this.logger.warn(
+          'Failed to parse encrypted folder manifest, returning empty manifest',
+          parseError,
+        );
+        return { folders: {} };
+      }
+      const normalized: Record<string, EncryptedFolderRecord> = {};
+      if (raw && typeof raw === 'object' && raw.folders) {
+        for (const [path, entry] of Object.entries(
+          raw.folders as Record<string, EncryptedFolderRecord>,
+        )) {
+          const normalizedPath = this.NormalizeDirectoryPath(path);
+          if (
+            normalizedPath &&
+            entry &&
+            typeof entry === 'object' &&
+            entry.ciphertext &&
+            entry.iv &&
+            entry.authTag &&
+            entry.salt
+          ) {
+            normalized[normalizedPath] = entry;
+          }
+        }
+      }
+      return { folders: normalized };
+    } catch (error) {
+      if (this.NotFoundErrorCodes.includes(error.name)) {
+        return { folders: {} };
+      }
+      this.logger.error('Failed to load encrypted folder manifest', error);
+      throw error;
+    }
+  }
+
+  private async SaveEncryptedFolderManifest(
+    User: UserContext,
+    manifest: EncryptedFolderManifest,
+  ): Promise<void> {
+    const manifestKey = KeyBuilder([User.id, this.EncryptedFoldersManifestKey]);
+
+    await this.s3.send(
+      new PutObjectCommand({
+        Bucket: this.Buckets.Storage,
+        Key: manifestKey,
+        Body: JSON.stringify({ folders: manifest.folders || {} }),
+        ContentType: 'application/json',
+      }),
+    );
+  }
+
+  private EncryptFolderKey(
+    passphrase: string,
+    folderKey: string,
+  ): Omit<EncryptedFolderRecord, 'createdAt' | 'updatedAt'> {
+    const salt = randomBytes(16);
+    const key = pbkdf2Sync(
+      passphrase,
+      salt,
+      this.EncryptedFolderKdfIterations,
+      32,
+      'sha512',
+    );
+    const iv = randomBytes(this.EncryptedFolderIvLength);
+    const cipher = createCipheriv(this.EncryptedFolderAlgorithm, key, iv);
+    const encrypted = Buffer.concat([
+      cipher.update(folderKey, 'utf8'),
+      cipher.final(),
+    ]);
+    const authTag = cipher.getAuthTag();
+
+    return {
+      ciphertext: encrypted.toString('base64'),
+      iv: iv.toString('base64'),
+      authTag: authTag.toString('base64'),
+      salt: salt.toString('base64'),
+    };
+  }
+
+  private DecryptFolderKey(
+    passphrase: string,
+    record: EncryptedFolderRecord,
+  ): string {
+    const salt = Buffer.from(record.salt, 'base64');
+    const key = pbkdf2Sync(
+      passphrase,
+      salt,
+      this.EncryptedFolderKdfIterations,
+      32,
+      'sha512',
+    );
+    const iv = Buffer.from(record.iv, 'base64');
+    const decipher = createDecipheriv(this.EncryptedFolderAlgorithm, key, iv);
+    decipher.setAuthTag(Buffer.from(record.authTag, 'base64'));
+    const decrypted = Buffer.concat([
+      decipher.update(Buffer.from(record.ciphertext, 'base64')),
+      decipher.final(),
+    ]);
+    return decrypted.toString('utf8');
+  }
+
+  private async ReadStreamToString(stream: Readable): Promise<string> {
+    const chunks: Buffer[] = [];
+    for await (const chunk of stream) {
+      const bufferChunk = Buffer.isBuffer(chunk)
+        ? chunk
+        : Buffer.from(chunk instanceof Uint8Array ? chunk : String(chunk));
+      chunks.push(bufferChunk);
+    }
+    return Buffer.concat(chunks).toString('utf8');
   }
 
   //#endregion
