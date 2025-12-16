@@ -10,8 +10,9 @@ import {
   AuthenticationSignUpRequestModel,
   AuthenticationTokenResponseModel,
   AuthenticationTwoFactorGenerateResponseModel,
-  AuthenticationTwoFactorLoginRequestModel,
   AuthenticationTwoFactorVerifyRequestModel,
+  AuthenticationVerifyCredentialsRequestModel,
+  AuthenticationVerifyCredentialsResponseModel,
   JWTPayloadModel,
   JWTTokenDecodeResponseModel,
 } from './authentication.model';
@@ -119,25 +120,6 @@ export class AuthenticationService {
     };
   }
 
-  private async createTwoFactorChallengeResponse(
-    user: Pick<UserEntity, 'id' | 'email'>,
-  ): Promise<AuthenticationTokenResponseModel> {
-    const token = await this.jwtService.signAsync(
-      { id: user.id, email: user.email },
-      {
-        secret: jwtConstants.twoFactorSecret,
-        expiresIn: jwtConstants.twoFactorTokenExpiresIn,
-        subject: user.id,
-      },
-    );
-
-    return plainToInstance(AuthenticationTokenResponseModel, {
-      twoFactorRequired: true,
-      twoFactorToken: token,
-      twoFactorTokenExpiresIn: jwtConstants.twoFactorTokenExpiresIn,
-    });
-  }
-
   async Login(
     { email, password, twoFactorCode }: AuthenticationSignInRequestModel,
     request?: Request,
@@ -178,10 +160,6 @@ export class AuthenticationService {
       throw new HttpException(Codes.Error.User.SUSPENDED, 403);
     }
 
-    if (user.isTwoFactorEnabled && !twoFactorCode) {
-      return this.createTwoFactorChallengeResponse(user);
-    }
-
     this.ensureTwoFactorCodeIfRequired(user, twoFactorCode);
 
     const loginDate = user.role !== Role.ADMIN ? null : new Date();
@@ -205,6 +183,45 @@ export class AuthenticationService {
     const payload = this.buildJwtPayload(user, loginDate);
 
     return this.generateTokens(payload, request);
+  }
+
+  async VerifyCredentials({
+    email,
+    password,
+  }: AuthenticationVerifyCredentialsRequestModel): Promise<AuthenticationVerifyCredentialsResponseModel> {
+    const defaultResponse = plainToInstance(
+      AuthenticationVerifyCredentialsResponseModel,
+      {
+        isValid: false,
+        twoFactorRequired: false,
+      },
+    );
+
+    const user = await this.userRepository
+      .createQueryBuilder('user')
+      .select(['user.id', 'user.status', 'user.isTwoFactorEnabled'])
+      .addSelect('user.password')
+      .where('user.email = :email', { email })
+      .getOne()
+      .catch(() => null);
+
+    if (!user) {
+      return defaultResponse;
+    }
+
+    const isPasswordValid = await argon2.verify(user.password, password);
+    if (!isPasswordValid) {
+      return defaultResponse;
+    }
+
+    if (user.status === Status.SUSPENDED || user.status === Status.INACTIVE) {
+      return defaultResponse;
+    }
+
+    return plainToInstance(AuthenticationVerifyCredentialsResponseModel, {
+      isValid: true,
+      twoFactorRequired: user.isTwoFactorEnabled,
+    });
   }
 
   async RefreshToken({
@@ -372,89 +389,9 @@ export class AuthenticationService {
       accessToken,
       refreshToken,
       expiresIn: jwtConstants.accessTokenExpiresIn,
-      twoFactorRequired: false,
     };
 
     return plainToInstance(AuthenticationTokenResponseModel, response);
-  }
-
-  async VerifyTwoFactorLogin({
-    token,
-    code,
-    request,
-  }: {
-    token: string;
-    code: string;
-    request?: Request;
-  }): Promise<AuthenticationTokenResponseModel> {
-    let challengePayload: JWTPayloadModel | null = null;
-
-    try {
-      challengePayload = (await this.jwtService.verifyAsync(token, {
-        secret: jwtConstants.twoFactorSecret,
-      })) as JWTPayloadModel;
-    } catch {
-      throw new HttpException(Codes.Error.TwoFactor.INVALID_CHALLENGE, 400);
-    }
-
-    const user = await this.userRepository
-      .createQueryBuilder('user')
-      .select([
-        'user.id',
-        'user.role',
-        'user.fullName',
-        'user.email',
-        'user.status',
-        'user.lastLoginAt',
-        'user.image',
-        'user.isTwoFactorEnabled',
-      ])
-      .addSelect('user.twoFactorSecret')
-      .where('user.id = :id', {
-        id: challengePayload.id,
-      })
-      .getOneOrFail()
-      .catch((error: Error) => {
-        if (
-          error.name === Codes.Error.Database.EntityMetadataNotFoundError ||
-          error.name === Codes.Error.Database.EntityNotFoundError
-        )
-          throw new HttpException(Codes.Error.User.NOT_FOUND, 400);
-
-        throw error;
-      });
-
-    if (!user.isTwoFactorEnabled) {
-      throw new HttpException(Codes.Error.TwoFactor.NOT_ENABLED, 400);
-    }
-
-    if (user.status === Status.SUSPENDED) {
-      throw new HttpException(Codes.Error.User.SUSPENDED, 403);
-    }
-
-    this.ensureTwoFactorCodeIfRequired(user, code);
-
-    const loginDate = user.role !== Role.ADMIN ? null : new Date();
-
-    if (loginDate) {
-      await this.userRepository.update(
-        { id: user.id },
-        { lastLoginAt: loginDate },
-      );
-      user.lastLoginAt = loginDate;
-    }
-
-    if (user.status === Status.PENDING) {
-      await this.userRepository.update(
-        { id: user.id },
-        { status: Status.ACTIVE },
-      );
-      user.status = Status.ACTIVE;
-    }
-
-    const payload = this.buildJwtPayload(user, loginDate);
-
-    return this.generateTokens(payload, request);
   }
 
   async RevokeRefreshToken(refreshToken: string): Promise<boolean> {

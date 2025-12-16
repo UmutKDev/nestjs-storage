@@ -8,7 +8,8 @@ import {
   AuthenticationSignInRequestModel,
   AuthenticationSignUpRequestModel,
   AuthenticationTokenResponseModel,
-  AuthenticationTwoFactorLoginRequestModel,
+  AuthenticationVerifyCredentialsRequestModel,
+  AuthenticationVerifyCredentialsResponseModel,
 } from './authentication.model';
 import { Public } from '@common/decorators/public.decorator';
 import { Request } from 'express';
@@ -29,6 +30,18 @@ export class AuthenticationController {
     @Req() request: Request,
   ): Promise<AuthenticationTokenResponseModel> {
     return this.authenticationService.Login(body, request);
+  }
+
+  @Post('VerifyCredentials')
+  @ApiSuccessResponse(AuthenticationVerifyCredentialsResponseModel)
+  @Public()
+  @ApiOperation({
+    summary: 'Check whether the provided email/password pair is valid and if 2FA applies',
+  })
+  async VerifyCredentials(
+    @Body() body: AuthenticationVerifyCredentialsRequestModel,
+  ): Promise<AuthenticationVerifyCredentialsResponseModel> {
+    return this.authenticationService.VerifyCredentials(body);
   }
 
   @Post('Register')
@@ -80,18 +93,4 @@ export class AuthenticationController {
     return this.authenticationService.ResetPassword({ email });
   }
 
-  @Post('TwoFactor/Login')
-  @ApiSuccessResponse(AuthenticationTokenResponseModel)
-  @ApiOperation({ summary: 'Complete login by verifying 2FA challenge code' })
-  @Public()
-  async VerifyTwoFactorLogin(
-    @Body() { token, code }: AuthenticationTwoFactorLoginRequestModel,
-    @Req() request: Request,
-  ): Promise<AuthenticationTokenResponseModel> {
-    return this.authenticationService.VerifyTwoFactorLogin({
-      token,
-      code,
-      request,
-    });
-  }
 }

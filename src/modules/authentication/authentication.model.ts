@@ -87,24 +87,6 @@ export class AuthenticationTokenResponseModel {
   @Expose()
   @ApiProperty({ required: false })
   expiresIn?: number;
-
-  @Expose()
-  @ApiProperty({ default: false })
-  twoFactorRequired?: boolean;
-
-  @Expose()
-  @ApiProperty({
-    required: false,
-    description: 'Temporary token used to finalize login with a 2FA code',
-  })
-  twoFactorToken?: string;
-
-  @Expose()
-  @ApiProperty({
-    required: false,
-    description: 'Lifetime in seconds of the temporary 2FA login token',
-  })
-  twoFactorTokenExpiresIn?: number;
 }
 
 export class JWTPayloadModel extends PickType(UserViewModel, [
@@ -166,12 +148,21 @@ export class AuthenticationTwoFactorVerifyRequestModel {
   code: string;
 }
 
-export class AuthenticationTwoFactorLoginRequestModel extends AuthenticationTwoFactorVerifyRequestModel {
-  @ApiProperty({
-    description: 'Temporary token received after submitting email & password',
-  })
-  @IsString()
-  @IsNotEmpty()
-  @IsJWT()
-  token: string;
+export class AuthenticationVerifyCredentialsRequestModel extends PickType(
+  UserViewModel,
+  ['email'] as const,
+) {
+  @ApiProperty()
+  @IsNotEmpty({ message: Codes.Error.Password.CANNOT_BE_EMPTY })
+  password: string;
+}
+
+export class AuthenticationVerifyCredentialsResponseModel {
+  @ApiProperty()
+  @Expose()
+  isValid: boolean;
+
+  @ApiProperty()
+  @Expose()
+  twoFactorRequired: boolean;
 }
