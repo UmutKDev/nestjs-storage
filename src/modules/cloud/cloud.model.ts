@@ -183,7 +183,7 @@ export class CloudDeleteRequestModel {
   @IsArray()
   @IsString({ each: true })
   @Transform(({ value }) => value.map((v: string) => S3KeyConverter(v)))
-  Key: Array<string>;
+  Keys: Array<string>;
 
   @ApiProperty({ required: false, default: false })
   @IsBoolean()

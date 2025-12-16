@@ -789,20 +789,45 @@ export class CloudService {
   //#region Delete
 
   async Delete(
-    { Key, IsDirectory }: CloudDeleteRequestModel,
+    { Keys, IsDirectory }: CloudDeleteRequestModel,
     User: UserContext,
   ): Promise<boolean> {
     try {
-      for await (const key of Key) {
-        await this.s3.send(
-          new DeleteObjectCommand({
-            Bucket: this.Buckets.Storage,
-            Key: KeyBuilder([
-              User.id,
-              key + (IsDirectory ? '/' + this.EmptyFolderPlaceholder : ''),
-            ]),
-          }),
-        );
+      for await (const key of Keys) {
+        if (IsDirectory) {
+          const directoryKey = key.replace(/^\/+|\/+$/g, '') + '/';
+          // List all objects with the directory prefix
+          let continuationToken: string | undefined = undefined;
+          do {
+            const listCommand = await this.s3.send(
+              new ListObjectsV2Command({
+                Bucket: this.Buckets.Storage,
+                Prefix: KeyBuilder([User.id, directoryKey]),
+                ContinuationToken: continuationToken,
+              }),
+            );
+            const contents = listCommand.Contents || [];
+            for (const content of contents) {
+              // Delete each object within the directory
+              await this.s3.send(
+                new DeleteObjectCommand({
+                  Bucket: this.Buckets.Storage,
+                  Key: content.Key!,
+                }),
+              );
+            }
+            continuationToken = listCommand.IsTruncated
+              ? listCommand.NextContinuationToken
+              : undefined;
+          } while (continuationToken);
+        } else {
+          await this.s3.send(
+            new DeleteObjectCommand({
+              Bucket: this.Buckets.Storage,
+              Key: KeyBuilder([User.id, key]),
+            }),
+          );
+        }
       }
     } catch (error) {
       if (this.NotFoundErrorCodes.includes(error.name)) {
