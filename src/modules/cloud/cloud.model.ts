@@ -195,7 +195,7 @@ export class CloudDeleteModel {
   IsDirectory: boolean = false;
 }
 export class CloudDeleteRequestModel {
-  @ApiProperty()
+  @ApiProperty({ type: CloudDeleteModel, isArray: true })
   @IsNotEmpty()
   @IsArray()
   @Type(() => CloudDeleteModel)
