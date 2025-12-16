@@ -106,8 +106,6 @@ export class SubscriptionPutBodyRequestModel extends OmitType(
 /* User subscription DTOs                        */
 /* -------------------------------------------- */
 
-export class UserSubscriptionDateModel extends BaseDateModel {}
-
 export class UserSubscriptionViewModel {
   @Expose()
   @ApiProperty({ format: 'uuid' })
@@ -155,14 +153,14 @@ export class UserSubscriptionViewModel {
   subscription?: SubscriptionResponseModel;
 
   @Expose()
-  @ApiProperty({ type: UserSubscriptionDateModel })
-  @Type(() => UserSubscriptionDateModel)
-  date: UserSubscriptionDateModel;
+  @ApiProperty({ type: BaseDateModel })
+  @Type(() => BaseDateModel)
+  date: BaseDateModel;
 }
 
 export class UserSubscriptionResponseModel extends OmitType(
   UserSubscriptionViewModel,
-  [] as const,
+  ['userId', 'subscriptionId', 'providerSubscriptionId'] as const,
 ) {}
 
 export class SubscribeRequestModel {

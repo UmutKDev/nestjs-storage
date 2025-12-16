@@ -4,8 +4,9 @@ import { ApiProperty, OmitType } from '@nestjs/swagger';
 import { IsEmail, IsOptional, IsPhoneNumber, IsString } from 'class-validator';
 import { Role, Status } from '@common/enums';
 import { UserSubscriptionResponseModel } from '../subscription/subscription.model';
-import { Expose, Transform } from 'class-transformer';
+import { Expose, Transform, Type } from 'class-transformer';
 import { CDNPathResolver } from '@common/helpers/cast.helper';
+import { UserSubscriptionEntity } from '@entities/user-subscription.entity';
 
 export class UserDateModel extends BaseDateModel {
   @ApiProperty()
@@ -58,8 +59,9 @@ export class UserViewModel implements UserEntity {
   status: string;
 
   @Expose()
-  @ApiProperty({ required: false, type: UserSubscriptionResponseModel })
-  subscription?: UserSubscriptionResponseModel;
+  @ApiProperty({ type: UserSubscriptionResponseModel })
+  @Type(() => UserSubscriptionResponseModel)
+  subscription: UserSubscriptionEntity;
 
   @Expose()
   @ApiProperty({ type: UserDateModel })

@@ -11,6 +11,7 @@ import { Repository } from 'typeorm';
 import { UserEntity } from '@entities//user.entity';
 // import { CloudPaths } from '@common/enums';
 import { plainToInstance } from 'class-transformer';
+import { SubscriptionStatus } from '@common/enums';
 // import { SubscriptionStatus } from '@common/enums';
 
 @Injectable()
@@ -41,27 +42,19 @@ export class AccountService {
         throw error;
       });
 
-    // const activeSubscription = query.subscriptions.find(
-    //   (sub) => sub.status === SubscriptionStatus.ACTIVE,
-    // );
+    const activeSubscription = query.subscriptions.find(
+      (sub) => sub.status === SubscriptionStatus.ACTIVE,
+    );
 
-    // const userQuer: AccountResponseModel = {
-    //   ...query,
-    //   subscription: {
-    //     name: activeSubscription?.subscription.name,
-
-    //     billingCycle: activeSubscription?.billingCycle,
-    //     status: activeSubscription?.status,
-    //     date: {
-    //       created: activeSubscription?.createdAt,
-    //       updated: activeSubscription?.updatedAt,
-    //     },
-    //   },
-    // };
+    const userQuery: AccountResponseModel = {
+      ...query,
+      subscription: activeSubscription,
+      date: query.date,
+    };
 
     // console.log(plainToInstance(AccountResponseModel, query));
 
-    return plainToInstance(AccountResponseModel, query);
+    return plainToInstance(AccountResponseModel, userQuery);
   }
 
   async Edit({
