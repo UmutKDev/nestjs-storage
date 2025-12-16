@@ -34,6 +34,7 @@ import {
   CloudCreateMultipartUploadRequestModel,
   CloudCreateMultipartUploadResponseModel,
   CloudKeyRequestModel,
+  CloudRenameDirectoryRequestModel,
   CloudGetMultipartPartUrlRequestModel,
   CloudGetMultipartPartUrlResponseModel,
   CloudListRequestModel,
@@ -50,11 +51,13 @@ import {
   CloudUserStorageUsageResponseModel,
   CloudPreSignedUrlRequestModel,
   CloudEncryptedFolderCreateRequestModel,
+  CloudEncryptedFolderConvertRequestModel,
   CloudEncryptedFolderSummaryModel,
   CloudEncryptedFolderListResponseModel,
   CloudEncryptedFolderUnlockRequestModel,
   CloudEncryptedFolderUnlockResponseModel,
   CloudEncryptedFolderDeleteRequestModel,
+  CloudEncryptedFolderRenameRequestModel,
 } from './cloud.model';
 import { plainToInstance } from 'class-transformer';
 import {
@@ -903,7 +906,7 @@ export class CloudService {
 
   //#endregion
 
-  //#region Create Directory
+  //#region Directory Management
 
   async CreateDirectory(
     { Key }: CloudKeyRequestModel,
@@ -920,6 +923,253 @@ export class CloudService {
       }),
     );
     return true;
+  }
+
+  async RenameDirectory(
+    { Key, Name }: CloudRenameDirectoryRequestModel,
+    User: UserContext,
+    options?: { allowEncryptedDirectories?: boolean },
+  ): Promise<boolean> {
+    const sourcePath = this.NormalizeDirectoryPath(Key);
+    if (!sourcePath) {
+      throw new HttpException(
+        'Directory path is required',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    if (!options?.allowEncryptedDirectories) {
+      const encryptedFolders = await this.GetEncryptedFolderSet(User);
+      if (encryptedFolders.has(sourcePath)) {
+        throw new HttpException(
+          'Encrypted folders must be renamed via the encrypted-folder endpoint.',
+          HttpStatus.FORBIDDEN,
+        );
+      }
+    }
+
+    const trimmedName = (Name || '').trim();
+    if (!trimmedName) {
+      throw new HttpException(
+        'Directory name is required',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const sanitizedName = trimmedName.replace(/^\/+|\/+$/g, '');
+    if (!sanitizedName) {
+      throw new HttpException(
+        'Directory name is required',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const segments = sourcePath.split('/').filter((segment) => !!segment);
+    if (!segments.length) {
+      throw new HttpException(
+        'Directory path is required',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const parentSegments = segments.slice(0, -1);
+    const targetPath = parentSegments.length
+      ? `${parentSegments.join('/')}/${sanitizedName}`
+      : sanitizedName;
+    const normalizedTargetPath = this.NormalizeDirectoryPath(targetPath);
+
+    if (!normalizedTargetPath) {
+      throw new HttpException(
+        'Target directory path is invalid',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    if (normalizedTargetPath === sourcePath) {
+      return true;
+    }
+
+    const ensureTrailingSlash = (value: string): string =>
+      value.endsWith('/') ? value : value + '/';
+
+    const bucket = this.Buckets.Storage;
+    const sourcePrefixFull = ensureTrailingSlash(
+      KeyBuilder([User.id, sourcePath]),
+    );
+    const targetPrefixFull = ensureTrailingSlash(
+      KeyBuilder([User.id, normalizedTargetPath]),
+    );
+
+    try {
+      const targetCheck = await this.s3.send(
+        new ListObjectsV2Command({
+          Bucket: bucket,
+          Prefix: targetPrefixFull,
+          MaxKeys: 1,
+        }),
+      );
+
+      const targetExists =
+        (targetCheck.KeyCount ?? targetCheck.Contents?.length ?? 0) > 0;
+
+      if (targetExists) {
+        throw new HttpException(
+          'Target directory already exists',
+          HttpStatus.CONFLICT,
+        );
+      }
+
+      let continuationToken: string | undefined = undefined;
+      let movedObjects = 0;
+
+      do {
+        const listResp = await this.s3.send(
+          new ListObjectsV2Command({
+            Bucket: bucket,
+            Prefix: sourcePrefixFull,
+            ContinuationToken: continuationToken,
+            MaxKeys: this.MaxListObjects,
+          }),
+        );
+
+        const contents = listResp.Contents || [];
+        if (!contents.length && !listResp.IsTruncated && movedObjects === 0) {
+          throw new HttpException(
+            Codes.Error.Cloud.FILE_NOT_FOUND,
+            HttpStatus.NOT_FOUND,
+          );
+        }
+
+        for (const content of contents) {
+          if (!content.Key) {
+            continue;
+          }
+
+          const suffix = content.Key.startsWith(sourcePrefixFull)
+            ? content.Key.slice(sourcePrefixFull.length)
+            : '';
+          const destinationKey = suffix
+            ? targetPrefixFull + suffix
+            : targetPrefixFull.slice(0, -1);
+
+          await this.s3.send(
+            new CopyObjectCommand({
+              Bucket: bucket,
+              CopySource: `${bucket}/${content.Key}`,
+              Key: destinationKey,
+            }),
+          );
+
+          await this.s3.send(
+            new DeleteObjectCommand({
+              Bucket: bucket,
+              Key: content.Key,
+            }),
+          );
+
+          movedObjects++;
+        }
+
+        continuationToken = listResp.IsTruncated
+          ? listResp.NextContinuationToken
+          : undefined;
+      } while (continuationToken);
+
+      await this.UpdateEncryptedFoldersAfterRename(
+        sourcePath,
+        normalizedTargetPath,
+        User,
+      );
+
+      return true;
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      if (this.NotFoundErrorCodes.includes(error.name)) {
+        throw new HttpException(Codes.Error.Cloud.FILE_NOT_FOUND, 404);
+      }
+      throw error;
+    }
+  }
+
+  async RenameEncryptedFolder(
+    { Path, Name, Passphrase }: CloudEncryptedFolderRenameRequestModel,
+    User: UserContext,
+  ): Promise<boolean> {
+    const normalizedPath = this.NormalizeDirectoryPath(Path);
+    if (!normalizedPath) {
+      throw new HttpException(
+        'Folder path is required',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const trimmedName = (Name || '').trim();
+    const sanitizedName = trimmedName.replace(/^\/+|\/+$/g, '');
+    if (!sanitizedName) {
+      throw new HttpException(
+        'Directory name is required',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const manifest = await this.GetEncryptedFolderManifest(User);
+    const entry = manifest.folders[normalizedPath];
+
+    if (!entry) {
+      throw new HttpException(
+        Codes.Error.Cloud.FILE_NOT_FOUND,
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    try {
+      this.DecryptFolderKey(Passphrase, entry);
+    } catch (error) {
+      throw new HttpException('Invalid passphrase', HttpStatus.BAD_REQUEST);
+    }
+
+    const segments = normalizedPath.split('/').filter((segment) => !!segment);
+    if (!segments.length) {
+      throw new HttpException(
+        'Folder path is required',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const parentSegments = segments.slice(0, -1);
+    const targetPath = parentSegments.length
+      ? `${parentSegments.join('/')}/${sanitizedName}`
+      : sanitizedName;
+    const normalizedTargetPath = this.NormalizeDirectoryPath(targetPath);
+
+    if (!normalizedTargetPath) {
+      throw new HttpException(
+        'Target directory path is invalid',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    if (
+      normalizedTargetPath !== normalizedPath &&
+      manifest.folders[normalizedTargetPath]
+    ) {
+      throw new HttpException(
+        'Encrypted folder already exists',
+        HttpStatus.CONFLICT,
+      );
+    }
+
+    if (normalizedTargetPath === normalizedPath) {
+      return true;
+    }
+
+    return this.RenameDirectory(
+      { Key: normalizedPath, Name: sanitizedName },
+      User,
+      { allowEncryptedDirectories: true },
+    );
   }
 
   //#endregion
@@ -974,6 +1224,69 @@ export class CloudService {
     );
     const encrypted = this.EncryptFolderKey(Passphrase, folderKey);
 
+    const now = new Date().toISOString();
+
+    manifest.folders[normalizedPath] = {
+      ...encrypted,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    await this.SaveEncryptedFolderManifest(User, manifest);
+
+    return plainToInstance(CloudEncryptedFolderSummaryModel, {
+      Path: normalizedPath,
+      CreatedAt: now,
+      UpdatedAt: now,
+    });
+  }
+
+  async ConvertFolderToEncrypted(
+    { Path, Passphrase }: CloudEncryptedFolderConvertRequestModel,
+    User: UserContext,
+  ): Promise<CloudEncryptedFolderSummaryModel> {
+    const normalizedPath = this.NormalizeDirectoryPath(Path);
+    if (!normalizedPath) {
+      throw new HttpException(
+        'Folder path is required',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const manifest = await this.GetEncryptedFolderManifest(User);
+    if (manifest.folders[normalizedPath]) {
+      throw new HttpException(
+        'Encrypted folder already exists',
+        HttpStatus.CONFLICT,
+      );
+    }
+
+    const ensureTrailingSlash = (value: string): string =>
+      value.endsWith('/') ? value : value + '/';
+    const directoryPrefix = ensureTrailingSlash(
+      KeyBuilder([User.id, normalizedPath]),
+    );
+
+    const listResponse = await this.s3.send(
+      new ListObjectsV2Command({
+        Bucket: this.Buckets.Storage,
+        Prefix: directoryPrefix,
+        MaxKeys: 1,
+      }),
+    );
+
+    const hasObjects = (listResponse.Contents?.length ?? 0) > 0;
+    if (!hasObjects) {
+      throw new HttpException(
+        Codes.Error.Cloud.FILE_NOT_FOUND,
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    const folderKey = randomBytes(this.EncryptedFolderKeyBytes).toString(
+      'base64',
+    );
+    const encrypted = this.EncryptFolderKey(Passphrase, folderKey);
     const now = new Date().toISOString();
 
     manifest.folders[normalizedPath] = {
@@ -1084,6 +1397,45 @@ export class CloudService {
     await this.SaveEncryptedFolderManifest(User, manifest);
 
     return true;
+  }
+
+  private async UpdateEncryptedFoldersAfterRename(
+    sourcePath: string,
+    targetPath: string,
+    User: UserContext,
+  ): Promise<void> {
+    const manifest = await this.GetEncryptedFolderManifest(User);
+    const folders = manifest.folders || {};
+    const updatedFolders: Record<string, EncryptedFolderRecord> = {};
+    const sourcePrefix = sourcePath + '/';
+    let hasChanges = false;
+    const now = new Date().toISOString();
+
+    for (const [path, record] of Object.entries(folders)) {
+      if (path === sourcePath || path.startsWith(sourcePrefix)) {
+        const suffix = path.slice(sourcePath.length);
+        const normalizedSuffix = suffix.startsWith('/')
+          ? suffix.slice(1)
+          : suffix;
+        const updatedPath = normalizedSuffix
+          ? `${targetPath}/${normalizedSuffix}`
+          : targetPath;
+        const normalizedUpdatedPath =
+          this.NormalizeDirectoryPath(updatedPath);
+        updatedFolders[normalizedUpdatedPath] = {
+          ...record,
+          updatedAt: now,
+        };
+        hasChanges = true;
+      } else {
+        updatedFolders[path] = record;
+      }
+    }
+
+    if (hasChanges) {
+      manifest.folders = updatedFolders;
+      await this.SaveEncryptedFolderManifest(User, manifest);
+    }
   }
 
   private async GetEncryptedFolderSet(User: UserContext): Promise<Set<string>> {

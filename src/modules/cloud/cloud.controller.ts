@@ -44,6 +44,9 @@ import {
   CloudEncryptedFolderUnlockRequestModel,
   CloudEncryptedFolderUnlockResponseModel,
   CloudEncryptedFolderDeleteRequestModel,
+  CloudRenameDirectoryRequestModel,
+  CloudEncryptedFolderRenameRequestModel,
+  CloudEncryptedFolderConvertRequestModel,
 } from './cloud.model';
 import {
   ApiSuccessArrayResponse,
@@ -207,6 +210,24 @@ export class CloudController {
   }
 
   @ApiOperation({
+    summary: 'Rename directory (prefix)',
+    description:
+      'Renames a directory within the same parent path by updating its final segment.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Directory renamed',
+    schema: { type: 'boolean' },
+  })
+  @Put('RenameDirectory')
+  async RenameDirectory(
+    @Body() model: CloudRenameDirectoryRequestModel,
+    @User() user: UserContext,
+  ): Promise<boolean> {
+    return this.cloudService.RenameDirectory(model, user);
+  }
+
+  @ApiOperation({
     summary: 'List encrypted folders',
     description: 'Returns encrypted folders metadata scoped to the user.',
   })
@@ -230,6 +251,20 @@ export class CloudController {
     @User() user: UserContext,
   ): Promise<CloudEncryptedFolderSummaryModel> {
     return this.cloudService.CreateEncryptedFolder(model, user);
+  }
+
+  @ApiOperation({
+    summary: 'Convert a folder into an encrypted folder',
+    description:
+      'Marks an existing folder as encrypted using the provided passphrase.',
+  })
+  @Post('EncryptedFolder/Convert')
+  @ApiSuccessResponse(CloudEncryptedFolderSummaryModel)
+  async ConvertFolderToEncrypted(
+    @Body() model: CloudEncryptedFolderConvertRequestModel,
+    @User() user: UserContext,
+  ): Promise<CloudEncryptedFolderSummaryModel> {
+    return this.cloudService.ConvertFolderToEncrypted(model, user);
   }
 
   @ApiOperation({
@@ -263,6 +298,24 @@ export class CloudController {
     @User() user: UserContext,
   ): Promise<boolean> {
     return this.cloudService.DeleteEncryptedFolder(model, user);
+  }
+
+  @ApiOperation({
+    summary: 'Rename an encrypted folder',
+    description:
+      'Renames an encrypted folder after validating the supplied passphrase.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Encrypted folder renamed',
+    schema: { type: 'boolean' },
+  })
+  @Put('EncryptedFolder/Rename')
+  async RenameEncryptedFolder(
+    @Body() model: CloudEncryptedFolderRenameRequestModel,
+    @User() user: UserContext,
+  ): Promise<boolean> {
+    return this.cloudService.RenameEncryptedFolder(model, user);
   }
 
   @ApiOperation({

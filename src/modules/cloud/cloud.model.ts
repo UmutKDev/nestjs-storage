@@ -13,6 +13,7 @@ import {
   ValidateNested,
   MinLength,
   ValidateIf,
+  Matches,
 } from 'class-validator';
 
 export class CloudBreadCrumbModel {
@@ -168,6 +169,40 @@ export class CloudKeyRequestModel {
   @IsNotEmpty()
   @Transform(({ value }) => S3KeyConverter(value))
   Key: string;
+}
+
+export class CloudRenameDirectoryRequestModel extends CloudKeyRequestModel {
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  @Matches(/^[^/]+$/, {
+    message: 'Directory name cannot contain slashes',
+  })
+  @Transform(({ value }) => S3KeyConverter(value))
+  Name: string;
+}
+
+export class CloudEncryptedFolderRenameRequestModel {
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  @Transform(({ value }) => S3KeyConverter(value))
+  Path: string;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  @Matches(/^[^/]+$/, {
+    message: 'Directory name cannot contain slashes',
+  })
+  @Transform(({ value }) => S3KeyConverter(value))
+  Name: string;
+
+  @ApiProperty({ minLength: 8 })
+  @IsString()
+  @IsNotEmpty()
+  @MinLength(8)
+  Passphrase: string;
 }
 
 export class CloudPreSignedUrlRequestModel {
@@ -470,6 +505,8 @@ export class CloudEncryptedFolderCreateRequestModel {
   @MinLength(8)
   Passphrase: string;
 }
+
+export class CloudEncryptedFolderConvertRequestModel extends CloudEncryptedFolderCreateRequestModel {}
 
 export class CloudEncryptedFolderUnlockRequestModel {
   @ApiProperty()
