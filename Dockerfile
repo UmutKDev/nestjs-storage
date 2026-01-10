@@ -1,17 +1,17 @@
 
-FROM node:22.11-alpine AS development
+FROM node:24.12-alpine AS development
 
 WORKDIR /usr/src/app
 
 COPY yarn.lock package*.json ./
 
-RUN npm install --legacy-peer-deps
+RUN yarn install --frozen-lockfile
 
 COPY . .
 
-RUN npm run build
+RUN yarn build
 
-FROM node:22.11-alpine AS production
+FROM node:24.12-alpine AS production
 
 ARG NODE_ENV=production
 ENV NODE_ENV=${NODE_ENV}

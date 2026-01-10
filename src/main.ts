@@ -87,7 +87,7 @@ async function bootstrap() {
   });
   SwaggerModule.setup('swagger', app, document);
 
-  app.use('/reference', apiReference({ spec: { content: document } }));
+  app.use('/reference', apiReference({ content: document }));
 
   await app.listen(process.env.PORT || 8080);
 }
