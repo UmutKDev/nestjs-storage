@@ -76,16 +76,7 @@ export class SubscriptionController {
       userId: model.userId,
       subscriptionId: model.subscriptionId,
       isTrial: model.isTrial,
-      providerSubscriptionId: model.providerSubscriptionId,
     });
-  }
-
-  @Get('List/User/:userId')
-  @ApiSuccessArrayResponse(UserSubscriptionResponseModel)
-  async ListForUser(
-    @Param() model: BaseIdRequestModel,
-  ): Promise<UserSubscriptionResponseModel[]> {
-    return await this.subscriptionService.ListForUser({ userId: model.id });
   }
 
   @Delete('Unsubscribe/:id')

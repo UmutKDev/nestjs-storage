@@ -30,7 +30,7 @@ export class AccountService {
     const query = await this.userRepository
       .findOneOrFail({
         where: { id: user.id },
-        relations: ['subscriptions'],
+        relations: ['subscription'],
       })
       .catch((error: Error) => {
         if (
@@ -42,13 +42,9 @@ export class AccountService {
         throw error;
       });
 
-    const activeSubscription = query.subscriptions.find(
-      (sub) => sub.status === SubscriptionStatus.ACTIVE,
-    );
-
     const userQuery: AccountResponseModel = {
       ...query,
-      subscription: activeSubscription,
+      subscription: query.subscription,
       date: query.date,
     };
 

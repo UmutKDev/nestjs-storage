@@ -4,6 +4,7 @@ import {
   Entity,
   JoinColumn,
   ManyToOne,
+  OneToOne,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
   DeleteDateColumn,
@@ -54,7 +55,7 @@ export class UserSubscriptionEntity {
   @DeleteDateColumn()
   deletedAt?: Date;
 
-  @ManyToOne(() => UserEntity, { onDelete: 'CASCADE', eager: true })
+  @OneToOne(() => UserEntity, { onDelete: 'CASCADE', eager: true })
   @JoinColumn({ name: 'userId' })
   user: UserEntity;
 

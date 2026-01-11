@@ -5,7 +5,7 @@ import {
   UpdateDateColumn,
   CreateDateColumn,
   DeleteDateColumn,
-  OneToMany,
+  OneToOne,
   Index,
 } from 'typeorm';
 import { UserSubscriptionEntity } from './user-subscription.entity';
@@ -78,9 +78,9 @@ export class UserEntity {
   @DeleteDateColumn()
   deletedAt?: Date;
 
-  // user subscriptions (history + current)
-  @OneToMany(() => UserSubscriptionEntity, (us) => us.user)
-  subscriptions?: UserSubscriptionEntity[];
+  // user subscription (current only)
+  @OneToOne(() => UserSubscriptionEntity, (us) => us.user)
+  subscription?: UserSubscriptionEntity;
 
   constructor(partial: Partial<UserEntity>) {
     Object.assign(this, partial);

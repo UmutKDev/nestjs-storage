@@ -1,10 +1,9 @@
-import { Body, Controller, Get, Post, Delete, Param } from '@nestjs/common';
+import { Body, Controller, Get, Post, Delete } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { SubscriptionService } from './subscription.service';
 import {
   SubscribeRequestModel,
   UserSubscriptionResponseModel,
-  UnsubscribeRequestModel,
 } from './subscription.model';
 import { User } from '@common/decorators/user.decorator';
 
@@ -23,13 +22,6 @@ export class SubscriptionUserController {
     });
   }
 
-  @Get('My/List')
-  async ListMy(
-    @User() user: UserContext,
-  ): Promise<UserSubscriptionResponseModel[]> {
-    return await this.subscriptionService.ListForUser({ userId: user.id });
-  }
-
   @Post('My/Subscribe')
   async Subscribe(
     @User() user: UserContext,
@@ -42,13 +34,11 @@ export class SubscriptionUserController {
     });
   }
 
-  @Delete('My/Unsubscribe/:id')
+  @Delete('My/Unsubscribe')
   async Unsubscribe(
     @User() user: UserContext,
-    @Param() model: UnsubscribeRequestModel,
   ): Promise<boolean> {
     return await this.subscriptionService.UnsubscribeByUser({
-      id: model.id,
       userId: user.id,
     });
   }
