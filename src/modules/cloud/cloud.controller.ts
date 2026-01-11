@@ -11,8 +11,15 @@ import {
   UploadedFile,
   UseInterceptors,
   Res,
+  Headers,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiBody, ApiConsumes, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiConsumes,
+  ApiTags,
+  ApiHeader,
+} from '@nestjs/swagger';
 import { CloudService } from './cloud.service';
 import {
   CloudAbortMultipartUploadRequestModel,
@@ -38,15 +45,16 @@ import {
   CloudUploadPartResponseModel,
   CloudUserStorageUsageResponseModel,
   CloudPreSignedUrlRequestModel,
-  CloudEncryptedFolderCreateRequestModel,
-  CloudEncryptedFolderSummaryModel,
-  CloudEncryptedFolderListResponseModel,
-  CloudEncryptedFolderUnlockRequestModel,
-  CloudEncryptedFolderUnlockResponseModel,
-  CloudEncryptedFolderDeleteRequestModel,
-  CloudRenameDirectoryRequestModel,
-  CloudEncryptedFolderRenameRequestModel,
-  CloudEncryptedFolderConvertRequestModel,
+  // New Directories API
+  DirectoryCreateRequestModel,
+  DirectoryRenameRequestModel,
+  DirectoryDeleteRequestModel,
+  DirectoryUnlockRequestModel,
+  DirectoryUnlockResponseModel,
+  DirectoryLockRequestModel,
+  DirectoryConvertToEncryptedRequestModel,
+  DirectoryDecryptRequestModel,
+  DirectoryResponseModel,
 } from './cloud.model';
 import {
   ApiSuccessArrayResponse,
@@ -60,6 +68,10 @@ import { promisify } from 'util';
 import type { Response } from 'express';
 import { ApiOperation, ApiQuery, ApiResponse } from '@nestjs/swagger';
 import { SizeFormatter } from '@common/helpers/cast.helper';
+import {
+  FOLDER_SESSION_HEADER,
+  FOLDER_PASSPHRASE_HEADER,
+} from './cloud.constants';
 
 @Controller('Cloud')
 @ApiTags('Cloud')
@@ -70,15 +82,21 @@ export class CloudController {
   @ApiOperation({
     summary: 'List files and directories',
     description:
-      'Returns a view (breadcrumbs, directories and objects) for the given user-scoped path. Supports delimiter and metadata processing flags.',
+      'Returns a view (breadcrumbs, directories and objects) for the given user-scoped path. Supports delimiter and metadata processing flags. For encrypted folders, provide session token via X-Folder-Session header.',
   })
   @Get('List')
+  @ApiHeader({
+    name: FOLDER_SESSION_HEADER,
+    required: false,
+    description: 'Session token for encrypted folder access',
+  })
   @ApiSuccessResponse(CloudListResponseModel)
   async List(
     @Query() model: CloudListRequestModel,
     @User() user: UserContext,
+    @Headers(FOLDER_SESSION_HEADER) sessionToken?: string,
   ): Promise<CloudListResponseModel> {
-    return this.cloudService.List(model, user);
+    return this.cloudService.List(model, user, sessionToken);
   }
 
   @ApiOperation({
@@ -96,28 +114,42 @@ export class CloudController {
 
   @ApiOperation({
     summary: 'List directories inside a path',
-    description: 'Returns directory prefixes (folders) for a given path.',
+    description:
+      'Returns directory prefixes (folders) for a given path. For encrypted folders, provide session token via X-Folder-Session header.',
   })
   @Get('List/Directories')
+  @ApiHeader({
+    name: FOLDER_SESSION_HEADER,
+    required: false,
+    description: 'Session token for encrypted folder access',
+  })
   @ApiSuccessArrayResponse(CloudDirectoryModel)
   async ListDirectories(
     @Query() model: CloudListDirectoriesRequestModel,
     @User() user: UserContext,
+    @Headers(FOLDER_SESSION_HEADER) sessionToken?: string,
   ): Promise<CloudDirectoryModel[]> {
-    return this.cloudService.ListDirectories(model, user);
+    return this.cloudService.ListDirectories(model, user, sessionToken);
   }
 
   @ApiOperation({
     summary: 'List objects (files) inside a path',
-    description: 'Returns files at a given path for the authenticated user.',
+    description:
+      'Returns files at a given path for the authenticated user. For encrypted folders, provide session token via X-Folder-Session header.',
   })
   @Get('List/Objects')
+  @ApiHeader({
+    name: FOLDER_SESSION_HEADER,
+    required: false,
+    description: 'Session token for encrypted folder access',
+  })
   @ApiSuccessArrayResponse(CloudObjectModel)
   async ListObjects(
     @Query() model: CloudListObjectsRequestModel,
     @User() user: UserContext,
+    @Headers(FOLDER_SESSION_HEADER) sessionToken?: string,
   ): Promise<CloudObjectModel[]> {
-    return this.cloudService.ListObjects(model, user);
+    return this.cloudService.ListObjects(model, user, sessionToken);
   }
 
   @ApiOperation({
@@ -192,131 +224,7 @@ export class CloudController {
     return this.cloudService.Delete(model, user);
   }
 
-  @ApiOperation({
-    summary: 'Create directory (prefix)',
-    description: 'Creates a directory/prefix within the user scoped storage.',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Directory created',
-    schema: { type: 'boolean' },
-  })
-  @Post('CreateDirectory')
-  async CreateDirectory(
-    @Body() model: CloudKeyRequestModel,
-    @User() user: UserContext,
-  ): Promise<boolean> {
-    return this.cloudService.CreateDirectory(model, user);
-  }
 
-  @ApiOperation({
-    summary: 'Rename directory (prefix)',
-    description:
-      'Renames a directory within the same parent path by updating its final segment.',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Directory renamed',
-    schema: { type: 'boolean' },
-  })
-  @Put('RenameDirectory')
-  async RenameDirectory(
-    @Body() model: CloudRenameDirectoryRequestModel,
-    @User() user: UserContext,
-  ): Promise<boolean> {
-    return this.cloudService.RenameDirectory(model, user);
-  }
-
-  @ApiOperation({
-    summary: 'List encrypted folders',
-    description: 'Returns encrypted folders metadata scoped to the user.',
-  })
-  @Get('EncryptedFolder')
-  @ApiSuccessResponse(CloudEncryptedFolderListResponseModel)
-  async ListEncryptedFolders(
-    @User() user: UserContext,
-  ): Promise<CloudEncryptedFolderListResponseModel> {
-    return this.cloudService.ListEncryptedFolders(user);
-  }
-
-  @ApiOperation({
-    summary: 'Create an encrypted folder',
-    description:
-      'Creates or marks a folder as encrypted using a client-provided passphrase.',
-  })
-  @Post('EncryptedFolder')
-  @ApiSuccessResponse(CloudEncryptedFolderSummaryModel)
-  async CreateEncryptedFolder(
-    @Body() model: CloudEncryptedFolderCreateRequestModel,
-    @User() user: UserContext,
-  ): Promise<CloudEncryptedFolderSummaryModel> {
-    return this.cloudService.CreateEncryptedFolder(model, user);
-  }
-
-  @ApiOperation({
-    summary: 'Convert a folder into an encrypted folder',
-    description:
-      'Marks an existing folder as encrypted using the provided passphrase.',
-  })
-  @Post('EncryptedFolder/Convert')
-  @ApiSuccessResponse(CloudEncryptedFolderSummaryModel)
-  async ConvertFolderToEncrypted(
-    @Body() model: CloudEncryptedFolderConvertRequestModel,
-    @User() user: UserContext,
-  ): Promise<CloudEncryptedFolderSummaryModel> {
-    return this.cloudService.ConvertFolderToEncrypted(model, user);
-  }
-
-  @ApiOperation({
-    summary: 'Unlock an encrypted folder',
-    description:
-      'Validates the passphrase and returns the encrypted folder key for client-side encryption.',
-  })
-  @Post('EncryptedFolder/Unlock')
-  @ApiSuccessResponse(CloudEncryptedFolderUnlockResponseModel)
-  async UnlockEncryptedFolder(
-    @Body() model: CloudEncryptedFolderUnlockRequestModel,
-    @User() user: UserContext,
-  ): Promise<CloudEncryptedFolderUnlockResponseModel> {
-    return this.cloudService.UnlockEncryptedFolder(model, user);
-  }
-
-  @ApiOperation({
-    summary: 'Delete an encrypted folder definition',
-    description:
-      'Removes encrypted-folder metadata and optionally deletes folder contents.',
-  })
-  @Delete('EncryptedFolder')
-  @ApiResponse({
-    status: 200,
-    description: 'Encrypted folder removed',
-    schema: { type: 'boolean' },
-  })
-  @ApiBody({ type: CloudEncryptedFolderDeleteRequestModel })
-  async DeleteEncryptedFolder(
-    @Body() model: CloudEncryptedFolderDeleteRequestModel,
-    @User() user: UserContext,
-  ): Promise<boolean> {
-    return this.cloudService.DeleteEncryptedFolder(model, user);
-  }
-
-  @ApiOperation({
-    summary: 'Rename an encrypted folder',
-    description:
-      'Renames an encrypted folder after validating the supplied passphrase.',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Encrypted folder renamed',
-    schema: { type: 'boolean' },
-  })
-  @Put('EncryptedFolder/Rename')
-  async RenameEncryptedFolder(
-    @Body() model: CloudEncryptedFolderRenameRequestModel,
-    @User() user: UserContext,
-  ): Promise<boolean> {
-    return this.cloudService.RenameEncryptedFolder(model, user);
-  }
 
   @ApiOperation({
     summary: 'Create a multipart upload session',
@@ -494,5 +402,154 @@ export class CloudController {
         new HttpException(er, HttpStatus.INTERNAL_SERVER_ERROR);
       }
     }
+  }
+
+  // ============================================================================
+  // DIRECTORIES API - Unified Directory Management
+  // ============================================================================
+
+  @ApiOperation({
+    summary: 'Create a directory',
+    description:
+      'Creates a new directory. For encrypted directories, set IsEncrypted=true and provide passphrase via X-Folder-Passphrase header.',
+  })
+  @Post('Directories')
+  @ApiHeader({
+    name: FOLDER_PASSPHRASE_HEADER,
+    required: false,
+    description: 'Passphrase for encrypted directory (min 8 chars)',
+  })
+  @ApiSuccessResponse(DirectoryResponseModel)
+  async DirectoryCreate(
+    @Body() model: DirectoryCreateRequestModel,
+    @User() user: UserContext,
+    @Headers(FOLDER_PASSPHRASE_HEADER) passphrase?: string,
+  ): Promise<DirectoryResponseModel> {
+    return this.cloudService.DirectoryCreate(model, passphrase, user);
+  }
+
+  @ApiOperation({
+    summary: 'Rename a directory',
+    description:
+      'Renames a directory. For encrypted directories, provide passphrase via X-Folder-Passphrase header.',
+  })
+  @Put('Directories/Rename')
+  @ApiHeader({
+    name: FOLDER_PASSPHRASE_HEADER,
+    required: false,
+    description: 'Passphrase for encrypted directory',
+  })
+  @ApiSuccessResponse(DirectoryResponseModel)
+  async DirectoryRename(
+    @Body() model: DirectoryRenameRequestModel,
+    @User() user: UserContext,
+    @Headers(FOLDER_PASSPHRASE_HEADER) passphrase?: string,
+  ): Promise<DirectoryResponseModel> {
+    return this.cloudService.DirectoryRename(model, passphrase, user);
+  }
+
+  @ApiOperation({
+    summary: 'Delete a directory',
+    description:
+      'Deletes a directory and all its contents. For encrypted directories, provide passphrase via X-Folder-Passphrase header.',
+  })
+  @Delete('Directories')
+  @ApiHeader({
+    name: FOLDER_PASSPHRASE_HEADER,
+    required: false,
+    description: 'Passphrase for encrypted directory',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Directory deleted',
+    schema: { type: 'boolean' },
+  })
+  async DirectoryDelete(
+    @Body() model: DirectoryDeleteRequestModel,
+    @User() user: UserContext,
+    @Headers(FOLDER_PASSPHRASE_HEADER) passphrase?: string,
+  ): Promise<boolean> {
+    return this.cloudService.DirectoryDelete(model, passphrase, user);
+  }
+
+  @ApiOperation({
+    summary: 'Unlock an encrypted directory',
+    description:
+      'Validates passphrase and creates a session token for subsequent access. The session token should be passed via X-Folder-Session header in subsequent requests.',
+  })
+  @Post('Directories/Unlock')
+  @ApiHeader({
+    name: FOLDER_PASSPHRASE_HEADER,
+    required: true,
+    description: 'Passphrase for encrypted directory (min 8 chars)',
+  })
+  @ApiSuccessResponse(DirectoryUnlockResponseModel)
+  async DirectoryUnlock(
+    @Body() model: DirectoryUnlockRequestModel,
+    @User() user: UserContext,
+    @Headers(FOLDER_PASSPHRASE_HEADER) passphrase?: string,
+  ): Promise<DirectoryUnlockResponseModel> {
+    return this.cloudService.DirectoryUnlock(model, passphrase, user);
+  }
+
+  @ApiOperation({
+    summary: 'Lock an encrypted directory',
+    description: 'Invalidates the session token for an encrypted directory.',
+  })
+  @Post('Directories/Lock')
+  @ApiResponse({
+    status: 200,
+    description: 'Directory locked',
+    schema: { type: 'boolean' },
+  })
+  async DirectoryLock(
+    @Body() model: DirectoryLockRequestModel,
+    @User() user: UserContext,
+  ): Promise<boolean> {
+    return this.cloudService.DirectoryLock(model, user);
+  }
+
+  @ApiOperation({
+    summary: 'Convert a directory to encrypted',
+    description:
+      'Marks an existing directory as encrypted. Provide passphrase via X-Folder-Passphrase header.',
+  })
+  @Post('Directories/Encrypt')
+  @ApiHeader({
+    name: FOLDER_PASSPHRASE_HEADER,
+    required: true,
+    description: 'Passphrase for encryption (min 8 chars)',
+  })
+  @ApiSuccessResponse(DirectoryResponseModel)
+  async DirectoryConvertToEncrypted(
+    @Body() model: DirectoryConvertToEncryptedRequestModel,
+    @User() user: UserContext,
+    @Headers(FOLDER_PASSPHRASE_HEADER) passphrase?: string,
+  ): Promise<DirectoryResponseModel> {
+    return this.cloudService.DirectoryConvertToEncrypted(
+      model,
+      passphrase,
+      user,
+    );
+  }
+
+  @ApiOperation({
+    summary: 'Remove encryption from a directory',
+    description:
+      'Removes encryption from a directory (keeps files). Provide passphrase via X-Folder-Passphrase header.',
+  })
+  @Post('Directories/Decrypt')
+  @ApiHeader({
+    name: FOLDER_PASSPHRASE_HEADER,
+    required: true,
+    description: 'Passphrase for decryption',
+  })
+  @ApiSuccessResponse(DirectoryResponseModel)
+  async DirectoryDecrypt(
+    @Body() model: DirectoryDecryptRequestModel,
+    @User() user: UserContext,
+    @Headers(FOLDER_PASSPHRASE_HEADER) passphrase?: string,
+  ): Promise<DirectoryResponseModel> {
+    return this.cloudService.DirectoryDecrypt(model, passphrase, user);
   }
 }

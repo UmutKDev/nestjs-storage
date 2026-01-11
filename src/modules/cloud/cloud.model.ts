@@ -57,6 +57,13 @@ export class CloudDirectoryModel {
   @Expose()
   @ApiProperty({ default: false })
   IsEncrypted?: boolean = false;
+
+  @Expose()
+  @ApiProperty({
+    default: true,
+    description: 'True if encrypted folder is locked (no valid session)',
+  })
+  IsLocked?: boolean = true;
 }
 
 export class CloudMetadataDefaultModel {
@@ -224,10 +231,10 @@ export class CloudDeleteModel {
   @Transform(({ value }) => S3KeyConverter(value))
   Key: string;
 
-  @ApiProperty({ required: false, default: false })
-  @IsBoolean()
+  @ApiProperty({ required: false })
   @IsOptional()
-  IsDirectory: boolean = false;
+  @IsBoolean()
+  IsDirectory?: boolean;
 }
 export class CloudDeleteRequestModel {
   @ApiProperty({ type: CloudDeleteModel, isArray: true })
@@ -553,4 +560,155 @@ export class CloudEncryptedFolderDeleteRequestModel {
   @IsString()
   @MinLength(8)
   Passphrase?: string;
+}
+
+// ============================================================================
+// DIRECTORIES API - Unified Directory Management
+// ============================================================================
+
+/**
+ * Request model for creating a directory.
+ * If IsEncrypted is true, passphrase must be provided via X-Folder-Passphrase header.
+ */
+export class DirectoryCreateRequestModel {
+  @ApiProperty({ description: 'Directory path to create' })
+  @IsString()
+  @IsNotEmpty()
+  @Transform(({ value }) => S3KeyConverter(value))
+  Path: string;
+
+  @ApiProperty({
+    required: false,
+    default: false,
+    description: 'Create as encrypted directory',
+  })
+  @IsBoolean()
+  @IsOptional()
+  IsEncrypted?: boolean = false;
+}
+
+/**
+ * Request model for renaming a directory.
+ * For encrypted directories, passphrase must be provided via X-Folder-Passphrase header.
+ */
+export class DirectoryRenameRequestModel {
+  @ApiProperty({ description: 'Current directory path' })
+  @IsString()
+  @IsNotEmpty()
+  @Transform(({ value }) => S3KeyConverter(value))
+  Path: string;
+
+  @ApiProperty({ description: 'New directory name (not full path)' })
+  @IsString()
+  @IsNotEmpty()
+  @Matches(/^[^/]+$/, {
+    message: 'Directory name cannot contain slashes',
+  })
+  Name: string;
+}
+
+/**
+ * Request model for deleting a directory.
+ * For encrypted directories, passphrase must be provided via X-Folder-Passphrase header.
+ */
+export class DirectoryDeleteRequestModel {
+  @ApiProperty({ description: 'Directory path to delete' })
+  @IsString()
+  @IsNotEmpty()
+  @Transform(({ value }) => S3KeyConverter(value))
+  Path: string;
+}
+
+/**
+ * Request model for unlocking an encrypted directory.
+ * Creates a session token for subsequent requests.
+ */
+export class DirectoryUnlockRequestModel {
+  @ApiProperty({ description: 'Encrypted directory path' })
+  @IsString()
+  @IsNotEmpty()
+  @Transform(({ value }) => S3KeyConverter(value))
+  Path: string;
+}
+
+/**
+ * Response model for directory unlock operation.
+ */
+export class DirectoryUnlockResponseModel {
+  @Expose()
+  @ApiProperty({ description: 'Directory path that was unlocked' })
+  Path: string;
+
+  @Expose()
+  @ApiProperty({
+    description:
+      'Session token for subsequent requests. Pass via X-Folder-Session header.',
+  })
+  SessionToken: string;
+
+  @Expose()
+  @ApiProperty({
+    description: 'Session expiration timestamp (Unix epoch in seconds)',
+  })
+  ExpiresAt: number;
+
+  @Expose()
+  @ApiProperty({ description: 'Session TTL in seconds' })
+  TTL: number;
+}
+
+/**
+ * Request model for locking an encrypted directory (invalidate session).
+ */
+export class DirectoryLockRequestModel {
+  @ApiProperty({ description: 'Encrypted directory path to lock' })
+  @IsString()
+  @IsNotEmpty()
+  @Transform(({ value }) => S3KeyConverter(value))
+  Path: string;
+}
+
+/**
+ * Request model for converting an existing directory to encrypted.
+ * Passphrase must be provided via X-Folder-Passphrase header.
+ */
+export class DirectoryConvertToEncryptedRequestModel {
+  @ApiProperty({ description: 'Directory path to convert' })
+  @IsString()
+  @IsNotEmpty()
+  @Transform(({ value }) => S3KeyConverter(value))
+  Path: string;
+}
+
+/**
+ * Request model for decrypting an encrypted directory (remove encryption).
+ * Passphrase must be provided via X-Folder-Passphrase header.
+ */
+export class DirectoryDecryptRequestModel {
+  @ApiProperty({ description: 'Encrypted directory path to decrypt' })
+  @IsString()
+  @IsNotEmpty()
+  @Transform(({ value }) => S3KeyConverter(value))
+  Path: string;
+}
+
+/**
+ * Response model for directory operations.
+ */
+export class DirectoryResponseModel {
+  @Expose()
+  @ApiProperty()
+  Path: string;
+
+  @Expose()
+  @ApiProperty()
+  IsEncrypted: boolean;
+
+  @Expose()
+  @ApiProperty({ required: false })
+  CreatedAt?: string;
+
+  @Expose()
+  @ApiProperty({ required: false })
+  UpdatedAt?: string;
 }

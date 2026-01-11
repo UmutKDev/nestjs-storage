@@ -50,15 +50,20 @@ import {
   CloudUploadPartResponseModel,
   CloudUserStorageUsageResponseModel,
   CloudPreSignedUrlRequestModel,
-  CloudEncryptedFolderCreateRequestModel,
-  CloudEncryptedFolderConvertRequestModel,
-  CloudEncryptedFolderSummaryModel,
-  CloudEncryptedFolderListResponseModel,
-  CloudEncryptedFolderUnlockRequestModel,
-  CloudEncryptedFolderUnlockResponseModel,
-  CloudEncryptedFolderDeleteRequestModel,
-  CloudEncryptedFolderRenameRequestModel,
+  // New Directories API models
+  DirectoryCreateRequestModel,
+  DirectoryRenameRequestModel,
+  DirectoryDeleteRequestModel,
+  DirectoryUnlockRequestModel,
+  DirectoryUnlockResponseModel,
+  DirectoryLockRequestModel,
+  DirectoryConvertToEncryptedRequestModel,
+  DirectoryDecryptRequestModel,
+  DirectoryResponseModel,
 } from './cloud.model';
+import { RedisService } from '@modules/redis/redis.service';
+import { ENCRYPTED_FOLDER_SESSION_TTL } from './cloud.constants';
+import { EncryptedFolderSession } from './guards/encrypted-folder.guard';
 import { plainToInstance } from 'class-transformer';
 import {
   IsImageFile,
@@ -114,7 +119,8 @@ export class CloudService {
   @InjectRepository(UserSubscriptionEntity)
   private userSubscriptionRepository: Repository<UserSubscriptionEntity>;
   @InjectAws(S3Client) private readonly s3: S3Client;
-  constructor() {}
+
+  constructor(private readonly redisService: RedisService) {}
 
   // Default download speeds (bytes per second) mapped by subscription slug
   private readonly DefaultDownloadSpeeds: Record<string, number> = {
@@ -130,8 +136,24 @@ export class CloudService {
   async List(
     { Path, Delimiter, IsMetadataProcessing }: CloudListRequestModel,
     User: UserContext,
+    sessionToken?: string,
   ): Promise<CloudListResponseModel> {
     const cleanedPath = Path ? Path.replace(/^\/+|\/+$/g, '') : '';
+
+    // Check if we're trying to access an encrypted folder
+    const accessCheck = await this.CheckEncryptedFolderAccess(
+      cleanedPath,
+      User.id,
+      sessionToken,
+    );
+
+    if (accessCheck.isEncrypted && !accessCheck.hasAccess) {
+      throw new HttpException(
+        `Access denied. Folder "${accessCheck.encryptingFolder}" is encrypted. Unlock it first via POST /Cloud/Directories/Unlock`,
+        HttpStatus.FORBIDDEN,
+      );
+    }
+
     let prefix = KeyBuilder([User.id, cleanedPath]);
     if (!prefix.endsWith('/')) {
       prefix = prefix + '/';
@@ -156,6 +178,7 @@ export class CloudService {
         this.Prefix,
         User,
         encryptedFolders,
+        sessionToken,
       ),
       this.ProcessObjects(command.Contents ?? [], IsMetadataProcessing, User),
     ]);
@@ -224,11 +247,27 @@ export class CloudService {
   async ListDirectories(
     { Path, Delimiter, search, skip, take }: CloudListDirectoriesRequestModel,
     User: UserContext,
+    sessionToken?: string,
   ): Promise<CloudDirectoryModel[]> {
     const store = asyncLocalStorage.getStore();
     const request: Request = store?.get('request');
 
     const cleanedPath = Path ? Path.replace(/^\/+|\/+$/g, '') : '';
+
+    // Check encrypted folder access
+    const accessCheck = await this.CheckEncryptedFolderAccess(
+      cleanedPath,
+      User.id,
+      sessionToken,
+    );
+
+    if (accessCheck.isEncrypted && !accessCheck.hasAccess) {
+      throw new HttpException(
+        `Access denied. Folder "${accessCheck.encryptingFolder}" is encrypted. Unlock it first via POST /Cloud/Directories/Unlock`,
+        HttpStatus.FORBIDDEN,
+      );
+    }
+
     let prefix = KeyBuilder([User.id, cleanedPath]);
     if (!prefix.endsWith('/')) {
       prefix = prefix + '/';
@@ -251,6 +290,7 @@ export class CloudService {
         this.Prefix,
         User,
         encryptedFolders,
+        sessionToken,
       );
     }
 
@@ -334,7 +374,13 @@ export class CloudService {
       request.totalRowCount = totalCount;
     }
 
-    return this.ProcessDirectories(sliced, this.Prefix, User, encryptedFolders);
+    return this.ProcessDirectories(
+      sliced,
+      this.Prefix,
+      User,
+      encryptedFolders,
+      sessionToken,
+    );
   }
 
   //#endregion
@@ -351,11 +397,27 @@ export class CloudService {
       take,
     }: CloudListRequestModel,
     User: UserContext,
+    sessionToken?: string,
   ): Promise<CloudObjectModel[]> {
     const store = asyncLocalStorage.getStore();
     const request: Request = store?.get('request');
 
     const cleanedPath = Path ? Path.replace(/^\/+|\/+$/g, '') : '';
+
+    // Check encrypted folder access
+    const accessCheck = await this.CheckEncryptedFolderAccess(
+      cleanedPath,
+      User.id,
+      sessionToken,
+    );
+
+    if (accessCheck.isEncrypted && !accessCheck.hasAccess) {
+      throw new HttpException(
+        `Access denied. Folder "${accessCheck.encryptingFolder}" is encrypted. Unlock it first via POST /Cloud/Directories/Unlock`,
+        HttpStatus.FORBIDDEN,
+      );
+    }
+
     let prefix = KeyBuilder([User.id, cleanedPath]);
     if (!prefix.endsWith('/')) {
       prefix = prefix + '/';
@@ -704,6 +766,7 @@ export class CloudService {
     Prefix: string,
     User: UserContext,
     encryptedFolders?: Set<string>,
+    sessionToken?: string,
   ): Promise<CloudDirectoryModel[]> {
     const CommonPrefixesFiltered = CommonPrefixes.filter(
       (cp) => !cp.Prefix.includes('.secure/'),
@@ -725,10 +788,24 @@ export class CloudService {
           '',
         );
         const normalizedPrefix = this.NormalizeDirectoryPath(DirectoryPrefix);
+        const isEncrypted = encryptedFolders?.has(normalizedPrefix) ?? false;
+
+        // Check if user has active session for this encrypted folder
+        let isLocked = true;
+        if (isEncrypted && sessionToken) {
+          const session = await this.ValidateDirectorySession(
+            User.id,
+            normalizedPrefix,
+            sessionToken,
+          );
+          isLocked = !session;
+        }
+
         directories.push({
           Name: DirectoryName,
           Prefix: DirectoryPrefix,
-          IsEncrypted: encryptedFolders?.has(normalizedPrefix) ?? false,
+          IsEncrypted: isEncrypted,
+          IsLocked: isEncrypted ? isLocked : false,
         });
       }
     }
@@ -842,58 +919,18 @@ export class CloudService {
   async Delete(
     { Items }: CloudDeleteRequestModel,
     User: UserContext,
-    options?: { allowEncryptedDirectories?: boolean },
+    _options?: { allowEncryptedDirectories?: boolean },
   ): Promise<boolean> {
+    // mark _options as used to avoid unused-parameter errors
+    void _options;
     try {
-      const encryptedFolders = await this.GetEncryptedFolderSet(User);
-
       for await (const item of Items) {
-        if (item.IsDirectory) {
-          const normalizedKey = this.NormalizeDirectoryPath(item.Key);
-          if (
-            normalizedKey &&
-            encryptedFolders.has(normalizedKey) &&
-            !options?.allowEncryptedDirectories
-          ) {
-            throw new HttpException(
-              'Encrypted folders must be deleted via the encrypted-folder endpoint.',
-              HttpStatus.FORBIDDEN,
-            );
-          }
-
-          const directoryKey = item.Key.replace(/^\/+|\/+$/g, '') + '/';
-          // List all objects with the directory prefix
-          let continuationToken: string | undefined = undefined;
-          do {
-            const listCommand = await this.s3.send(
-              new ListObjectsV2Command({
-                Bucket: this.Buckets.Storage,
-                Prefix: KeyBuilder([User.id, directoryKey]),
-                ContinuationToken: continuationToken,
-              }),
-            );
-            const contents = listCommand.Contents || [];
-            for (const content of contents) {
-              // Delete each object within the directory
-              await this.s3.send(
-                new DeleteObjectCommand({
-                  Bucket: this.Buckets.Storage,
-                  Key: content.Key!,
-                }),
-              );
-            }
-            continuationToken = listCommand.IsTruncated
-              ? listCommand.NextContinuationToken
-              : undefined;
-          } while (continuationToken);
-        } else {
-          await this.s3.send(
-            new DeleteObjectCommand({
-              Bucket: this.Buckets.Storage,
-              Key: KeyBuilder([User.id, item.Key]),
-            }),
-          );
-        }
+        await this.s3.send(
+          new DeleteObjectCommand({
+            Bucket: this.Buckets.Storage,
+            Key: KeyBuilder([User.id, item.Key]),
+          }),
+        );
       }
     } catch (error) {
       if (this.NotFoundErrorCodes.includes(error.name)) {
@@ -1093,312 +1130,6 @@ export class CloudService {
     }
   }
 
-  async RenameEncryptedFolder(
-    { Path, Name, Passphrase }: CloudEncryptedFolderRenameRequestModel,
-    User: UserContext,
-  ): Promise<boolean> {
-    const normalizedPath = this.NormalizeDirectoryPath(Path);
-    if (!normalizedPath) {
-      throw new HttpException(
-        'Folder path is required',
-        HttpStatus.BAD_REQUEST,
-      );
-    }
-
-    const trimmedName = (Name || '').trim();
-    const sanitizedName = trimmedName.replace(/^\/+|\/+$/g, '');
-    if (!sanitizedName) {
-      throw new HttpException(
-        'Directory name is required',
-        HttpStatus.BAD_REQUEST,
-      );
-    }
-
-    const manifest = await this.GetEncryptedFolderManifest(User);
-    const entry = manifest.folders[normalizedPath];
-
-    if (!entry) {
-      throw new HttpException(
-        Codes.Error.Cloud.FILE_NOT_FOUND,
-        HttpStatus.NOT_FOUND,
-      );
-    }
-
-    try {
-      this.DecryptFolderKey(Passphrase, entry);
-    } catch (error) {
-      throw new HttpException('Invalid passphrase', HttpStatus.BAD_REQUEST);
-    }
-
-    const segments = normalizedPath.split('/').filter((segment) => !!segment);
-    if (!segments.length) {
-      throw new HttpException(
-        'Folder path is required',
-        HttpStatus.BAD_REQUEST,
-      );
-    }
-
-    const parentSegments = segments.slice(0, -1);
-    const targetPath = parentSegments.length
-      ? `${parentSegments.join('/')}/${sanitizedName}`
-      : sanitizedName;
-    const normalizedTargetPath = this.NormalizeDirectoryPath(targetPath);
-
-    if (!normalizedTargetPath) {
-      throw new HttpException(
-        'Target directory path is invalid',
-        HttpStatus.BAD_REQUEST,
-      );
-    }
-
-    if (
-      normalizedTargetPath !== normalizedPath &&
-      manifest.folders[normalizedTargetPath]
-    ) {
-      throw new HttpException(
-        'Encrypted folder already exists',
-        HttpStatus.CONFLICT,
-      );
-    }
-
-    if (normalizedTargetPath === normalizedPath) {
-      return true;
-    }
-
-    return this.RenameDirectory(
-      { Key: normalizedPath, Name: sanitizedName },
-      User,
-      { allowEncryptedDirectories: true },
-    );
-  }
-
-  //#endregion
-
-  //#region Encrypted Folders
-
-  async ListEncryptedFolders(
-    User: UserContext,
-  ): Promise<CloudEncryptedFolderListResponseModel> {
-    const manifest = await this.GetEncryptedFolderManifest(User);
-    const folders = Object.entries(manifest.folders || {})
-      .map(([path, record]) => ({
-        Path: this.NormalizeDirectoryPath(path),
-        CreatedAt: record.createdAt,
-        UpdatedAt: record.updatedAt,
-      }))
-      .filter((folder) => !!folder.Path)
-      .sort((a, b) => a.Path.localeCompare(b.Path));
-
-    return plainToInstance(CloudEncryptedFolderListResponseModel, {
-      Folders: folders,
-    });
-  }
-
-  async CreateEncryptedFolder(
-    { Path, Passphrase }: CloudEncryptedFolderCreateRequestModel,
-    User: UserContext,
-  ): Promise<CloudEncryptedFolderSummaryModel> {
-    const normalizedPath = this.NormalizeDirectoryPath(Path);
-    if (!normalizedPath) {
-      throw new HttpException(
-        'Folder path is required',
-        HttpStatus.BAD_REQUEST,
-      );
-    }
-
-    const manifest = await this.GetEncryptedFolderManifest(User);
-    if (manifest.folders[normalizedPath]) {
-      throw new HttpException(
-        'Encrypted folder already exists',
-        HttpStatus.CONFLICT,
-      );
-    }
-
-    await this.CreateDirectory(
-      { Key: normalizedPath } as CloudKeyRequestModel,
-      User,
-    );
-
-    const folderKey = randomBytes(this.EncryptedFolderKeyBytes).toString(
-      'base64',
-    );
-    const encrypted = this.EncryptFolderKey(Passphrase, folderKey);
-
-    const now = new Date().toISOString();
-
-    manifest.folders[normalizedPath] = {
-      ...encrypted,
-      createdAt: now,
-      updatedAt: now,
-    };
-
-    await this.SaveEncryptedFolderManifest(User, manifest);
-
-    return plainToInstance(CloudEncryptedFolderSummaryModel, {
-      Path: normalizedPath,
-      CreatedAt: now,
-      UpdatedAt: now,
-    });
-  }
-
-  async ConvertFolderToEncrypted(
-    { Path, Passphrase }: CloudEncryptedFolderConvertRequestModel,
-    User: UserContext,
-  ): Promise<CloudEncryptedFolderSummaryModel> {
-    const normalizedPath = this.NormalizeDirectoryPath(Path);
-    if (!normalizedPath) {
-      throw new HttpException(
-        'Folder path is required',
-        HttpStatus.BAD_REQUEST,
-      );
-    }
-
-    const manifest = await this.GetEncryptedFolderManifest(User);
-    if (manifest.folders[normalizedPath]) {
-      throw new HttpException(
-        'Encrypted folder already exists',
-        HttpStatus.CONFLICT,
-      );
-    }
-
-    const ensureTrailingSlash = (value: string): string =>
-      value.endsWith('/') ? value : value + '/';
-    const directoryPrefix = ensureTrailingSlash(
-      KeyBuilder([User.id, normalizedPath]),
-    );
-
-    const listResponse = await this.s3.send(
-      new ListObjectsV2Command({
-        Bucket: this.Buckets.Storage,
-        Prefix: directoryPrefix,
-        MaxKeys: 1,
-      }),
-    );
-
-    const hasObjects = (listResponse.Contents?.length ?? 0) > 0;
-    if (!hasObjects) {
-      throw new HttpException(
-        Codes.Error.Cloud.FILE_NOT_FOUND,
-        HttpStatus.NOT_FOUND,
-      );
-    }
-
-    const folderKey = randomBytes(this.EncryptedFolderKeyBytes).toString(
-      'base64',
-    );
-    const encrypted = this.EncryptFolderKey(Passphrase, folderKey);
-    const now = new Date().toISOString();
-
-    manifest.folders[normalizedPath] = {
-      ...encrypted,
-      createdAt: now,
-      updatedAt: now,
-    };
-
-    await this.SaveEncryptedFolderManifest(User, manifest);
-
-    return plainToInstance(CloudEncryptedFolderSummaryModel, {
-      Path: normalizedPath,
-      CreatedAt: now,
-      UpdatedAt: now,
-    });
-  }
-
-  async UnlockEncryptedFolder(
-    { Path, Passphrase }: CloudEncryptedFolderUnlockRequestModel,
-    User: UserContext,
-  ): Promise<CloudEncryptedFolderUnlockResponseModel> {
-    const normalizedPath = this.NormalizeDirectoryPath(Path);
-    if (!normalizedPath) {
-      throw new HttpException(
-        'Folder path is required',
-        HttpStatus.BAD_REQUEST,
-      );
-    }
-
-    const manifest = await this.GetEncryptedFolderManifest(User);
-    const entry = manifest.folders[normalizedPath];
-
-    if (!entry) {
-      throw new HttpException(
-        Codes.Error.Cloud.FILE_NOT_FOUND,
-        HttpStatus.NOT_FOUND,
-      );
-    }
-
-    try {
-      const folderKey = this.DecryptFolderKey(Passphrase, entry);
-      return plainToInstance(CloudEncryptedFolderUnlockResponseModel, {
-        Path: normalizedPath,
-        FolderKey: folderKey,
-      });
-    } catch (error) {
-      this.logger.warn(
-        `Failed to unlock encrypted folder ${normalizedPath} for user ${User.id}`,
-      );
-      throw new HttpException('Invalid passphrase', HttpStatus.BAD_REQUEST);
-    }
-  }
-
-  async DeleteEncryptedFolder(
-    {
-      Path,
-      ShouldDeleteContents,
-      Passphrase,
-    }: CloudEncryptedFolderDeleteRequestModel,
-    User: UserContext,
-  ): Promise<boolean> {
-    const normalizedPath = this.NormalizeDirectoryPath(Path);
-    if (!normalizedPath) {
-      throw new HttpException(
-        'Folder path is required',
-        HttpStatus.BAD_REQUEST,
-      );
-    }
-
-    const manifest = await this.GetEncryptedFolderManifest(User);
-    const entry = manifest.folders[normalizedPath];
-    if (!entry) {
-      throw new HttpException(
-        Codes.Error.Cloud.FILE_NOT_FOUND,
-        HttpStatus.NOT_FOUND,
-      );
-    }
-
-    if (ShouldDeleteContents) {
-      if (!Passphrase) {
-        throw new HttpException(
-          'Passphrase is required to delete encrypted folders.',
-          HttpStatus.BAD_REQUEST,
-        );
-      }
-
-      try {
-        this.DecryptFolderKey(Passphrase, entry);
-      } catch (error) {
-        throw new HttpException('Invalid passphrase', HttpStatus.BAD_REQUEST);
-      }
-
-      await this.Delete(
-        {
-          Items: [
-            {
-              Key: normalizedPath,
-              IsDirectory: true,
-            },
-          ],
-        } as CloudDeleteRequestModel,
-        User,
-        { allowEncryptedDirectories: true },
-      );
-    }
-
-    delete manifest.folders[normalizedPath];
-    await this.SaveEncryptedFolderManifest(User, manifest);
-
-    return true;
-  }
-
   private async UpdateEncryptedFoldersAfterRename(
     sourcePath: string,
     targetPath: string,
@@ -1420,8 +1151,7 @@ export class CloudService {
         const updatedPath = normalizedSuffix
           ? `${targetPath}/${normalizedSuffix}`
           : targetPath;
-        const normalizedUpdatedPath =
-          this.NormalizeDirectoryPath(updatedPath);
+        const normalizedUpdatedPath = this.NormalizeDirectoryPath(updatedPath);
         updatedFolders[normalizedUpdatedPath] = {
           ...record,
           updatedAt: now,
@@ -1484,9 +1214,9 @@ export class CloudService {
         return { folders: {} };
       }
 
-      let raw: any = {};
+      let raw: Record<string, unknown> = {};
       try {
-        raw = JSON.parse(json);
+        raw = JSON.parse(json) as Record<string, unknown>;
       } catch (parseError) {
         this.logger.warn(
           'Failed to parse encrypted folder manifest, returning empty manifest',
@@ -2055,6 +1785,536 @@ export class CloudService {
       }
       throw error;
     }
+  }
+
+  //#endregion
+
+  // ============================================================================
+  // DIRECTORIES API - Unified Directory Management
+  // ============================================================================
+
+  //#region Directories API
+
+  /**
+   * Create a directory. If IsEncrypted is true, creates an encrypted directory.
+   * For encrypted directories, passphrase is required via X-Folder-Passphrase header.
+   */
+  async DirectoryCreate(
+    { Path, IsEncrypted }: DirectoryCreateRequestModel,
+    passphrase: string | undefined,
+    User: UserContext,
+  ): Promise<DirectoryResponseModel> {
+    const normalizedPath = this.NormalizeDirectoryPath(Path);
+    if (!normalizedPath) {
+      throw new HttpException(
+        'Directory path is required',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    if (IsEncrypted) {
+      if (!passphrase || passphrase.length < 8) {
+        throw new HttpException(
+          'Passphrase is required (min 8 characters) for encrypted directories. Provide via X-Folder-Passphrase header.',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      const manifest = await this.GetEncryptedFolderManifest(User);
+      if (manifest.folders[normalizedPath]) {
+        throw new HttpException(
+          'Encrypted folder already exists',
+          HttpStatus.CONFLICT,
+        );
+      }
+
+      // Create the directory
+      await this.CreateDirectory(
+        { Key: normalizedPath } as CloudKeyRequestModel,
+        User,
+      );
+
+      // Generate and encrypt the folder key
+      const folderKey = randomBytes(this.EncryptedFolderKeyBytes).toString(
+        'base64',
+      );
+      const encrypted = this.EncryptFolderKey(passphrase, folderKey);
+
+      const now = new Date().toISOString();
+      manifest.folders[normalizedPath] = {
+        ...encrypted,
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      await this.SaveEncryptedFolderManifest(User, manifest);
+
+      return plainToInstance(DirectoryResponseModel, {
+        Path: normalizedPath,
+        IsEncrypted: true,
+        CreatedAt: now,
+        UpdatedAt: now,
+      });
+    }
+
+    // Regular directory creation
+    await this.CreateDirectory(
+      { Key: normalizedPath } as CloudKeyRequestModel,
+      User,
+    );
+
+    return plainToInstance(DirectoryResponseModel, {
+      Path: normalizedPath,
+      IsEncrypted: false,
+    });
+  }
+
+  /**
+   * Rename a directory. For encrypted directories, validates passphrase.
+   */
+  async DirectoryRename(
+    { Path, Name }: DirectoryRenameRequestModel,
+    passphrase: string | undefined,
+    User: UserContext,
+  ): Promise<DirectoryResponseModel> {
+    const normalizedPath = this.NormalizeDirectoryPath(Path);
+    if (!normalizedPath) {
+      throw new HttpException(
+        'Directory path is required',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const manifest = await this.GetEncryptedFolderManifest(User);
+    const isEncrypted = !!manifest.folders[normalizedPath];
+
+    if (isEncrypted) {
+      if (!passphrase) {
+        throw new HttpException(
+          'Passphrase required for encrypted directories. Provide via X-Folder-Passphrase header.',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      const entry = manifest.folders[normalizedPath];
+      try {
+        this.DecryptFolderKey(passphrase, entry);
+      } catch {
+        throw new HttpException('Invalid passphrase', HttpStatus.BAD_REQUEST);
+      }
+    }
+
+    await this.RenameDirectory({ Key: normalizedPath, Name }, User, {
+      allowEncryptedDirectories: isEncrypted,
+    });
+
+    // Calculate new path
+    const segments = normalizedPath.split('/').filter((s) => !!s);
+    const parentSegments = segments.slice(0, -1);
+    const newPath = parentSegments.length
+      ? `${parentSegments.join('/')}/${Name}`
+      : Name;
+
+    return plainToInstance(DirectoryResponseModel, {
+      Path: this.NormalizeDirectoryPath(newPath),
+      IsEncrypted: isEncrypted,
+    });
+  }
+
+  /**
+   * Delete a directory. For encrypted directories, validates passphrase.
+   */
+  async DirectoryDelete(
+    { Path }: DirectoryDeleteRequestModel,
+    passphrase: string | undefined,
+    User: UserContext,
+  ): Promise<boolean> {
+    const normalizedPath = this.NormalizeDirectoryPath(Path);
+    if (!normalizedPath) {
+      throw new HttpException(
+        'Directory path is required',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const manifest = await this.GetEncryptedFolderManifest(User);
+    const isEncrypted = !!manifest.folders[normalizedPath];
+
+    if (isEncrypted) {
+      if (!passphrase) {
+        throw new HttpException(
+          'Passphrase required for encrypted directories. Provide via X-Folder-Passphrase header.',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      const entry = manifest.folders[normalizedPath];
+      try {
+        this.DecryptFolderKey(passphrase, entry);
+      } catch {
+        throw new HttpException('Invalid passphrase', HttpStatus.BAD_REQUEST);
+      }
+
+      // Delete the directory contents
+      await this.Delete(
+        {
+          Items: [{ Key: normalizedPath, IsDirectory: true }],
+        } as CloudDeleteRequestModel,
+        User,
+        { allowEncryptedDirectories: true },
+      );
+
+      // Remove from manifest
+      delete manifest.folders[normalizedPath];
+      await this.SaveEncryptedFolderManifest(User, manifest);
+    } else {
+      // Regular directory deletion
+      await this.Delete(
+        {
+          Items: [{ Key: normalizedPath, IsDirectory: true }],
+        } as CloudDeleteRequestModel,
+        User,
+      );
+    }
+
+    // Invalidate any active sessions for this path
+    await this.InvalidateDirectorySession(User.id, normalizedPath);
+
+    return true;
+  }
+
+  /**
+   * Unlock an encrypted directory and create a session token.
+   * The session token allows access to folder contents without providing passphrase.
+   */
+  async DirectoryUnlock(
+    { Path }: DirectoryUnlockRequestModel,
+    passphrase: string | undefined,
+    User: UserContext,
+  ): Promise<DirectoryUnlockResponseModel> {
+    const normalizedPath = this.NormalizeDirectoryPath(Path);
+    if (!normalizedPath) {
+      throw new HttpException(
+        'Directory path is required',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    if (!passphrase || passphrase.length < 8) {
+      throw new HttpException(
+        'Passphrase is required (min 8 characters). Provide via X-Folder-Passphrase header.',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const manifest = await this.GetEncryptedFolderManifest(User);
+    const entry = manifest.folders[normalizedPath];
+
+    if (!entry) {
+      throw new HttpException(
+        'Encrypted folder not found',
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    let folderKey: string;
+    try {
+      folderKey = this.DecryptFolderKey(passphrase, entry);
+    } catch {
+      this.logger.warn(
+        `Failed to unlock encrypted folder ${normalizedPath} for user ${User.id}`,
+      );
+      throw new HttpException('Invalid passphrase', HttpStatus.BAD_REQUEST);
+    }
+
+    // Generate session token
+    const sessionToken = randomBytes(32).toString('hex');
+    const expiresAt =
+      Math.floor(Date.now() / 1000) + ENCRYPTED_FOLDER_SESSION_TTL;
+
+    const session: EncryptedFolderSession = {
+      token: sessionToken,
+      folderPath: normalizedPath,
+      folderKey,
+      expiresAt,
+    };
+
+    // Store session in Redis
+    const cacheKey = this.BuildSessionKey(User.id, normalizedPath);
+    await this.redisService.set(
+      cacheKey,
+      session,
+      ENCRYPTED_FOLDER_SESSION_TTL,
+    );
+
+    return plainToInstance(DirectoryUnlockResponseModel, {
+      Path: normalizedPath,
+      SessionToken: sessionToken,
+      ExpiresAt: expiresAt,
+      TTL: ENCRYPTED_FOLDER_SESSION_TTL,
+    });
+  }
+
+  /**
+   * Lock an encrypted directory (invalidate session).
+   */
+  async DirectoryLock(
+    { Path }: DirectoryLockRequestModel,
+    User: UserContext,
+  ): Promise<boolean> {
+    const normalizedPath = this.NormalizeDirectoryPath(Path);
+    if (!normalizedPath) {
+      throw new HttpException(
+        'Directory path is required',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    await this.InvalidateDirectorySession(User.id, normalizedPath);
+    return true;
+  }
+
+  /**
+   * Convert an existing directory to encrypted.
+   */
+  async DirectoryConvertToEncrypted(
+    { Path }: DirectoryConvertToEncryptedRequestModel,
+    passphrase: string | undefined,
+    User: UserContext,
+  ): Promise<DirectoryResponseModel> {
+    const normalizedPath = this.NormalizeDirectoryPath(Path);
+    if (!normalizedPath) {
+      throw new HttpException(
+        'Directory path is required',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    if (!passphrase || passphrase.length < 8) {
+      throw new HttpException(
+        'Passphrase is required (min 8 characters). Provide via X-Folder-Passphrase header.',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const manifest = await this.GetEncryptedFolderManifest(User);
+    if (manifest.folders[normalizedPath]) {
+      throw new HttpException(
+        'Directory is already encrypted',
+        HttpStatus.CONFLICT,
+      );
+    }
+
+    // Verify directory exists
+    const ensureTrailingSlash = (value: string): string =>
+      value.endsWith('/') ? value : value + '/';
+    const directoryPrefix = ensureTrailingSlash(
+      KeyBuilder([User.id, normalizedPath]),
+    );
+
+    const listResponse = await this.s3.send(
+      new ListObjectsV2Command({
+        Bucket: this.Buckets.Storage,
+        Prefix: directoryPrefix,
+        MaxKeys: 1,
+      }),
+    );
+
+    const hasObjects = (listResponse.Contents?.length ?? 0) > 0;
+    if (!hasObjects) {
+      throw new HttpException(
+        'Directory not found or is empty',
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    // Generate and encrypt folder key
+    const folderKey = randomBytes(this.EncryptedFolderKeyBytes).toString(
+      'base64',
+    );
+    const encrypted = this.EncryptFolderKey(passphrase, folderKey);
+    const now = new Date().toISOString();
+
+    manifest.folders[normalizedPath] = {
+      ...encrypted,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    await this.SaveEncryptedFolderManifest(User, manifest);
+
+    return plainToInstance(DirectoryResponseModel, {
+      Path: normalizedPath,
+      IsEncrypted: true,
+      CreatedAt: now,
+      UpdatedAt: now,
+    });
+  }
+
+  /**
+   * Remove encryption from a directory (decrypt).
+   */
+  async DirectoryDecrypt(
+    { Path }: DirectoryDecryptRequestModel,
+    passphrase: string | undefined,
+    User: UserContext,
+  ): Promise<DirectoryResponseModel> {
+    const normalizedPath = this.NormalizeDirectoryPath(Path);
+    if (!normalizedPath) {
+      throw new HttpException(
+        'Directory path is required',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    if (!passphrase) {
+      throw new HttpException(
+        'Passphrase is required. Provide via X-Folder-Passphrase header.',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const manifest = await this.GetEncryptedFolderManifest(User);
+    const entry = manifest.folders[normalizedPath];
+
+    if (!entry) {
+      throw new HttpException(
+        'Directory is not encrypted',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    // Validate passphrase
+    try {
+      this.DecryptFolderKey(passphrase, entry);
+    } catch {
+      throw new HttpException('Invalid passphrase', HttpStatus.BAD_REQUEST);
+    }
+
+    // Remove encryption metadata
+    delete manifest.folders[normalizedPath];
+    await this.SaveEncryptedFolderManifest(User, manifest);
+
+    // Invalidate any active sessions
+    await this.InvalidateDirectorySession(User.id, normalizedPath);
+
+    return plainToInstance(DirectoryResponseModel, {
+      Path: normalizedPath,
+      IsEncrypted: false,
+    });
+  }
+
+  /**
+   * Validate session token for an encrypted folder.
+   * Returns the session if valid, null otherwise.
+   */
+  async ValidateDirectorySession(
+    userId: string,
+    folderPath: string,
+    sessionToken: string,
+  ): Promise<EncryptedFolderSession | null> {
+    const cacheKey = this.BuildSessionKey(userId, folderPath);
+    const session =
+      await this.redisService.get<EncryptedFolderSession>(cacheKey);
+
+    if (!session || session.token !== sessionToken) {
+      return null;
+    }
+
+    if (session.expiresAt < Math.floor(Date.now() / 1000)) {
+      await this.redisService.del(cacheKey);
+      return null;
+    }
+
+    return session;
+  }
+
+  /**
+   * Check if a path is inside an encrypted folder and whether the user has a valid session.
+   * Returns { isEncrypted, hasAccess, encryptingFolder } tuple.
+   */
+  async CheckEncryptedFolderAccess(
+    path: string,
+    userId: string,
+    sessionToken?: string,
+  ): Promise<{
+    isEncrypted: boolean;
+    hasAccess: boolean;
+    encryptingFolder?: string;
+  }> {
+    const normalizedPath = this.NormalizeDirectoryPath(path);
+    const manifest = await this.GetEncryptedFolderManifestByUserId(userId);
+
+    // Check if path is inside any encrypted folder
+    let encryptingFolder: string | undefined;
+    for (const encPath of Object.keys(manifest.folders)) {
+      if (
+        normalizedPath === encPath ||
+        normalizedPath.startsWith(encPath + '/')
+      ) {
+        encryptingFolder = encPath;
+        break;
+      }
+    }
+
+    if (!encryptingFolder) {
+      return { isEncrypted: false, hasAccess: true };
+    }
+
+    if (!sessionToken) {
+      return { isEncrypted: true, hasAccess: false, encryptingFolder };
+    }
+
+    const session = await this.ValidateDirectorySession(
+      userId,
+      encryptingFolder,
+      sessionToken,
+    );
+
+    return {
+      isEncrypted: true,
+      hasAccess: !!session,
+      encryptingFolder,
+    };
+  }
+
+  private BuildSessionKey(userId: string, folderPath: string): string {
+    const normalizedPath = this.NormalizeDirectoryPath(folderPath);
+    return `encrypted-folder:session:${userId}:${normalizedPath}`;
+  }
+
+  private async InvalidateDirectorySession(
+    userId: string,
+    folderPath: string,
+  ): Promise<void> {
+    const cacheKey = this.BuildSessionKey(userId, folderPath);
+    await this.redisService.del(cacheKey);
+  }
+
+  private async GetEncryptedFolderManifestByUserId(
+    userId: string,
+  ): Promise<EncryptedFolderManifest> {
+    // Create a minimal user context for internal use
+    return this.GetEncryptedFolderManifest({ id: userId } as UserContext);
+  }
+
+  /**
+   * Get active session for encrypted folder access.
+   * Used by ProcessDirectories to determine lock status.
+   */
+  async GetActiveSession(
+    userId: string,
+    folderPath: string,
+  ): Promise<EncryptedFolderSession | null> {
+    const cacheKey = this.BuildSessionKey(userId, folderPath);
+    const session =
+      await this.redisService.get<EncryptedFolderSession>(cacheKey);
+
+    if (!session || session.expiresAt < Math.floor(Date.now() / 1000)) {
+      return null;
+    }
+
+    return session;
   }
 
   //#endregion
