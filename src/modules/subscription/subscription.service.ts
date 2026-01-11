@@ -189,17 +189,13 @@ export class SubscriptionService {
     return true;
   }
 
-  async UnsubscribeByUser({
-    userId,
-  }: {
-    userId: string;
-  }): Promise<boolean> {
+  async UnsubscribeByUser({ userId }: { userId: string }): Promise<boolean> {
     const entity = await this.userSubscriptionRepository.findOne({
       where: { user: { id: userId } },
     });
-    
+
     if (!entity) throw new ForbiddenException('No active subscription found');
-    
+
     entity.endAt = new Date();
     entity.status = SubscriptionStatus.CANCELLED;
     await this.userSubscriptionRepository.save(entity);
