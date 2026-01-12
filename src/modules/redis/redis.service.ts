@@ -80,7 +80,7 @@ export class RedisService {
    */
   async delByPattern(pattern: string): Promise<void> {
     const keys = await this.keys(pattern);
-    
+
     // Delete all matching keys
     for (const key of keys) {
       await this.cacheManager.del(key);
