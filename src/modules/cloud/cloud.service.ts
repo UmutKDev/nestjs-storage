@@ -7,6 +7,7 @@ import {
   CreateMultipartUploadCommand,
   DeleteObjectCommand,
   GetObjectCommand,
+  GetObjectCommandOutput,
   HeadObjectCommand,
   HeadObjectCommandOutput,
   ListObjectsV2Command,
@@ -115,6 +116,7 @@ export class CloudService {
   private readonly EncryptedFolderIvLength = 12;
   private readonly EncryptedFolderKdfIterations = 120000;
   private readonly EncryptedFolderAlgorithm = 'aes-256-gcm';
+  private readonly IsSignedUrlProcessing = true;
   private Prefix = null;
   @InjectRepository(UserSubscriptionEntity)
   private userSubscriptionRepository: Repository<UserSubscriptionEntity>;
@@ -180,7 +182,12 @@ export class CloudService {
         encryptedFolders,
         sessionToken,
       ),
-      this.ProcessObjects(command.Contents ?? [], IsMetadataProcessing, User),
+      this.ProcessObjects(
+        command.Contents ?? [],
+        IsMetadataProcessing,
+        User,
+        this.IsSignedUrlProcessing,
+      ),
     ]);
 
     return plainToInstance(CloudListResponseModel, {
@@ -444,6 +451,7 @@ export class CloudService {
         command.Contents ?? [],
         IsMetadataProcessing,
         User,
+        this.IsSignedUrlProcessing,
       );
 
       if (request) {
@@ -504,6 +512,7 @@ export class CloudService {
       sliced,
       IsMetadataProcessing,
       User,
+      this.IsSignedUrlProcessing,
     );
 
     // Continue fetching to get accurate total count
@@ -820,6 +829,7 @@ export class CloudService {
     Contents: _Object[],
     IsMetadataProcessing = false,
     User: UserContext,
+    IsSignedUrlProcessing = false,
   ): Promise<CloudObjectModel[]> {
     if (Contents.length === 0) {
       return [];
@@ -833,7 +843,7 @@ export class CloudService {
     Contents = Contents.filter((c) => !this.IsDirectory(c.Key || ''));
     const processedContents: CloudObjectModel[] = [];
     for (const content of Contents) {
-      let metadata: Partial<HeadObjectCommandOutput> = {};
+      let metadata: Partial<GetObjectCommandOutput> = {};
 
       if (IsMetadataProcessing) {
         metadata = await this.s3.send(
@@ -843,6 +853,17 @@ export class CloudService {
           }),
         );
       }
+
+      const ObjectCommand = new GetObjectCommand({
+        Bucket: this.Buckets.Storage,
+        Key: content.Key,
+      });
+
+      const SignedUrl = IsSignedUrlProcessing
+        ? await getSignedUrl(this.s3, ObjectCommand, {
+            expiresIn: this.PresignedUrlExpirySeconds,
+          })
+        : undefined;
 
       const Name = content.Key?.split('/').pop();
       const Extension = Name?.includes('.') ? Name.split('.').pop() : '';
@@ -856,7 +877,7 @@ export class CloudService {
         Path: {
           Host: this.PublicEndpoint,
           Key: content.Key.replace('' + User.id + '/', ''),
-          Url: this.PublicEndpoint + '/' + content.Key,
+          Url: SignedUrl,
         },
         Metadata: this.DecodeMetadataFromS3(metadata.Metadata),
         Size: content.Size,
@@ -2008,13 +2029,32 @@ export class CloudService {
     }
 
     const manifest = await this.GetEncryptedFolderManifest(User);
-    const entry = manifest.folders[normalizedPath];
 
+    // First try to find exact match
+    let entry = manifest.folders[normalizedPath];
+    let encryptedFolderPath = normalizedPath;
+
+    // If not found, search for parent encrypted folder
     if (!entry) {
-      throw new HttpException(
-        'Encrypted folder not found',
-        HttpStatus.NOT_FOUND,
-      );
+      const pathSegments = normalizedPath.split('/');
+
+      // Try each parent folder from most specific to root
+      for (let i = pathSegments.length - 1; i > 0; i--) {
+        const parentPath = pathSegments.slice(0, i).join('/');
+        if (manifest.folders[parentPath]) {
+          entry = manifest.folders[parentPath];
+          encryptedFolderPath = parentPath;
+          break;
+        }
+      }
+
+      // If still not found, throw error
+      if (!entry) {
+        throw new HttpException(
+          'Encrypted folder not found',
+          HttpStatus.NOT_FOUND,
+        );
+      }
     }
 
     let folderKey: string;
@@ -2034,21 +2074,32 @@ export class CloudService {
 
     const session: EncryptedFolderSession = {
       token: sessionToken,
-      folderPath: normalizedPath,
+      folderPath: encryptedFolderPath,
       folderKey,
       expiresAt,
     };
 
-    // Store session in Redis
-    const cacheKey = this.BuildSessionKey(User.id, normalizedPath);
+    // Store session in Redis for the encrypted folder
+    const cacheKey = this.BuildSessionKey(User.id, encryptedFolderPath);
     await this.redisService.set(
       cacheKey,
       session,
       ENCRYPTED_FOLDER_SESSION_TTL,
     );
 
+    // If unlocking a child folder, also store session for the requested path
+    if (normalizedPath !== encryptedFolderPath) {
+      const childCacheKey = this.BuildSessionKey(User.id, normalizedPath);
+      await this.redisService.set(
+        childCacheKey,
+        session,
+        ENCRYPTED_FOLDER_SESSION_TTL,
+      );
+    }
+
     return plainToInstance(DirectoryUnlockResponseModel, {
       Path: normalizedPath,
+      EncryptedFolderPath: encryptedFolderPath,
       SessionToken: sessionToken,
       ExpiresAt: expiresAt,
       TTL: ENCRYPTED_FOLDER_SESSION_TTL,
@@ -2213,9 +2264,30 @@ export class CloudService {
     folderPath: string,
     sessionToken: string,
   ): Promise<EncryptedFolderSession | null> {
-    const cacheKey = this.BuildSessionKey(userId, folderPath);
-    const session =
-      await this.redisService.get<EncryptedFolderSession>(cacheKey);
+    const normalizedPath = this.NormalizeDirectoryPath(folderPath);
+
+    // First, try to find session for the exact folder path
+    const cacheKey = this.BuildSessionKey(userId, normalizedPath);
+    let session = await this.redisService.get<EncryptedFolderSession>(cacheKey);
+
+    // If not found, check if there's a session for any child folder of this path
+    // This handles the case where user unlocks a child folder and then navigates to parent
+    if (!session) {
+      const basePattern = `encrypted-folder:session:${userId}:`;
+      const pattern = normalizedPath
+        ? `${basePattern}${normalizedPath}/*`
+        : `${basePattern}*`;
+      const keys = await this.redisService.keys(pattern);
+
+      for (const key of keys) {
+        const childSession =
+          await this.redisService.get<EncryptedFolderSession>(key);
+        if (childSession && childSession.token === sessionToken) {
+          session = childSession;
+          break;
+        }
+      }
+    }
 
     if (!session || session.token !== sessionToken) {
       return null;

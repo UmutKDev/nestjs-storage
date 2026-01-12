@@ -34,11 +34,11 @@ export class RedisService {
   }
 
   /**
-   * Delete all keys matching a pattern (user-based invalidation)
-   * @param pattern Pattern to match (e.g., 'cloud:user:123:*')
+   * Get all keys matching a pattern
+   * @param pattern Pattern to match (e.g., 'encrypted-folder:session:*')
+   * @returns Array of matching keys
    */
-  async delByPattern(pattern: string): Promise<void> {
-    // Access the underlying store to get keys
+  async keys(pattern: string): Promise<string[]> {
     const cacheManagerAny = this.cacheManager as unknown as {
       stores?: Array<{
         keys?: (pattern: string) => Promise<string[]>;
@@ -71,6 +71,16 @@ export class RedisService {
       }
     }
 
+    return keys;
+  }
+
+  /**
+   * Delete all keys matching a pattern (user-based invalidation)
+   * @param pattern Pattern to match (e.g., 'cloud:user:123:*')
+   */
+  async delByPattern(pattern: string): Promise<void> {
+    const keys = await this.keys(pattern);
+    
     // Delete all matching keys
     for (const key of keys) {
       await this.cacheManager.del(key);

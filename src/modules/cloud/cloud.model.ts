@@ -636,8 +636,14 @@ export class DirectoryUnlockRequestModel {
  */
 export class DirectoryUnlockResponseModel {
   @Expose()
-  @ApiProperty({ description: 'Directory path that was unlocked' })
+  @ApiProperty({ description: 'Directory path that was requested for unlock' })
   Path: string;
+
+  @Expose()
+  @ApiProperty({ 
+    description: 'The root encrypted folder path (parent folder that is actually encrypted)' 
+  })
+  EncryptedFolderPath: string;
 
   @Expose()
   @ApiProperty({
