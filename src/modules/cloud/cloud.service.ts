@@ -9,7 +9,6 @@ import {
   GetObjectCommand,
   GetObjectCommandOutput,
   HeadObjectCommand,
-  HeadObjectCommandOutput,
   ListObjectsV2Command,
   ListObjectsV2CommandInput,
   PutObjectCommand,
@@ -392,6 +391,58 @@ export class CloudService {
 
   //#endregion
 
+  private readonly ListObjectsCacheTTL = 60; // 1 minute cache
+
+  private BuildListObjectsCacheKey(
+    userId: string,
+    path: string,
+    delimiter: boolean,
+    isMetadataProcessing: boolean,
+    search: string | undefined,
+    skip: number,
+    take: number,
+  ): string {
+    const parts = [
+      'cloud:list-objects',
+      userId,
+      path || 'root',
+      delimiter ? 'd1' : 'd0',
+      isMetadataProcessing ? 'm1' : 'm0',
+      search || '',
+      `s${skip}`,
+      `t${take}`,
+    ];
+    return parts.join(':');
+  }
+
+  /**
+   * Invalidate list objects cache for a user's path.
+   * Call this when objects are added, deleted, moved, or renamed.
+   */
+  async InvalidateListObjectsCache(
+    userId: string,
+    path?: string,
+  ): Promise<void> {
+    const pattern = path
+      ? `cloud:list-objects:${userId}:${path.replace(/^\/+|\/+$/g, '') || 'root'}:*`
+      : `cloud:list-objects:${userId}:*`;
+    await this.redisService.delByPattern(pattern);
+  }
+
+  /**
+   * Extract parent folder path from a key.
+   * e.g., "folder1/folder2/file.txt" -> "folder1/folder2"
+   * e.g., "file.txt" -> "" (root)
+   */
+  private GetParentFolderPath(key: string): string {
+    const normalized = (key || '').replace(/^\/+|\/+$/g, '');
+    const parts = normalized.split('/');
+    if (parts.length <= 1) {
+      return ''; // root folder
+    }
+    return parts.slice(0, -1).join('/');
+  }
+
   //#region Objects
 
   async ListObjects(
@@ -436,6 +487,30 @@ export class CloudService {
     const takeValue =
       typeof take === 'number' && take > 0 ? take : this.MaxListObjects;
 
+    // Build cache key
+    const cacheKey = this.BuildListObjectsCacheKey(
+      User.id,
+      cleanedPath,
+      !!Delimiter,
+      !!IsMetadataProcessing,
+      search,
+      skipValue,
+      takeValue,
+    );
+
+    // Try to get from cache
+    const cached = await this.redisService.get<{
+      objects: CloudObjectModel[];
+      totalCount: number;
+    }>(cacheKey);
+
+    if (cached) {
+      if (request) {
+        request.totalRowCount = cached.totalCount;
+      }
+      return cached.objects;
+    }
+
     // If both skip and take are defaults (0), preserve previous behavior for a single page
     if (!skipValue && takeValue === this.MaxListObjects) {
       const command = await this.s3.send(
@@ -452,6 +527,13 @@ export class CloudService {
         IsMetadataProcessing,
         User,
         this.IsSignedUrlProcessing,
+      );
+
+      // Cache the result
+      await this.redisService.set(
+        cacheKey,
+        { objects, totalCount: objects.length },
+        this.ListObjectsCacheTTL,
       );
 
       if (request) {
@@ -536,6 +618,13 @@ export class CloudService {
       }
       continuationToken = countCommand.NextContinuationToken;
     }
+
+    // Cache the result
+    await this.redisService.set(
+      cacheKey,
+      { objects, totalCount },
+      this.ListObjectsCacheTTL,
+    );
 
     if (request) {
       request.totalRowCount = totalCount;
@@ -898,6 +987,8 @@ export class CloudService {
     { SourceKeys, DestinationKey }: CloudMoveRequestModel,
     User: UserContext,
   ): Promise<boolean> {
+    const foldersToInvalidate = new Set<string>();
+
     try {
       for await (const sourceKey of SourceKeys) {
         const sourceFullKey = KeyBuilder([User.id, sourceKey]);
@@ -923,6 +1014,19 @@ export class CloudService {
             Key: sourceFullKey,
           }),
         );
+
+        // Collect folders to invalidate
+        foldersToInvalidate.add(this.GetParentFolderPath(sourceKey));
+      }
+
+      // Add destination folder
+      foldersToInvalidate.add(
+        (DestinationKey || '').replace(/^\/+|\/+$/g, ''),
+      );
+
+      // Invalidate cache for all affected folders
+      for (const folder of foldersToInvalidate) {
+        await this.InvalidateListObjectsCache(User.id, folder || undefined);
       }
     } catch (error) {
       if (this.NotFoundErrorCodes.includes(error.name)) {
@@ -944,6 +1048,8 @@ export class CloudService {
   ): Promise<boolean> {
     // mark _options as used to avoid unused-parameter errors
     void _options;
+    const foldersToInvalidate = new Set<string>();
+
     try {
       for await (const item of Items) {
         await this.s3.send(
@@ -952,6 +1058,14 @@ export class CloudService {
             Key: KeyBuilder([User.id, item.Key]),
           }),
         );
+
+        // Collect parent folder to invalidate
+        foldersToInvalidate.add(this.GetParentFolderPath(item.Key));
+      }
+
+      // Invalidate cache for all affected folders
+      for (const folder of foldersToInvalidate) {
+        await this.InvalidateListObjectsCache(User.id, folder || undefined);
       }
     } catch (error) {
       if (this.NotFoundErrorCodes.includes(error.name)) {
@@ -980,6 +1094,11 @@ export class CloudService {
         Body: '',
       }),
     );
+
+    // Invalidate parent folder cache
+    const parentFolder = this.GetParentFolderPath(Key);
+    await this.InvalidateListObjectsCache(User.id, parentFolder || undefined);
+
     return true;
   }
 
@@ -1138,6 +1257,10 @@ export class CloudService {
         normalizedTargetPath,
         User,
       );
+
+      // Invalidate cache for parent folder (both source and target are in same parent)
+      const parentFolder = this.GetParentFolderPath(sourcePath);
+      await this.InvalidateListObjectsCache(User.id, parentFolder || undefined);
 
       return true;
     } catch (error) {
@@ -1446,6 +1569,10 @@ export class CloudService {
     if (IsImageFile(Key)) {
       metadata = await this.ProcessImageMetadata(KeyBuilder([User.id, Key]));
     }
+
+    // Invalidate cache for the folder where the file was uploaded
+    const parentFolder = this.GetParentFolderPath(Key);
+    await this.InvalidateListObjectsCache(User.id, parentFolder || undefined);
 
     return plainToInstance(CloudCompleteMultipartUploadResponseModel, {
       Location: command.Location,
@@ -1794,6 +1921,21 @@ export class CloudService {
               ContentType: sourceContentType,
               Metadata: finalMetadataForS3,
             }),
+          );
+        }
+      }
+
+      // Invalidate cache for the folder(s) affected
+      const sourceFolder = this.GetParentFolderPath(Key);
+      await this.InvalidateListObjectsCache(User.id, sourceFolder || undefined);
+
+      // If renamed (different target), also invalidate target folder
+      if (targetRelative !== Key) {
+        const targetFolder = this.GetParentFolderPath(targetRelative);
+        if (targetFolder !== sourceFolder) {
+          await this.InvalidateListObjectsCache(
+            User.id,
+            targetFolder || undefined,
           );
         }
       }
