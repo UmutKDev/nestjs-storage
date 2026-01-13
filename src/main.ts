@@ -49,7 +49,10 @@ async function bootstrap() {
       transform: true,
       forbidNonWhitelisted: true,
       skipMissingProperties: false,
-      transformOptions: { enableImplicitConversion: true },
+      transformOptions: {
+        enableImplicitConversion: true,
+        exposeDefaultValues: true,
+      },
     }),
   );
 

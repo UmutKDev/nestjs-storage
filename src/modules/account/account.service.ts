@@ -1,18 +1,14 @@
 import { HttpException, Injectable } from '@nestjs/common';
 import {
   AccountChangePasswordRequestModel,
+  AccountProfileResponseModel,
   AccountPutBodyRequestModel,
-  AccountResponseModel,
 } from './account.model';
 import * as argon2 from 'argon2';
-// import { UploadService } from '../cloud';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { UserEntity } from '@entities//user.entity';
-// import { CloudPaths } from '@common/enums';
 import { plainToInstance } from 'class-transformer';
-import { SubscriptionStatus } from '@common/enums';
-// import { SubscriptionStatus } from '@common/enums';
 
 @Injectable()
 export class AccountService {
@@ -26,7 +22,7 @@ export class AccountService {
     user,
   }: {
     user: UserContext;
-  }): Promise<AccountResponseModel> {
+  }): Promise<AccountProfileResponseModel> {
     const query = await this.userRepository
       .findOneOrFail({
         where: { id: user.id },
@@ -42,15 +38,13 @@ export class AccountService {
         throw error;
       });
 
-    const userQuery: AccountResponseModel = {
+    const userQuery: AccountProfileResponseModel = {
       ...query,
       subscription: query.subscription,
       date: query.date,
     };
 
-    // console.log(plainToInstance(AccountResponseModel, query));
-
-    return plainToInstance(AccountResponseModel, userQuery);
+    return plainToInstance(AccountProfileResponseModel, userQuery);
   }
 
   async Edit({

@@ -74,10 +74,6 @@ export class SubscriptionViewModel implements SubscriptionEntity {
   status: string;
 
   @Expose()
-  @ApiProperty()
-  isActive: boolean;
-
-  @Expose()
   @ApiProperty({ type: SubscriptionDateModel })
   date: SubscriptionDateModel;
 }
@@ -126,10 +122,6 @@ export class UserSubscriptionViewModel {
   @Expose()
   @ApiProperty({ required: false })
   endAt?: Date | null;
-
-  @Expose()
-  @ApiProperty()
-  isActive: boolean;
 
   @Expose()
   @ApiProperty()
