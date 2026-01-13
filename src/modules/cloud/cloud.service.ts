@@ -1019,10 +1019,16 @@ export class CloudService {
         foldersToInvalidate.add(this.GetParentFolderPath(sourceKey));
       }
 
-      // Add destination folder
-      foldersToInvalidate.add(
-        (DestinationKey || '').replace(/^\/+|\/+$/g, ''),
+      // Add destination folder and its parent (in case destination folder is newly created)
+      const normalizedDestination = (DestinationKey || '').replace(
+        /^\/+|\/+$/g,
+        '',
       );
+      foldersToInvalidate.add(normalizedDestination);
+      const destinationParent = this.GetParentFolderPath(normalizedDestination);
+      if (destinationParent !== normalizedDestination) {
+        foldersToInvalidate.add(destinationParent);
+      }
 
       // Invalidate cache for all affected folders
       for (const folder of foldersToInvalidate) {
