@@ -94,7 +94,7 @@ type EncryptedFolderManifest = {
 export class CloudService {
   private readonly logger = new Logger(CloudService.name);
   private readonly Buckets = {
-    Storage: 'Storage',
+    Storage: 'storage',
     Photos: 'Photos',
   };
   private readonly PublicEndpoint =
