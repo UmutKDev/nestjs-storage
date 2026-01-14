@@ -10,7 +10,7 @@ import {
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { TransformInterceptor } from '@common/interceptors/transform.interceptor';
 import { RequestContextMiddleware } from './common/context/context.middleware';
-// import { apiReference } from '@scalar/nestjs-api-reference';
+import { apiReference } from '@scalar/nestjs-api-reference';
 import { json, urlencoded } from 'express';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { useContainer } from 'class-validator';
@@ -90,7 +90,7 @@ async function bootstrap() {
   });
   SwaggerModule.setup('swagger', app, document);
 
-  // app.use('/reference', apiReference({ content: document }));
+  app.use('/reference', apiReference({ content: document }));
 
   await app.listen(process.env.PORT || 8080);
 }
