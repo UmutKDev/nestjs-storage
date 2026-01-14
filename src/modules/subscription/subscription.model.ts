@@ -57,11 +57,6 @@ export class SubscriptionViewModel implements SubscriptionEntity {
   @Expose()
   @ApiProperty({ required: false })
   @IsOptional()
-  maxFileSizeBytes?: number | null;
-
-  @Expose()
-  @ApiProperty({ required: false })
-  @IsOptional()
   maxObjectCount?: number | null;
 
   @Expose()

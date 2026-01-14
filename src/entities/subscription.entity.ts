@@ -42,9 +42,6 @@ export class SubscriptionEntity {
   @Column({ type: 'bigint', default: 5 * 1024 * 1024 * 1024 }) // 5 GB
   storageLimitBytes: number;
 
-  @Column({ type: 'bigint', nullable: true, default: null })
-  maxFileSizeBytes?: number | null;
-
   @Column({ type: 'bigint', nullable: true, default: 50 * 1024 * 1024 })
   maxUploadSizeBytes?: number | null;
 
