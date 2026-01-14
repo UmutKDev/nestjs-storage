@@ -488,28 +488,28 @@ export class CloudService {
       typeof take === 'number' && take > 0 ? take : this.MaxListObjects;
 
     // Build cache key
-    const cacheKey = this.BuildListObjectsCacheKey(
-      User.id,
-      cleanedPath,
-      !!Delimiter,
-      !!IsMetadataProcessing,
-      search,
-      skipValue,
-      takeValue,
-    );
+    // const cacheKey = this.BuildListObjectsCacheKey(
+    //   User.id,
+    //   cleanedPath,
+    //   !!Delimiter,
+    //   !!IsMetadataProcessing,
+    //   search,
+    //   skipValue,
+    //   takeValue,
+    // );
 
     // Try to get from cache
-    const cached = await this.redisService.get<{
-      objects: CloudObjectModel[];
-      totalCount: number;
-    }>(cacheKey);
+    // const cached = await this.redisService.get<{
+    //   objects: CloudObjectModel[];
+    //   totalCount: number;
+    // }>(cacheKey);
 
-    if (cached) {
-      if (request) {
-        request.totalRowCount = cached.totalCount;
-      }
-      return cached.objects;
-    }
+    // if (cached) {
+    //   if (request) {
+    //     request.totalRowCount = cached.totalCount;
+    //   }
+    //   return cached.objects;
+    // }
 
     // If both skip and take are defaults (0), preserve previous behavior for a single page
     if (!skipValue && takeValue === this.MaxListObjects) {
@@ -530,11 +530,11 @@ export class CloudService {
       );
 
       // Cache the result
-      await this.redisService.set(
-        cacheKey,
-        { objects, totalCount: objects.length },
-        this.ListObjectsCacheTTL,
-      );
+      // await this.redisService.set(
+      //   cacheKey,
+      //   { objects, totalCount: objects.length },
+      //   this.ListObjectsCacheTTL,
+      // );
 
       if (request) {
         request.totalRowCount = objects.length;
@@ -620,11 +620,11 @@ export class CloudService {
     }
 
     // Cache the result
-    await this.redisService.set(
-      cacheKey,
-      { objects, totalCount },
-      this.ListObjectsCacheTTL,
-    );
+    // await this.redisService.set(
+    //   cacheKey,
+    //   { objects, totalCount },
+    //   this.ListObjectsCacheTTL,
+    // );
 
     if (request) {
       request.totalRowCount = totalCount;
