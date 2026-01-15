@@ -993,7 +993,7 @@ export class CloudService {
         ? await getSignedUrl(this.s3, ObjectCommand, {
             expiresIn: this.PresignedUrlExpirySeconds,
           })
-        : undefined;
+        : this.PublicEndpoint + '/' + content.Key;
 
       const Name = content.Key?.split('/').pop();
       const Extension = Name?.includes('.') ? Name.split('.').pop() : '';
