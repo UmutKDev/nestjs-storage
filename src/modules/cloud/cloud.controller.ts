@@ -72,6 +72,7 @@ import {
   FOLDER_SESSION_HEADER,
   FOLDER_PASSPHRASE_HEADER,
 } from './cloud.constants';
+import { Public } from '@common/decorators/public.decorator';
 
 @Controller('Cloud')
 @ApiTags('Cloud')
@@ -189,6 +190,21 @@ export class CloudController {
   }
 
   @ApiOperation({
+    summary: 'Get a presigned URL for upload/download',
+    description:
+      'Returns a presigned URL for a specific object key to allow direct client access.',
+  })
+  @ApiSuccessResponse('string')
+  @Get('Public/PresignedUrl')
+  @Public()
+  async GetPublicPresignedUrl(
+    @Query('key') key: string,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    return this.cloudService.GetPublicPresignedUrl({ key, res });
+  }
+
+  @ApiOperation({
     summary: 'Move/rename an object',
     description:
       'Move an object from SourceKey to DestinationKey within the user scope.',
@@ -223,8 +239,6 @@ export class CloudController {
   ): Promise<boolean> {
     return this.cloudService.Delete(model, user);
   }
-
-
 
   @ApiOperation({
     summary: 'Create a multipart upload session',

@@ -70,12 +70,14 @@ import {
   KeyBuilder,
   PascalizeKeys,
   MimeTypeFromExtension,
+  S3KeyConverter,
 } from '@common/helpers/cast.helper';
 import { CloudBreadcrumbLevelType } from '@common/enums';
 import { UserSubscriptionEntity } from '@entities/user-subscription.entity';
 import { Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { asyncLocalStorage } from '@common/context/context.service';
+import { Response } from 'express';
 
 type EncryptedFolderRecord = {
   ciphertext: string;
@@ -762,6 +764,42 @@ export class CloudService {
 
       return url;
     } catch (error) {
+      if (this.NotFoundErrorCodes.includes(error.name)) {
+        throw new HttpException(Codes.Error.Cloud.FILE_NOT_FOUND, 404);
+      }
+      throw error;
+    }
+  }
+
+  async GetPublicPresignedUrl({
+    key,
+    res,
+  }: {
+    key: string;
+    res: Response;
+  }): Promise<null> {
+    try {
+      await this.s3.send(
+        new HeadObjectCommand({
+          Bucket: this.Buckets.Storage,
+          Key: S3KeyConverter(key.replace(this.Buckets.Storage + '/', '')),
+        }),
+      );
+
+      const command = new GetObjectCommand({
+        Bucket: this.Buckets.Storage,
+        Key: S3KeyConverter(key.replace(this.Buckets.Storage + '/', '')),
+      });
+
+      const url = await getSignedUrl(this.s3, command, {
+        expiresIn: this.PresignedUrlExpirySeconds,
+      });
+
+      res.setHeader('X-Signed-Url', encodeURIComponent(url));
+
+      return null;
+    } catch (error) {
+      console.log(error);
       if (this.NotFoundErrorCodes.includes(error.name)) {
         throw new HttpException(Codes.Error.Cloud.FILE_NOT_FOUND, 404);
       }
