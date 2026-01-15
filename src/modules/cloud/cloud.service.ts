@@ -124,7 +124,9 @@ export class CloudService {
   private userSubscriptionRepository: Repository<UserSubscriptionEntity>;
   @InjectAws(S3Client) private readonly s3: S3Client;
 
-  constructor(private readonly redisService: RedisService) {}
+  constructor(private readonly redisService: RedisService) {
+    console.log(this.IsSignedUrlProcessing);
+  }
 
   // Default download speeds (bytes per second) mapped by subscription slug
   private readonly DefaultDownloadSpeeds: Record<string, number> = {
