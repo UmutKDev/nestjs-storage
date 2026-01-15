@@ -41,7 +41,9 @@ export class CloudPathModel {
 
   @Expose()
   @ApiProperty()
-  @Transform(({ value }) => CDNPathResolver(value), { toClassOnly: true })
+  @Transform(({ value }) => CDNPathResolver(encodeURIComponent(value)), {
+    toClassOnly: true,
+  })
   Url: string;
 }
 
