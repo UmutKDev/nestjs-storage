@@ -117,9 +117,8 @@ export class CloudService {
   private readonly EncryptedFolderIvLength = 12;
   private readonly EncryptedFolderKdfIterations = 120000;
   private readonly EncryptedFolderAlgorithm = 'aes-256-gcm';
-  private readonly IsSignedUrlProcessing = Boolean(
-    process.env.S3_PROTOCOL_SIGNED_URL_PROCESSING,
-  );
+  private readonly IsSignedUrlProcessing =
+    process.env.S3_PROTOCOL_SIGNED_URL_PROCESSING === 'true';
   private Prefix = null;
   @InjectRepository(UserSubscriptionEntity)
   private userSubscriptionRepository: Repository<UserSubscriptionEntity>;
