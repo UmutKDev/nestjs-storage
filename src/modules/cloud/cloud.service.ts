@@ -779,6 +779,7 @@ export class CloudService {
     res: Response;
   }): Promise<null> {
     try {
+      console.log(key);
       await this.s3.send(
         new HeadObjectCommand({
           Bucket: this.Buckets.Storage,
@@ -794,6 +795,8 @@ export class CloudService {
       const url = await getSignedUrl(this.s3, command, {
         expiresIn: this.PresignedUrlExpirySeconds,
       });
+
+      console.log(url);
 
       res.setHeader('x-signed-url', url);
 
