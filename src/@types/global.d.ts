@@ -34,6 +34,7 @@ export declare global {
       // AWS S3
       S3_PROTOCOL_ACCESS_KEY_ID?: string;
       S3_PROTOCOL_ACCESS_KEY_SECRET?: string;
+      S3_PROTOCOL_SIGNED_URL_PROCESSING?: string;
 
       STORAGE_S3_MAX_SOCKETS?: string;
       STORAGE_S3_ENDPOINT?: string;
