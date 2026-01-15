@@ -795,7 +795,7 @@ export class CloudService {
         expiresIn: this.PresignedUrlExpirySeconds,
       });
 
-      res.setHeader('X-Signed-Url', url);
+      res.setHeader('x-signed-url', url);
 
       return null;
     } catch (error) {
