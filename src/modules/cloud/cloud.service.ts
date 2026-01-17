@@ -992,11 +992,19 @@ export class CloudService {
         Key: content.Key,
       });
 
-      const SignedUrl = IsSignedUrlProcessing
-        ? await getSignedUrl(this.s3, ObjectCommand, {
-            expiresIn: this.PresignedUrlExpirySeconds,
-          })
-        : this.PublicEndpoint + '/' + content.Key;
+      const Width = Number(metadata.Metadata?.width) || 0;
+
+      const ImageBuilder =
+        IsImageFile(content.Key || '') && Width
+          ? `?w=${Width / (Width > 3000 ? 4 : Width > 2500 ? 3 : Width > 2000 ? 2.5 : Width > 1000 ? 2 : 1)}`
+          : '';
+
+      const SignedUrl =
+        (IsSignedUrlProcessing
+          ? await getSignedUrl(this.s3, ObjectCommand, {
+              expiresIn: this.PresignedUrlExpirySeconds,
+            })
+          : this.PublicEndpoint + '/' + content.Key) + ImageBuilder;
 
       const Name = content.Key?.split('/').pop();
       const Extension = Name?.includes('.') ? Name.split('.').pop() : '';
