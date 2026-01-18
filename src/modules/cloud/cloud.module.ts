@@ -7,6 +7,14 @@ import { CloudService } from './cloud.service';
 import { UserSubscriptionEntity } from '@entities/user-subscription.entity';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { RedisModule } from '@modules/redis/redis.module';
+import { CloudS3Service } from './cloud.s3.service';
+import { CloudMetadataService } from './cloud.metadata.service';
+import { CloudListService } from './cloud.list.service';
+import { CloudObjectService } from './cloud.object.service';
+import { CloudZipService } from './cloud.zip.service';
+import { CloudUploadService } from './cloud.upload.service';
+import { CloudDirectoryService } from './cloud.directory.service';
+import { CloudUsageService } from './cloud.usage.service';
 
 @Module({
   imports: [
@@ -28,7 +36,27 @@ import { RedisModule } from '@modules/redis/redis.module';
     TypeOrmModule.forFeature([UserSubscriptionEntity]),
   ],
   controllers: [CloudController],
-  providers: [CloudService],
-  exports: [CloudService],
+  providers: [
+    CloudService,
+    CloudS3Service,
+    CloudMetadataService,
+    CloudListService,
+    CloudObjectService,
+    CloudZipService,
+    CloudUploadService,
+    CloudDirectoryService,
+    CloudUsageService,
+  ],
+  exports: [
+    CloudService,
+    CloudS3Service,
+    CloudMetadataService,
+    CloudListService,
+    CloudObjectService,
+    CloudZipService,
+    CloudUploadService,
+    CloudDirectoryService,
+    CloudUsageService,
+  ],
 })
 export class CloudModule {}
