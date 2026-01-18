@@ -15,6 +15,7 @@ import { CloudZipService } from './cloud.zip.service';
 import { CloudUploadService } from './cloud.upload.service';
 import { CloudDirectoryService } from './cloud.directory.service';
 import { CloudUsageService } from './cloud.usage.service';
+import { CloudScanService } from './cloud.scan.service';
 
 @Module({
   imports: [
@@ -46,6 +47,7 @@ import { CloudUsageService } from './cloud.usage.service';
     CloudUploadService,
     CloudDirectoryService,
     CloudUsageService,
+    CloudScanService,
   ],
   exports: [
     CloudService,
@@ -57,6 +59,7 @@ import { CloudUsageService } from './cloud.usage.service';
     CloudUploadService,
     CloudDirectoryService,
     CloudUsageService,
+    CloudScanService,
   ],
 })
 export class CloudModule {}

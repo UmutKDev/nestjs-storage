@@ -339,6 +339,10 @@ export class CloudUploadPartRequestModel {
   })
   @IsOptional()
   File: Express.Multer.File;
+
+  @Expose()
+  @IsOptional()
+  ContentMd5?: string;
 }
 
 export class CloudUploadPartResponseModel {
@@ -486,6 +490,24 @@ export class CloudUserStorageUsageResponseModel {
   @IsNumber()
   @Transform(({ value }) => Number(value))
   MaxUploadSizeBytes: number = 0;
+}
+
+export class CloudScanStatusResponseModel {
+  @Expose()
+  @ApiProperty()
+  Status: string;
+
+  @Expose()
+  @ApiProperty({ required: false })
+  Reason?: string;
+
+  @Expose()
+  @ApiProperty({ required: false })
+  Signature?: string;
+
+  @Expose()
+  @ApiProperty({ required: false })
+  ScannedAt?: string;
 }
 
 export class CloudAbortMultipartUploadRequestModel {

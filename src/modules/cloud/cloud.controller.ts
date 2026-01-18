@@ -52,6 +52,7 @@ import {
   CloudUploadPartRequestModel,
   CloudUploadPartResponseModel,
   CloudUserStorageUsageResponseModel,
+  CloudScanStatusResponseModel,
   CloudPreSignedUrlRequestModel,
   // New Directories API
   DirectoryCreateRequestModel,
@@ -71,6 +72,7 @@ import {
 import { User } from '@common/decorators/user.decorator';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ThrottleTransform } from '@common/helpers/throttle.transform';
+import { Throttle } from '@nestjs/throttler';
 import { pipeline } from 'stream';
 import { promisify } from 'util';
 import type { Response } from 'express';
@@ -80,6 +82,20 @@ import {
   FOLDER_SESSION_HEADER,
   FOLDER_PASSPHRASE_HEADER,
 } from './cloud.constants';
+
+const CLOUD_UPLOAD_THROTTLE = {
+  default: {
+    ttl: Number(process.env.CLOUD_UPLOAD_RATE_TTL ?? 60000),
+    limit: Number(process.env.CLOUD_UPLOAD_RATE_LIMIT ?? 60),
+  },
+};
+
+const CLOUD_DOWNLOAD_THROTTLE = {
+  default: {
+    ttl: Number(process.env.CLOUD_DOWNLOAD_RATE_TTL ?? 60000),
+    limit: Number(process.env.CLOUD_DOWNLOAD_RATE_LIMIT ?? 60),
+  },
+};
 
 @Controller('Cloud')
 @ApiTags('Cloud')
@@ -173,6 +189,20 @@ export class CloudController {
   }
 
   @ApiOperation({
+    summary: 'Get antivirus scan status for a file',
+    description:
+      'Returns the latest antivirus scan status for the given object key.',
+  })
+  @Get('Scan/Status')
+  @ApiSuccessResponse(CloudScanStatusResponseModel)
+  async ScanStatus(
+    @Query() model: CloudKeyRequestModel,
+    @User() user: UserContext,
+  ): Promise<CloudScanStatusResponseModel | null> {
+    return this.cloudService.GetScanStatus(model, user);
+  }
+
+  @ApiOperation({
     summary: 'Get object metadata',
     description:
       'Find a single object by key (user scoped) and return its metadata.',
@@ -210,8 +240,9 @@ export class CloudController {
   async Move(
     @Body() model: CloudMoveRequestModel,
     @User() user: UserContext,
+    @Headers('idempotency-key') idempotencyKey?: string,
   ): Promise<boolean> {
-    return this.cloudService.Move(model, user);
+    return this.cloudService.Move(model, user, idempotencyKey);
   }
 
   @ApiOperation({
@@ -228,8 +259,9 @@ export class CloudController {
   async Delete(
     @Body() model: CloudDeleteRequestModel,
     @User() user: UserContext,
+    @Headers('idempotency-key') idempotencyKey?: string,
   ): Promise<boolean> {
-    return this.cloudService.Delete(model, user);
+    return this.cloudService.Delete(model, user, undefined, idempotencyKey);
   }
 
   @ApiOperation({
@@ -237,6 +269,7 @@ export class CloudController {
     description: 'Creates an UploadId and starts a multipart upload flow.',
   })
   @Post('Upload/CreateMultipartUpload')
+  @Throttle(CLOUD_UPLOAD_THROTTLE)
   @ApiHeader({
     name: FOLDER_SESSION_HEADER,
     required: false,
@@ -294,6 +327,7 @@ export class CloudController {
       'Returns an expiring URL to upload a single part for the provided UploadId and PartNumber.',
   })
   @Post('Upload/GetMultipartPartUrl')
+  @Throttle(CLOUD_UPLOAD_THROTTLE)
   @ApiHeader({
     name: FOLDER_SESSION_HEADER,
     required: false,
@@ -318,6 +352,7 @@ export class CloudController {
       'Accepts a single file part for a multipart upload. The request must be multipart/form-data.',
   })
   @Post('Upload/UploadPart')
+  @Throttle(CLOUD_UPLOAD_THROTTLE)
   @ApiConsumes('multipart/form-data')
   @ApiBody({
     type: CloudUploadPartRequestModel,
@@ -335,16 +370,25 @@ export class CloudController {
       new ParseFilePipe({
         validators: [
           new MaxFileSizeValidator({
-            maxSize: Number(process.env.CLOUD_UPLOAD_PART_MAX_BYTES ?? 5242880),
+            maxSize: Number(
+              process.env.CLOUD_UPLOAD_PART_MAX_BYTES ?? 10485760,
+            ),
           }),
         ],
       }),
     )
     file: Express.Multer.File,
     @User() user: UserContext,
+    @Headers('content-md5') contentMd5?: string,
     @Headers(FOLDER_SESSION_HEADER) sessionToken?: string,
   ): Promise<CloudUploadPartResponseModel> {
-    return this.cloudService.UploadPart(model, file, user, sessionToken);
+    return this.cloudService.UploadPart(
+      model,
+      file,
+      user,
+      sessionToken,
+      contentMd5,
+    );
   }
 
   @ApiOperation({
@@ -353,6 +397,7 @@ export class CloudController {
       'Completes a multipart upload by providing the list of parts and finalizes the object.',
   })
   @Post('Upload/CompleteMultipartUpload')
+  @Throttle(CLOUD_UPLOAD_THROTTLE)
   @ApiHeader({
     name: FOLDER_SESSION_HEADER,
     required: false,
@@ -363,11 +408,13 @@ export class CloudController {
     @Body() model: CloudCompleteMultipartUploadRequestModel,
     @User() user: UserContext,
     @Headers(FOLDER_SESSION_HEADER) sessionToken?: string,
+    @Headers('idempotency-key') idempotencyKey?: string,
   ): Promise<CloudCompleteMultipartUploadResponseModel> {
     return this.cloudService.UploadCompleteMultipartUpload(
       model,
       user,
       sessionToken,
+      idempotencyKey,
     );
   }
 
@@ -423,6 +470,7 @@ export class CloudController {
       'Abort an ongoing multipart upload and clean up temporary state.',
   })
   @Delete('Upload/AbortMultipartUpload')
+  @Throttle(CLOUD_UPLOAD_THROTTLE)
   async UploadAbortMultipartUpload(
     @Body() model: CloudAbortMultipartUploadRequestModel,
     @User() user: UserContext,
@@ -445,6 +493,7 @@ export class CloudController {
   }
 
   @Get('Download')
+  @Throttle(CLOUD_DOWNLOAD_THROTTLE)
   @ApiOperation({
     summary: 'Download a file for the authenticated user (streamed)',
     description:

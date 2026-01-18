@@ -1,4 +1,5 @@
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import { createHash } from 'crypto';
 import { Readable } from 'stream';
 import {
   CloudAbortMultipartUploadRequestModel,
@@ -29,6 +30,7 @@ import {
   CloudUploadPartRequestModel,
   CloudUploadPartResponseModel,
   CloudUserStorageUsageResponseModel,
+  CloudScanStatusResponseModel,
   CloudPreSignedUrlRequestModel,
   // New Directories API models
   DirectoryCreateRequestModel,
@@ -48,8 +50,10 @@ import { CloudZipService } from './cloud.zip.service';
 import { CloudUploadService } from './cloud.upload.service';
 import { CloudDirectoryService } from './cloud.directory.service';
 import { CloudUsageService } from './cloud.usage.service';
+import { CloudScanService } from './cloud.scan.service';
 import { NormalizeDirectoryPath } from './cloud.utils';
 import { SizeFormatter } from '@common/helpers/cast.helper';
+import { RedisService } from '@modules/redis/redis.service';
 
 @Injectable()
 export class CloudService {
@@ -62,6 +66,8 @@ export class CloudService {
     private readonly CloudUploadService: CloudUploadService,
     private readonly CloudDirectoryService: CloudDirectoryService,
     private readonly CloudUsageService: CloudUsageService,
+    private readonly CloudScanService: CloudScanService,
+    private readonly RedisService: RedisService,
   ) {}
 
   //#region List
@@ -245,6 +251,22 @@ export class CloudService {
     return this.CloudUsageService.UserStorageUsage(User);
   }
 
+  async GetScanStatus(
+    { Key }: CloudKeyRequestModel,
+    User: UserContext,
+  ): Promise<CloudScanStatusResponseModel | null> {
+    const status = await this.CloudScanService.GetScanStatus(User.id, Key);
+    if (!status) {
+      return null;
+    }
+    return {
+      Status: status.status,
+      Reason: status.reason,
+      Signature: status.signature,
+      ScannedAt: status.scannedAt,
+    };
+  }
+
   //#endregion
 
   //#region Find
@@ -294,8 +316,27 @@ export class CloudService {
   async Move(
     { SourceKeys, DestinationKey }: CloudMoveRequestModel,
     User: UserContext,
+    idempotencyKey?: string,
   ): Promise<boolean> {
-    return this.CloudObjectService.Move({ SourceKeys, DestinationKey }, User);
+    const cached = await this.GetIdempotentResult<boolean>(
+      User.id,
+      'move',
+      idempotencyKey,
+    );
+    if (cached !== undefined) {
+      return cached;
+    }
+    const result = await this.CloudObjectService.Move(
+      { SourceKeys, DestinationKey },
+      User,
+    );
+    await this.SetIdempotentResult(
+      User.id,
+      'move',
+      idempotencyKey,
+      result,
+    );
+    return result;
   }
 
   //#endregion
@@ -306,9 +347,18 @@ export class CloudService {
     { Items }: CloudDeleteRequestModel,
     User: UserContext,
     _options?: { allowEncryptedDirectories?: boolean },
+    idempotencyKey?: string,
   ): Promise<boolean> {
     // mark _options as used to avoid unused-parameter errors
     void _options;
+    const cached = await this.GetIdempotentResult<boolean>(
+      User.id,
+      'delete',
+      idempotencyKey,
+    );
+    if (cached !== undefined) {
+      return cached;
+    }
     const files: CloudDeleteRequestModel['Items'] = [];
     let bytesToDecrement = 0;
     for (const item of Items) {
@@ -343,8 +393,15 @@ export class CloudService {
         User,
       );
       await this.CloudUsageService.DecrementUsage(User.id, bytesToDecrement);
+      await this.SetIdempotentResult(
+        User.id,
+        'delete',
+        idempotencyKey,
+        deleted,
+      );
       return deleted;
     }
+    await this.SetIdempotentResult(User.id, 'delete', idempotencyKey, true);
     return true;
   }
 
@@ -456,10 +513,19 @@ export class CloudService {
     file: Express.Multer.File,
     User: UserContext,
     sessionToken?: string,
+    contentMd5?: string,
   ): Promise<CloudUploadPartResponseModel> {
     await this.EnsureUploadAccess(Key, User.id, sessionToken);
+    if (contentMd5) {
+      const hash = createHash('md5')
+        .update(file.buffer)
+        .digest('base64');
+      if (hash !== contentMd5) {
+        throw new HttpException('Content-MD5 mismatch.', HttpStatus.BAD_REQUEST);
+      }
+    }
     return this.CloudUploadService.UploadPart(
-      { Key, UploadId, PartNumber, File: file },
+      { Key, UploadId, PartNumber, File: file, ContentMd5: contentMd5 },
       User,
     );
   }
@@ -472,8 +538,18 @@ export class CloudService {
     { Key, UploadId, Parts }: CloudCompleteMultipartUploadRequestModel,
     User: UserContext,
     sessionToken?: string,
+    idempotencyKey?: string,
   ): Promise<CloudCompleteMultipartUploadResponseModel> {
     await this.EnsureUploadAccess(Key, User.id, sessionToken);
+    const cached =
+      await this.GetIdempotentResult<CloudCompleteMultipartUploadResponseModel>(
+        User.id,
+        'upload-complete',
+        idempotencyKey,
+      );
+    if (cached !== undefined) {
+      return cached;
+    }
     const result = await this.CloudUploadService.UploadCompleteMultipartUpload(
       { Key, UploadId, Parts },
       User,
@@ -482,6 +558,13 @@ export class CloudService {
     const uploadedSize = uploadedObject.Size || 0;
     await this.CloudUsageService.IncrementUsage(User.id, uploadedSize);
     await this.EnsureUploadedObjectWithinLimits(Key, User, uploadedSize);
+    await this.CloudScanService.EnqueueScan(User.id, Key);
+    await this.SetIdempotentResult(
+      User.id,
+      'upload-complete',
+      idempotencyKey,
+      result,
+    );
     return result;
   }
 
@@ -747,5 +830,45 @@ export class CloudService {
         HttpStatus.BAD_REQUEST,
       );
     }
+  }
+
+  private BuildIdempotencyKey(
+    userId: string,
+    action: string,
+    idempotencyKey?: string,
+  ): string | null {
+    if (!idempotencyKey) {
+      return null;
+    }
+    return `cloud:idempotency:${userId}:${action}:${idempotencyKey}`;
+  }
+
+  private async GetIdempotentResult<T>(
+    userId: string,
+    action: string,
+    idempotencyKey?: string,
+  ): Promise<T | undefined> {
+    const key = this.BuildIdempotencyKey(userId, action, idempotencyKey);
+    if (!key) {
+      return undefined;
+    }
+    return this.RedisService.get<T>(key);
+  }
+
+  private async SetIdempotentResult<T>(
+    userId: string,
+    action: string,
+    idempotencyKey: string | undefined,
+    value: T,
+  ): Promise<void> {
+    const key = this.BuildIdempotencyKey(userId, action, idempotencyKey);
+    if (!key) {
+      return;
+    }
+    const ttlSeconds = Math.max(
+      1,
+      parseInt(process.env.CLOUD_IDEMPOTENCY_TTL_SECONDS ?? '300', 10),
+    );
+    await this.RedisService.set(key, value, ttlSeconds);
   }
 }

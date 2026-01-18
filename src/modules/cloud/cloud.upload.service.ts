@@ -72,7 +72,7 @@ export class CloudUploadService {
   }
 
   async UploadPart(
-    { Key, UploadId, PartNumber, File }: CloudUploadPartRequestModel,
+    { Key, UploadId, PartNumber, File, ContentMd5 }: CloudUploadPartRequestModel,
     User: UserContext,
   ): Promise<CloudUploadPartResponseModel> {
     const command = new UploadPartCommand({
@@ -81,6 +81,7 @@ export class CloudUploadService {
       UploadId: UploadId,
       PartNumber: PartNumber,
       Body: File.buffer,
+      ContentMD5: ContentMd5,
     });
 
     const result = await this.CloudS3Service.Send(command);

@@ -55,6 +55,23 @@ export declare global {
       // Cloud Upload Limits
       CLOUD_UPLOAD_PART_MAX_BYTES?: string;
 
+      // Cloud Rate Limits
+      CLOUD_UPLOAD_RATE_TTL?: string;
+      CLOUD_UPLOAD_RATE_LIMIT?: string;
+      CLOUD_DOWNLOAD_RATE_TTL?: string;
+      CLOUD_DOWNLOAD_RATE_LIMIT?: string;
+
+      // Cloud Antivirus
+      CLOUD_AV_ENABLED?: string;
+      CLOUD_AV_HOST?: string;
+      CLOUD_AV_PORT?: string;
+      CLOUD_AV_MAX_BYTES?: string;
+      CLOUD_AV_SOCKET_TIMEOUT_MS?: string;
+      CLOUD_AV_CONCURRENCY?: string;
+
+      // Cloud Idempotency
+      CLOUD_IDEMPOTENCY_TTL_SECONDS?: string;
+
       // Zip Extraction Limits
       ZIP_EXTRACT_MAX_ENTRIES?: string;
       ZIP_EXTRACT_MAX_ENTRY_BYTES?: string;
