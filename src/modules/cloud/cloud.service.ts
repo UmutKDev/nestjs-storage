@@ -41,9 +41,7 @@ import {
   DirectoryDecryptRequestModel,
   DirectoryResponseModel,
 } from './cloud.model';
-import { EncryptedFolderSession } from './guards/encrypted-folder.guard';
 import { asyncLocalStorage } from '@common/context/context.service';
-import { Response } from 'express';
 import { CloudListService } from './cloud.list.service';
 import { CloudObjectService } from './cloud.object.service';
 import { CloudZipService } from './cloud.zip.service';
@@ -51,6 +49,7 @@ import { CloudUploadService } from './cloud.upload.service';
 import { CloudDirectoryService } from './cloud.directory.service';
 import { CloudUsageService } from './cloud.usage.service';
 import { NormalizeDirectoryPath } from './cloud.utils';
+import { SizeFormatter } from '@common/helpers/cast.helper';
 
 @Injectable()
 export class CloudService {
@@ -271,16 +270,6 @@ export class CloudService {
     );
   }
 
-  async GetPublicPresignedUrl({
-    key,
-    res,
-  }: {
-    key: string;
-    res: Response;
-  }): Promise<null> {
-    return this.CloudObjectService.GetPublicPresignedUrl({ key, res });
-  }
-
   //#region Get Object Stream
 
   async GetObjectStream(
@@ -321,6 +310,7 @@ export class CloudService {
     // mark _options as used to avoid unused-parameter errors
     void _options;
     const files: CloudDeleteRequestModel['Items'] = [];
+    let bytesToDecrement = 0;
     for (const item of Items) {
       if (item.IsDirectory) {
         await this.CloudDirectoryService.DeleteDirectoryContents(
@@ -329,11 +319,31 @@ export class CloudService {
         );
         continue;
       }
+      try {
+        const fileInfo = await this.CloudObjectService.Find(
+          { Key: item.Key },
+          User,
+        );
+        bytesToDecrement += fileInfo.Size || 0;
+      } catch (error) {
+        if (
+          error instanceof HttpException &&
+          error.getStatus() === HttpStatus.NOT_FOUND
+        ) {
+          continue;
+        }
+        throw error;
+      }
       files.push(item);
     }
 
     if (files.length) {
-      return this.CloudObjectService.Delete({ Items: files }, User);
+      const deleted = await this.CloudObjectService.Delete(
+        { Items: files },
+        User,
+      );
+      await this.CloudUsageService.DecrementUsage(User.id, bytesToDecrement);
+      return deleted;
     }
     return true;
   }
@@ -369,7 +379,7 @@ export class CloudService {
     userId: string,
     folderPath: string,
     sessionToken: string,
-  ): Promise<EncryptedFolderSession | null> {
+  ): Promise<unknown | null> {
     return this.CloudDirectoryService.ValidateDirectorySession(
       userId,
       folderPath,
@@ -396,7 +406,7 @@ export class CloudService {
   async GetActiveSession(
     userId: string,
     folderPath: string,
-  ): Promise<EncryptedFolderSession | null> {
+  ): Promise<unknown | null> {
     return this.CloudDirectoryService.GetActiveSession(userId, folderPath);
   }
 
@@ -464,10 +474,15 @@ export class CloudService {
     sessionToken?: string,
   ): Promise<CloudCompleteMultipartUploadResponseModel> {
     await this.EnsureUploadAccess(Key, User.id, sessionToken);
-    return this.CloudUploadService.UploadCompleteMultipartUpload(
+    const result = await this.CloudUploadService.UploadCompleteMultipartUpload(
       { Key, UploadId, Parts },
       User,
     );
+    const uploadedObject = await this.CloudObjectService.Find({ Key }, User);
+    const uploadedSize = uploadedObject.Size || 0;
+    await this.CloudUsageService.IncrementUsage(User.id, uploadedSize);
+    await this.EnsureUploadedObjectWithinLimits(Key, User, uploadedSize);
+    return result;
   }
 
   //#endregion
@@ -478,7 +493,9 @@ export class CloudService {
   async ExtractZipStart(
     { Key }: CloudExtractZipStartRequestModel,
     User: UserContext,
+    sessionToken?: string,
   ): Promise<CloudExtractZipStartResponseModel> {
+    await this.EnsureUploadAccess(Key, User.id, sessionToken);
     return this.CloudZipService.ExtractZipStart({ Key }, User);
   }
 
@@ -688,6 +705,46 @@ export class CloudService {
       throw new HttpException(
         `Access denied. Folder "${accessCheck.encryptingFolder}" is encrypted. Unlock it first via POST /Cloud/Directories/Unlock`,
         HttpStatus.FORBIDDEN,
+      );
+    }
+  }
+
+  private async EnsureUploadedObjectWithinLimits(
+    key: string,
+    user: UserContext,
+    objectSize?: number,
+  ): Promise<void> {
+    const usage = await this.CloudUsageService.UserStorageUsage(user);
+    let resolvedSize = typeof objectSize === 'number' ? objectSize : 0;
+    if (!resolvedSize) {
+      const object = await this.CloudObjectService.Find({ Key: key }, user);
+      resolvedSize = object.Size || 0;
+    }
+
+    if (usage.MaxUploadSizeBytes && resolvedSize > usage.MaxUploadSizeBytes) {
+      await this.CloudObjectService.Delete(
+        { Items: [{ Key: key, IsDirectory: false }] },
+        user,
+      );
+      await this.CloudUsageService.DecrementUsage(user.id, resolvedSize);
+      throw new HttpException(
+        `File size exceeds the maximum upload size of ${SizeFormatter({ From: usage.MaxUploadSizeBytes, FromUnit: 'B', ToUnit: 'MB' })} MB.`,
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    if (
+      usage.MaxStorageInBytes &&
+      usage.UsedStorageInBytes > usage.MaxStorageInBytes
+    ) {
+      await this.CloudObjectService.Delete(
+        { Items: [{ Key: key, IsDirectory: false }] },
+        user,
+      );
+      await this.CloudUsageService.DecrementUsage(user.id, resolvedSize);
+      throw new HttpException(
+        'Storage limit exceeded. Please upgrade your subscription.',
+        HttpStatus.BAD_REQUEST,
       );
     }
   }

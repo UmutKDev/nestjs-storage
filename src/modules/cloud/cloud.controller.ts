@@ -12,6 +12,8 @@ import {
   UseInterceptors,
   Res,
   Headers,
+  ParseFilePipe,
+  MaxFileSizeValidator,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -78,7 +80,6 @@ import {
   FOLDER_SESSION_HEADER,
   FOLDER_PASSPHRASE_HEADER,
 } from './cloud.constants';
-import { Public } from '@common/decorators/public.decorator';
 
 @Controller('Cloud')
 @ApiTags('Cloud')
@@ -193,21 +194,6 @@ export class CloudController {
     @User() user: UserContext,
   ) {
     return this.cloudService.GetPresignedUrl(model, user);
-  }
-
-  @ApiOperation({
-    summary: 'Get a presigned URL for upload/download',
-    description:
-      'Returns a presigned URL for a specific object key to allow direct client access.',
-  })
-  @ApiSuccessResponse('string')
-  @Get('Public/PresignedUrl')
-  @Public()
-  async GetPublicPresignedUrl(
-    @Query('key') key: string,
-    @Res({ passthrough: true }) res: Response,
-  ) {
-    return this.cloudService.GetPublicPresignedUrl({ key, res });
   }
 
   @ApiOperation({
@@ -345,7 +331,16 @@ export class CloudController {
   @ApiSuccessResponse(CloudUploadPartResponseModel)
   async UploadPart(
     @Body() model: CloudUploadPartRequestModel,
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFile(
+      new ParseFilePipe({
+        validators: [
+          new MaxFileSizeValidator({
+            maxSize: Number(process.env.CLOUD_UPLOAD_PART_MAX_BYTES ?? 5242880),
+          }),
+        ],
+      }),
+    )
+    file: Express.Multer.File,
     @User() user: UserContext,
     @Headers(FOLDER_SESSION_HEADER) sessionToken?: string,
   ): Promise<CloudUploadPartResponseModel> {
@@ -382,12 +377,18 @@ export class CloudController {
       'Starts an async job to extract a previously uploaded .zip file.',
   })
   @Post('Upload/ExtractZip/Start')
+  @ApiHeader({
+    name: FOLDER_SESSION_HEADER,
+    required: false,
+    description: 'Session token for encrypted folder access',
+  })
   @ApiSuccessResponse(CloudExtractZipStartResponseModel)
   async ExtractZipStart(
     @Body() model: CloudExtractZipStartRequestModel,
     @User() user: UserContext,
+    @Headers(FOLDER_SESSION_HEADER) sessionToken?: string,
   ): Promise<CloudExtractZipStartResponseModel> {
-    return this.cloudService.ExtractZipStart(model, user);
+    return this.cloudService.ExtractZipStart(model, user, sessionToken);
   }
 
   @ApiOperation({

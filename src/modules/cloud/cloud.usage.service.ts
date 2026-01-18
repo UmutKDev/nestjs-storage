@@ -7,6 +7,7 @@ import { CloudUserStorageUsageResponseModel } from './cloud.model';
 import { UserSubscriptionEntity } from '@entities/user-subscription.entity';
 import { CloudS3Service } from './cloud.s3.service';
 import { KeyBuilder } from '@common/helpers/cast.helper';
+import { RedisService } from '@modules/redis/redis.service';
 
 @Injectable()
 export class CloudUsageService {
@@ -23,7 +24,10 @@ export class CloudUsageService {
   @InjectRepository(UserSubscriptionEntity)
   private UserSubscriptionRepository: Repository<UserSubscriptionEntity>;
 
-  constructor(private readonly CloudS3Service: CloudS3Service) {}
+  constructor(
+    private readonly CloudS3Service: CloudS3Service,
+    private readonly RedisService: RedisService,
+  ) {}
 
   async GetDownloadSpeedBytesPerSec(User: UserContext): Promise<number> {
     const userSubscription = await this.UserSubscriptionRepository.findOne({
@@ -59,9 +63,6 @@ export class CloudUsageService {
   async UserStorageUsage(
     User: UserContext,
   ): Promise<CloudUserStorageUsageResponseModel> {
-    let continuationToken: string | undefined = undefined;
-    let totalSize = 0;
-
     const userSubscription = await this.UserSubscriptionRepository.findOne({
       where: {
         user: {
@@ -70,30 +71,11 @@ export class CloudUsageService {
       },
     });
 
-    do {
-      const command = await this.CloudS3Service.Send(
-        new ListObjectsV2Command({
-          Bucket: this.CloudS3Service.GetBuckets().Storage,
-          Prefix: KeyBuilder([User.id, '']),
-          ContinuationToken: continuationToken,
-        }),
-      );
-
-      const contents = command.Contents || [];
-      for (const content of contents) {
-        if (content.Size) {
-          totalSize += content.Size;
-        }
-      }
-
-      continuationToken = command.IsTruncated
-        ? command.NextContinuationToken
-        : undefined;
-    } while (continuationToken);
-
     if (!userSubscription || !userSubscription?.subscription) {
       throw new HttpException(Codes.Error.Subscription.NOT_FOUND, 404);
     }
+
+    const totalSize = await this.GetOrSeedUsage(User.id);
 
     return plainToInstance(CloudUserStorageUsageResponseModel, {
       UsedStorageInBytes: totalSize,
@@ -112,5 +94,80 @@ export class CloudUsageService {
         userSubscription.subscription.maxUploadSizeBytes ||
         this.MaxObjectSizeBytes,
     });
+  }
+
+  async IncrementUsage(userId: string, deltaBytes: number): Promise<number> {
+    if (!deltaBytes) {
+      const current = await this.GetOrSeedUsage(userId);
+      return current;
+    }
+    const current = await this.GetOrSeedUsage(userId);
+    const next = Math.max(0, current + deltaBytes);
+    await this.SetUsage(userId, next);
+    return next;
+  }
+
+  async DecrementUsage(userId: string, deltaBytes: number): Promise<number> {
+    if (!deltaBytes) {
+      const current = await this.GetOrSeedUsage(userId);
+      return current;
+    }
+    return this.IncrementUsage(userId, -Math.abs(deltaBytes));
+  }
+
+  private async GetOrSeedUsage(userId: string): Promise<number> {
+    const cached = await this.GetUsage(userId);
+    if (typeof cached === 'number') {
+      return cached;
+    }
+
+    const totalSize = await this.ComputeUsageFromS3(userId);
+    await this.SetUsage(userId, totalSize);
+    return totalSize;
+  }
+
+  private BuildUsageKey(userId: string): string {
+    return `cloud:usage:${userId}`;
+  }
+
+  private async GetUsage(userId: string): Promise<number | null> {
+    const raw = await this.RedisService.get<string>(this.BuildUsageKey(userId));
+    if (raw === undefined || raw === null) {
+      return null;
+    }
+    const parsed = Number(raw);
+    return Number.isNaN(parsed) ? null : parsed;
+  }
+
+  private async SetUsage(userId: string, value: number): Promise<void> {
+    await this.RedisService.set(this.BuildUsageKey(userId), String(value));
+  }
+
+  private async ComputeUsageFromS3(userId: string): Promise<number> {
+    let continuationToken: string | undefined = undefined;
+    let totalSize = 0;
+
+    do {
+      const command = await this.CloudS3Service.Send(
+        new ListObjectsV2Command({
+          Bucket: this.CloudS3Service.GetBuckets().Storage,
+          Prefix: KeyBuilder([userId, '']),
+          ContinuationToken: continuationToken,
+        }),
+      );
+
+      const contents = command.Contents || [];
+      for (const content of contents) {
+        if (content.Size) {
+          totalSize += content.Size;
+        }
+      }
+
+      continuationToken = command.IsTruncated
+        ? command.NextContinuationToken
+        : undefined;
+    } while (continuationToken);
+
+    return totalSize;
   }
 }

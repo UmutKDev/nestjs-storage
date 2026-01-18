@@ -9,7 +9,6 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { HttpException, Injectable, Logger } from '@nestjs/common';
 import { plainToInstance } from 'class-transformer';
 import { Readable } from 'stream';
-import { Response } from 'express';
 import {
   CloudKeyRequestModel,
   CloudMoveRequestModel,
@@ -20,7 +19,7 @@ import {
 } from './cloud.model';
 import { CloudS3Service } from './cloud.s3.service';
 import { CloudMetadataService } from './cloud.metadata.service';
-import { KeyBuilder, S3KeyConverter } from '@common/helpers/cast.helper';
+import { KeyBuilder } from '@common/helpers/cast.helper';
 
 @Injectable()
 export class CloudObjectService {
@@ -53,7 +52,9 @@ export class CloudObjectService {
           Key: Key.replace('' + User.id + '/', ''),
           Url: Key,
         },
-        Metadata: this.CloudMetadataService.DecodeMetadataFromS3(command.Metadata),
+        Metadata: this.CloudMetadataService.DecodeMetadataFromS3(
+          command.Metadata,
+        ),
         Size: command.ContentLength,
         ETag: command.ETag,
         LastModified: command.LastModified
@@ -90,41 +91,6 @@ export class CloudObjectService {
       });
 
       return url;
-    } catch (error) {
-      if (this.CloudS3Service.IsNotFoundError(error)) {
-        throw new HttpException(Codes.Error.Cloud.FILE_NOT_FOUND, 404);
-      }
-      throw error;
-    }
-  }
-
-  async GetPublicPresignedUrl({
-    key,
-    res,
-  }: {
-    key: string;
-    res: Response;
-  }): Promise<null> {
-    try {
-      await this.CloudS3Service.Send(
-        new HeadObjectCommand({
-          Bucket: this.CloudS3Service.GetBuckets().Storage,
-          Key: S3KeyConverter(key.replace(this.CloudS3Service.GetBuckets().Storage + '/', '')),
-        }),
-      );
-
-      const command = new GetObjectCommand({
-        Bucket: this.CloudS3Service.GetBuckets().Storage,
-        Key: S3KeyConverter(key.replace(this.CloudS3Service.GetBuckets().Storage + '/', '')),
-      });
-
-      const url = await getSignedUrl(this.CloudS3Service.GetClient(), command, {
-        expiresIn: this.PresignedUrlExpirySeconds,
-      });
-
-      res.setHeader('x-signed-url', url);
-
-      return null;
     } catch (error) {
       if (this.CloudS3Service.IsNotFoundError(error)) {
         throw new HttpException(Codes.Error.Cloud.FILE_NOT_FOUND, 404);
@@ -311,8 +277,7 @@ export class CloudObjectService {
           );
 
           const missingKeys = Object.keys(sanitizedProvidedMetadata).filter(
-            (k) =>
-              !headAfterCopy.Metadata || !(k in headAfterCopy.Metadata),
+            (k) => !headAfterCopy.Metadata || !(k in headAfterCopy.Metadata),
           );
 
           if (missingKeys.length) {
@@ -328,17 +293,12 @@ export class CloudObjectService {
             );
 
             const stream = getResp.Body as Readable;
-            const chunks: Buffer[] = [];
-            for await (const chunk of stream) {
-              chunks.push(Buffer.from(chunk));
-            }
-            const buffer = Buffer.concat(chunks);
 
             await this.CloudS3Service.Send(
               new PutObjectCommand({
                 Bucket: bucket,
                 Key: targetKey,
-                Body: buffer,
+                Body: stream,
                 ContentType: sourceContentType,
                 Metadata: finalMetadataForS3,
               }),
@@ -388,17 +348,12 @@ export class CloudObjectService {
             }),
           );
           const stream = getResp.Body as Readable;
-          const chunks: Buffer[] = [];
-          for await (const chunk of stream) {
-            chunks.push(Buffer.from(chunk));
-          }
-          const buffer = Buffer.concat(chunks);
 
           await this.CloudS3Service.Send(
             new PutObjectCommand({
               Bucket: bucket,
               Key: sourceKey,
-              Body: buffer,
+              Body: stream,
               ContentType: sourceContentType,
               Metadata: finalMetadataForS3,
             }),

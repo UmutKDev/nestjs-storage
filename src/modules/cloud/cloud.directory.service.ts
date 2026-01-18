@@ -28,12 +28,11 @@ import {
   DirectoryResponseModel,
 } from './cloud.model';
 import { CloudS3Service } from './cloud.s3.service';
-import { CloudObjectService } from './cloud.object.service';
 import { RedisService } from '@modules/redis/redis.service';
 import { ENCRYPTED_FOLDER_SESSION_TTL } from './cloud.constants';
-import { EncryptedFolderSession } from './guards/encrypted-folder.guard';
 import { KeyBuilder } from '@common/helpers/cast.helper';
 import { EnsureTrailingSlash, NormalizeDirectoryPath } from './cloud.utils';
+import { CloudUsageService } from './cloud.usage.service';
 
 type EncryptedFolderRecord = {
   ciphertext: string;
@@ -46,6 +45,13 @@ type EncryptedFolderRecord = {
 
 type EncryptedFolderManifest = {
   folders: Record<string, EncryptedFolderRecord>;
+};
+
+type EncryptedFolderSession = {
+  token: string;
+  folderPath: string;
+  folderKey: string;
+  expiresAt: number;
 };
 
 @Injectable()
@@ -62,8 +68,8 @@ export class CloudDirectoryService {
 
   constructor(
     private readonly CloudS3Service: CloudS3Service,
-    private readonly CloudObjectService: CloudObjectService,
     private readonly RedisService: RedisService,
+    private readonly CloudUsageService: CloudUsageService,
   ) {}
 
   async CreateDirectory(
@@ -409,14 +415,15 @@ export class CloudDirectoryService {
   async DeleteDirectoryContents(
     Key: string,
     User: UserContext,
-  ): Promise<void> {
+  ): Promise<number> {
     const normalized = NormalizeDirectoryPath(Key);
     if (!normalized) {
-      return;
+      return 0;
     }
 
     const prefix = EnsureTrailingSlash(KeyBuilder([User.id, normalized]));
     let continuationToken: string | undefined = undefined;
+    let totalBytes = 0;
 
     do {
       const list = await this.CloudS3Service.Send(
@@ -433,6 +440,9 @@ export class CloudDirectoryService {
         if (!content.Key) {
           continue;
         }
+        if (content.Size) {
+          totalBytes += content.Size;
+        }
         await this.CloudS3Service.Send(
           new DeleteObjectCommand({
             Bucket: this.CloudS3Service.GetBuckets().Storage,
@@ -445,6 +455,12 @@ export class CloudDirectoryService {
         ? list.NextContinuationToken
         : undefined;
     } while (continuationToken);
+
+    if (totalBytes > 0) {
+      await this.CloudUsageService.DecrementUsage(User.id, totalBytes);
+    }
+
+    return totalBytes;
   }
 
   async DirectoryUnlock(
@@ -549,6 +565,10 @@ export class CloudDirectoryService {
         HttpStatus.BAD_REQUEST,
       );
     }
+
+    await this.RedisService.delByPattern(
+      `encrypted-folder:session:${User.id}:${normalizedPath}*`,
+    );
 
     return true;
   }
@@ -678,25 +698,8 @@ export class CloudDirectoryService {
     const normalizedPath = NormalizeDirectoryPath(folderPath);
 
     const cacheKey = this.BuildSessionKey(userId, normalizedPath);
-    let session =
+    const session =
       await this.RedisService.get<EncryptedFolderSession>(cacheKey);
-
-    if (!session) {
-      const basePattern = `encrypted-folder:session:${userId}:`;
-      const pattern = normalizedPath
-        ? `${basePattern}${normalizedPath}/*`
-        : `${basePattern}*`;
-      const keys = await this.RedisService.keys(pattern);
-
-      for (const key of keys) {
-        const childSession =
-          await this.RedisService.get<EncryptedFolderSession>(key);
-        if (childSession && childSession.token === sessionToken) {
-          session = childSession;
-          break;
-        }
-      }
-    }
 
     if (!session || session.token !== sessionToken) {
       return null;
@@ -825,7 +828,6 @@ export class CloudDirectoryService {
     }
     return set;
   }
-
 
   private async GetEncryptedFolderManifest(
     User: UserContext,
@@ -970,7 +972,6 @@ export class CloudDirectoryService {
     const normalizedPath = NormalizeDirectoryPath(folderPath);
     return `encrypted-folder:session:${userId}:${normalizedPath}`;
   }
-
 
   private async GetEncryptedFolderManifestByUserId(
     userId: string,

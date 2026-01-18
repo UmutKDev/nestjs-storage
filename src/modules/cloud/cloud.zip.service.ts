@@ -1,7 +1,4 @@
-import {
-  GetObjectCommand,
-  PutObjectCommand,
-} from '@aws-sdk/client-s3';
+import { GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
 import {
   HttpException,
   HttpStatus,
@@ -33,6 +30,7 @@ import {
   NormalizeZipEntryPath,
 } from './cloud.utils';
 import { RedisService } from '@modules/redis/redis.service';
+import { CloudUsageService } from './cloud.usage.service';
 
 type ZipExtractJobData = {
   userId: string;
@@ -80,6 +78,28 @@ export class CloudZipService implements OnModuleInit, OnModuleDestroy {
       10,
     ),
   );
+  private readonly ZipExtractMaxEntries = Math.max(
+    1,
+    parseInt(process.env.ZIP_EXTRACT_MAX_ENTRIES ?? '2000', 10),
+  );
+  private readonly ZipExtractMaxEntryBytes = Math.max(
+    1,
+    parseInt(
+      process.env.ZIP_EXTRACT_MAX_ENTRY_BYTES ?? `${512 * 1024 * 1024}`,
+      10,
+    ),
+  );
+  private readonly ZipExtractMaxTotalBytes = Math.max(
+    1,
+    parseInt(
+      process.env.ZIP_EXTRACT_MAX_TOTAL_BYTES ?? `${2 * 1024 * 1024 * 1024}`,
+      10,
+    ),
+  );
+  private readonly ZipExtractMaxCompressionRatio = Math.max(
+    1,
+    parseInt(process.env.ZIP_EXTRACT_MAX_RATIO ?? '100', 10),
+  );
 
   private ZipExtractQueue?: Queue<ZipExtractJobData, ZipExtractJobResult>;
   private ZipExtractWorker?: Worker<ZipExtractJobData, ZipExtractJobResult>;
@@ -90,6 +110,7 @@ export class CloudZipService implements OnModuleInit, OnModuleDestroy {
     private readonly RedisService: RedisService,
     private readonly CloudS3Service: CloudS3Service,
     private readonly CloudMetadataService: CloudMetadataService,
+    private readonly CloudUsageService: CloudUsageService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -307,6 +328,7 @@ export class CloudZipService implements OnModuleInit, OnModuleDestroy {
   ): Promise<string> {
     const sourceKey = KeyBuilder([User.id, key]);
     const extractPrefix = BuildZipExtractPrefix(key);
+    let totalUncompressedBytes = 0;
 
     try {
       const object = await this.CloudS3Service.Send(
@@ -411,6 +433,46 @@ export class CloudZipService implements OnModuleInit, OnModuleDestroy {
             continue;
           }
 
+          progress.entriesProcessed += 1;
+          if (progress.entriesProcessed > this.ZipExtractMaxEntries) {
+            entry.autodrain();
+            throw new HttpException(
+              'Zip archive has too many entries.',
+              HttpStatus.BAD_REQUEST,
+            );
+          }
+
+          const entryUncompressedSize = Number(
+            (entry as { vars?: { uncompressedSize?: number } }).vars
+              ?.uncompressedSize ?? 0,
+          );
+          if (entryUncompressedSize > this.ZipExtractMaxEntryBytes) {
+            entry.autodrain();
+            throw new HttpException(
+              'Zip entry is too large.',
+              HttpStatus.BAD_REQUEST,
+            );
+          }
+          totalUncompressedBytes += entryUncompressedSize;
+          if (totalUncompressedBytes > this.ZipExtractMaxTotalBytes) {
+            entry.autodrain();
+            throw new HttpException(
+              'Zip archive is too large to extract.',
+              HttpStatus.BAD_REQUEST,
+            );
+          }
+          if (
+            totalBytes > 0 &&
+            totalUncompressedBytes / totalBytes >
+              this.ZipExtractMaxCompressionRatio
+          ) {
+            entry.autodrain();
+            throw new HttpException(
+              'Zip compression ratio is too high.',
+              HttpStatus.BAD_REQUEST,
+            );
+          }
+
           if (entry.type === 'Directory') {
             const directoryKey = JoinKey(
               extractPrefix,
@@ -424,7 +486,6 @@ export class CloudZipService implements OnModuleInit, OnModuleDestroy {
                 Body: '',
               }),
             ).then(async () => {
-              progress.entriesProcessed += 1;
               await maybeReportProgress(normalizedPath);
             });
             await enqueue(task);
@@ -452,7 +513,6 @@ export class CloudZipService implements OnModuleInit, OnModuleDestroy {
             await this.CloudMetadataService.MetadataProcessor(
               KeyBuilder([User.id, targetKey]),
             );
-            progress.entriesProcessed += 1;
             await maybeReportProgress(normalizedPath);
           });
           await enqueue(task);
@@ -479,6 +539,13 @@ export class CloudZipService implements OnModuleInit, OnModuleDestroy {
         error,
       );
       throw error;
+    }
+
+    if (totalUncompressedBytes > 0) {
+      await this.CloudUsageService.IncrementUsage(
+        User.id,
+        totalUncompressedBytes,
+      );
     }
 
     return extractPrefix;

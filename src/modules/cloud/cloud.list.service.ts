@@ -24,8 +24,15 @@ import { NormalizeDirectoryPath } from './cloud.utils';
 
 @Injectable()
 export class CloudListService {
-  private readonly MaxProcessMetadataObjects = 1000;
+  private readonly MaxProcessMetadataObjects = Math.max(
+    1,
+    parseInt(process.env.CLOUD_LIST_METADATA_MAX ?? '1000', 10),
+  );
   private readonly MaxListObjects = 1000;
+  private readonly MetadataProcessingConcurrency = Math.max(
+    1,
+    parseInt(process.env.CLOUD_LIST_METADATA_CONCURRENCY ?? '5', 10),
+  );
   private readonly PresignedUrlExpirySeconds = 3600;
   private readonly EmptyFolderPlaceholder = '.emptyFolderPlaceholder';
   private readonly IsSignedUrlProcessing =
@@ -214,7 +221,6 @@ export class CloudListService {
   async ListDirectories(
     {
       Path,
-      Delimiter,
       search,
       skip,
       take,
@@ -239,10 +245,14 @@ export class CloudListService {
       prefix = prefix + '/';
     }
 
-    if (!Delimiter) {
+    const usePagination = typeof skip === 'number' || typeof take === 'number';
+    const delimiterValue = '/';
+
+    if (!usePagination) {
       const command = await this.CloudS3Service.Send(
         new ListObjectsV2Command({
           Bucket: this.CloudS3Service.GetBuckets().Storage,
+          Delimiter: delimiterValue,
           Prefix: prefix,
         }),
       );
@@ -277,7 +287,7 @@ export class CloudListService {
       );
       const params: ListObjectsV2CommandInput = {
         Bucket: this.CloudS3Service.GetBuckets().Storage,
-        Delimiter: '/',
+        Delimiter: delimiterValue,
         Prefix: prefix,
         MaxKeys: maxKeys,
       };
@@ -327,7 +337,7 @@ export class CloudListService {
     while (continuationToken) {
       const countParams: ListObjectsV2CommandInput = {
         Bucket: this.CloudS3Service.GetBuckets().Storage,
-        Delimiter: '/',
+        Delimiter: delimiterValue,
         Prefix: prefix,
         MaxKeys: this.MaxListObjects,
         ContinuationToken: continuationToken,
@@ -453,57 +463,82 @@ export class CloudListService {
 
     Contents = Contents.filter((c) => c.Key !== undefined);
     Contents = Contents.filter((c) => !this.IsDirectory(c.Key || ''));
-    const processedContents: CloudObjectModel[] = [];
-    for (const content of Contents) {
-      let metadata: Record<string, string> = {};
-      let contentType: string | undefined = undefined;
-
-      if (IsMetadataProcessing) {
-        const head = await this.CloudS3Service.Send(
-          new HeadObjectCommand({
-            Bucket: this.CloudS3Service.GetBuckets().Storage,
-            Key: content.Key,
-          }),
+    const processedContents = new Array<CloudObjectModel>(Contents.length);
+    let index = 0;
+    const worker = async () => {
+      while (true) {
+        const current = index++;
+        if (current >= Contents.length) {
+          break;
+        }
+        const content = Contents[current];
+        processedContents[current] = await this.BuildObjectModel(
+          content,
+          User,
+          IsMetadataProcessing,
+          IsSignedUrlProcessing,
         );
-        metadata = this.CloudMetadataService.DecodeMetadataFromS3(
-          head.Metadata,
-        );
-        contentType = head.ContentType;
       }
+    };
+    const concurrency = Math.min(
+      this.MetadataProcessingConcurrency,
+      Contents.length,
+    );
+    await Promise.all(Array.from({ length: concurrency }, () => worker()));
+    return processedContents.filter((item) => !!item);
+  }
 
-      const ObjectCommand = new GetObjectCommand({
-        Bucket: this.CloudS3Service.GetBuckets().Storage,
-        Key: content.Key,
-      });
+  private async BuildObjectModel(
+    content: _Object,
+    User: UserContext,
+    IsMetadataProcessing: boolean,
+    IsSignedUrlProcessing: boolean,
+  ): Promise<CloudObjectModel> {
+    let metadata: Record<string, string> = {};
+    let contentType: string | undefined = undefined;
 
-      const SignedUrl = IsSignedUrlProcessing
-        ? await getSignedUrl(this.CloudS3Service.GetClient(), ObjectCommand, {
-            expiresIn: this.PresignedUrlExpirySeconds,
-          })
-        : this.CloudS3Service.GetPublicEndpoint() + '/' + content.Key;
-
-      const Name = content.Key?.split('/').pop();
-      const Extension = Name?.includes('.') ? Name.split('.').pop() : '';
-
-      processedContents.push({
-        Name: Name,
-        Extension: Extension,
-        MimeType:
-          (contentType ?? MimeTypeFromExtension(Extension)) ||
-          'application/octet-stream',
-        Path: {
-          Host: this.CloudS3Service.GetPublicEndpoint(),
-          Key: content.Key.replace('' + User.id + '/', ''),
-          Url: SignedUrl,
-        },
-        Metadata: metadata,
-        Size: content.Size,
-        ETag: content.ETag,
-        LastModified: content.LastModified
-          ? content.LastModified.toISOString()
-          : '',
-      });
+    if (IsMetadataProcessing) {
+      const head = await this.CloudS3Service.Send(
+        new HeadObjectCommand({
+          Bucket: this.CloudS3Service.GetBuckets().Storage,
+          Key: content.Key,
+        }),
+      );
+      metadata = this.CloudMetadataService.DecodeMetadataFromS3(head.Metadata);
+      contentType = head.ContentType;
     }
-    return processedContents;
+
+    const ObjectCommand = new GetObjectCommand({
+      Bucket: this.CloudS3Service.GetBuckets().Storage,
+      Key: content.Key,
+    });
+
+    const SignedUrl = IsSignedUrlProcessing
+      ? await getSignedUrl(this.CloudS3Service.GetClient(), ObjectCommand, {
+          expiresIn: this.PresignedUrlExpirySeconds,
+        })
+      : this.CloudS3Service.GetPublicEndpoint() + '/' + content.Key;
+
+    const Name = content.Key?.split('/').pop();
+    const Extension = Name?.includes('.') ? Name.split('.').pop() : '';
+
+    return {
+      Name: Name,
+      Extension: Extension,
+      MimeType:
+        (contentType ?? MimeTypeFromExtension(Extension)) ||
+        'application/octet-stream',
+      Path: {
+        Host: this.CloudS3Service.GetPublicEndpoint(),
+        Key: content.Key.replace('' + User.id + '/', ''),
+        Url: SignedUrl,
+      },
+      Metadata: metadata,
+      Size: content.Size,
+      ETag: content.ETag,
+      LastModified: content.LastModified
+        ? content.LastModified.toISOString()
+        : '',
+    };
   }
 }

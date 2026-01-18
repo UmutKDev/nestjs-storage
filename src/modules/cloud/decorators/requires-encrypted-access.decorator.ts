@@ -3,7 +3,7 @@ import { ENCRYPTED_FOLDER_METADATA } from '../cloud.constants';
 
 /**
  * Decorator to mark endpoints that may access encrypted folder contents.
- * When applied, the EncryptedFolderGuard will validate the session token.
+ * Validation is handled in the service layer.
  */
 export const RequiresEncryptedAccess = () =>
   SetMetadata(ENCRYPTED_FOLDER_METADATA, true);

@@ -1,6 +1,7 @@
 import {
   CopyObjectCommand,
   GetObjectCommand,
+  HeadObjectCommand,
   PutObjectCommand,
 } from '@aws-sdk/client-s3';
 import { Injectable, Logger } from '@nestjs/common';
@@ -24,20 +25,12 @@ export class CloudMetadataService {
 
   async ProcessFileMetadata(key: string): Promise<Record<string, string>> {
     try {
-      const getObjectCommand = new GetObjectCommand({
+      const headObjectCommand = new HeadObjectCommand({
         Bucket: this.CloudS3Service.GetBuckets().Storage,
         Key: key,
       });
-      const object = await this.CloudS3Service.Send(getObjectCommand);
-
+      const object = await this.CloudS3Service.Send(headObjectCommand);
       const existingMetadata = object.Metadata || {};
-
-      const stream = object.Body as Readable;
-      const chunks: Buffer[] = [];
-
-      for await (const chunk of stream) {
-        chunks.push(Buffer.from(chunk));
-      }
 
       return this.DecodeMetadataFromS3(existingMetadata);
     } catch (error) {

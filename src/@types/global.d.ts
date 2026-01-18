@@ -48,6 +48,19 @@ export declare global {
       REDIS_PASSWORD: string;
       REDIS_TTL: string;
 
+      // Cloud Listing Limits
+      CLOUD_LIST_METADATA_CONCURRENCY?: string;
+      CLOUD_LIST_METADATA_MAX?: string;
+
+      // Cloud Upload Limits
+      CLOUD_UPLOAD_PART_MAX_BYTES?: string;
+
+      // Zip Extraction Limits
+      ZIP_EXTRACT_MAX_ENTRIES?: string;
+      ZIP_EXTRACT_MAX_ENTRY_BYTES?: string;
+      ZIP_EXTRACT_MAX_TOTAL_BYTES?: string;
+      ZIP_EXTRACT_MAX_RATIO?: string;
+
       // Mail Configuration
       MAIL_HOST: string;
       MAIL_SECURE: string;
