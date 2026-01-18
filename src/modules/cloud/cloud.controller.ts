@@ -251,10 +251,16 @@ export class CloudController {
     description: 'Creates an UploadId and starts a multipart upload flow.',
   })
   @Post('Upload/CreateMultipartUpload')
+  @ApiHeader({
+    name: FOLDER_SESSION_HEADER,
+    required: false,
+    description: 'Session token for encrypted folder access',
+  })
   @ApiSuccessResponse(CloudCreateMultipartUploadResponseModel)
   async UploadCreateMultipartUpload(
     @Body() model: CloudCreateMultipartUploadRequestModel,
     @User() user: UserContext,
+    @Headers(FOLDER_SESSION_HEADER) sessionToken?: string,
   ): Promise<CloudCreateMultipartUploadResponseModel> {
     if (model.TotalSize) {
       const UserStorage = await this.cloudService.UserStorageUsage(user);
@@ -289,7 +295,11 @@ export class CloudController {
       }
     }
 
-    return this.cloudService.UploadCreateMultipartUpload(model, user);
+    return this.cloudService.UploadCreateMultipartUpload(
+      model,
+      user,
+      sessionToken,
+    );
   }
 
   @ApiOperation({
@@ -298,12 +308,22 @@ export class CloudController {
       'Returns an expiring URL to upload a single part for the provided UploadId and PartNumber.',
   })
   @Post('Upload/GetMultipartPartUrl')
+  @ApiHeader({
+    name: FOLDER_SESSION_HEADER,
+    required: false,
+    description: 'Session token for encrypted folder access',
+  })
   @ApiSuccessResponse(CloudGetMultipartPartUrlResponseModel)
   async UploadGetMultipartPartUrl(
     @Body() model: CloudGetMultipartPartUrlRequestModel,
     @User() user: UserContext,
+    @Headers(FOLDER_SESSION_HEADER) sessionToken?: string,
   ): Promise<CloudGetMultipartPartUrlResponseModel> {
-    return this.cloudService.UploadGetMultipartPartUrl(model, user);
+    return this.cloudService.UploadGetMultipartPartUrl(
+      model,
+      user,
+      sessionToken,
+    );
   }
 
   @ApiOperation({
@@ -317,13 +337,19 @@ export class CloudController {
     type: CloudUploadPartRequestModel,
   })
   @UseInterceptors(FileInterceptor('File'))
+  @ApiHeader({
+    name: FOLDER_SESSION_HEADER,
+    required: false,
+    description: 'Session token for encrypted folder access',
+  })
   @ApiSuccessResponse(CloudUploadPartResponseModel)
   async UploadPart(
     @Body() model: CloudUploadPartRequestModel,
     @UploadedFile() file: Express.Multer.File,
     @User() user: UserContext,
+    @Headers(FOLDER_SESSION_HEADER) sessionToken?: string,
   ): Promise<CloudUploadPartResponseModel> {
-    return this.cloudService.UploadPart(model, file, user);
+    return this.cloudService.UploadPart(model, file, user, sessionToken);
   }
 
   @ApiOperation({
@@ -332,12 +358,22 @@ export class CloudController {
       'Completes a multipart upload by providing the list of parts and finalizes the object.',
   })
   @Post('Upload/CompleteMultipartUpload')
+  @ApiHeader({
+    name: FOLDER_SESSION_HEADER,
+    required: false,
+    description: 'Session token for encrypted folder access',
+  })
   @ApiSuccessResponse(CloudCompleteMultipartUploadResponseModel)
   async UploadCompleteMultipartUpload(
     @Body() model: CloudCompleteMultipartUploadRequestModel,
     @User() user: UserContext,
+    @Headers(FOLDER_SESSION_HEADER) sessionToken?: string,
   ): Promise<CloudCompleteMultipartUploadResponseModel> {
-    return this.cloudService.UploadCompleteMultipartUpload(model, user);
+    return this.cloudService.UploadCompleteMultipartUpload(
+      model,
+      user,
+      sessionToken,
+    );
   }
 
   @ApiOperation({
@@ -479,13 +515,24 @@ export class CloudController {
     required: false,
     description: 'Passphrase for encrypted directory (min 8 chars)',
   })
+  @ApiHeader({
+    name: FOLDER_SESSION_HEADER,
+    required: false,
+    description: 'Session token for encrypted folder access',
+  })
   @ApiSuccessResponse(DirectoryResponseModel)
   async DirectoryCreate(
     @Body() model: DirectoryCreateRequestModel,
     @User() user: UserContext,
     @Headers(FOLDER_PASSPHRASE_HEADER) passphrase?: string,
+    @Headers(FOLDER_SESSION_HEADER) sessionToken?: string,
   ): Promise<DirectoryResponseModel> {
-    return this.cloudService.DirectoryCreate(model, passphrase, user);
+    return this.cloudService.DirectoryCreate(
+      model,
+      passphrase,
+      user,
+      sessionToken,
+    );
   }
 
   @ApiOperation({
@@ -499,13 +546,24 @@ export class CloudController {
     required: false,
     description: 'Passphrase for encrypted directory',
   })
+  @ApiHeader({
+    name: FOLDER_SESSION_HEADER,
+    required: false,
+    description: 'Session token for encrypted folder access',
+  })
   @ApiSuccessResponse(DirectoryResponseModel)
   async DirectoryRename(
     @Body() model: DirectoryRenameRequestModel,
     @User() user: UserContext,
     @Headers(FOLDER_PASSPHRASE_HEADER) passphrase?: string,
+    @Headers(FOLDER_SESSION_HEADER) sessionToken?: string,
   ): Promise<DirectoryResponseModel> {
-    return this.cloudService.DirectoryRename(model, passphrase, user);
+    return this.cloudService.DirectoryRename(
+      model,
+      passphrase,
+      user,
+      sessionToken,
+    );
   }
 
   @ApiOperation({
@@ -519,6 +577,11 @@ export class CloudController {
     required: false,
     description: 'Passphrase for encrypted directory',
   })
+  @ApiHeader({
+    name: FOLDER_SESSION_HEADER,
+    required: false,
+    description: 'Session token for encrypted folder access',
+  })
   @ApiResponse({
     status: 200,
     description: 'Directory deleted',
@@ -528,8 +591,14 @@ export class CloudController {
     @Body() model: DirectoryDeleteRequestModel,
     @User() user: UserContext,
     @Headers(FOLDER_PASSPHRASE_HEADER) passphrase?: string,
+    @Headers(FOLDER_SESSION_HEADER) sessionToken?: string,
   ): Promise<boolean> {
-    return this.cloudService.DirectoryDelete(model, passphrase, user);
+    return this.cloudService.DirectoryDelete(
+      model,
+      passphrase,
+      user,
+      sessionToken,
+    );
   }
 
   @ApiOperation({
@@ -580,16 +649,23 @@ export class CloudController {
     required: true,
     description: 'Passphrase for encryption (min 8 chars)',
   })
+  @ApiHeader({
+    name: FOLDER_SESSION_HEADER,
+    required: false,
+    description: 'Session token for encrypted folder access',
+  })
   @ApiSuccessResponse(DirectoryResponseModel)
   async DirectoryConvertToEncrypted(
     @Body() model: DirectoryConvertToEncryptedRequestModel,
     @User() user: UserContext,
     @Headers(FOLDER_PASSPHRASE_HEADER) passphrase?: string,
+    @Headers(FOLDER_SESSION_HEADER) sessionToken?: string,
   ): Promise<DirectoryResponseModel> {
     return this.cloudService.DirectoryConvertToEncrypted(
       model,
       passphrase,
       user,
+      sessionToken,
     );
   }
 
@@ -604,12 +680,23 @@ export class CloudController {
     required: true,
     description: 'Passphrase for decryption',
   })
+  @ApiHeader({
+    name: FOLDER_SESSION_HEADER,
+    required: false,
+    description: 'Session token for encrypted folder access',
+  })
   @ApiSuccessResponse(DirectoryResponseModel)
   async DirectoryDecrypt(
     @Body() model: DirectoryDecryptRequestModel,
     @User() user: UserContext,
     @Headers(FOLDER_PASSPHRASE_HEADER) passphrase?: string,
+    @Headers(FOLDER_SESSION_HEADER) sessionToken?: string,
   ): Promise<DirectoryResponseModel> {
-    return this.cloudService.DirectoryDecrypt(model, passphrase, user);
+    return this.cloudService.DirectoryDecrypt(
+      model,
+      passphrase,
+      user,
+      sessionToken,
+    );
   }
 }

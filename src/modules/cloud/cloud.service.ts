@@ -50,6 +50,7 @@ import { CloudZipService } from './cloud.zip.service';
 import { CloudUploadService } from './cloud.upload.service';
 import { CloudDirectoryService } from './cloud.directory.service';
 import { CloudUsageService } from './cloud.usage.service';
+import { NormalizeDirectoryPath } from './cloud.utils';
 
 @Injectable()
 export class CloudService {
@@ -62,8 +63,7 @@ export class CloudService {
     private readonly CloudUploadService: CloudUploadService,
     private readonly CloudDirectoryService: CloudDirectoryService,
     private readonly CloudUsageService: CloudUsageService,
-  ) {
-  }
+  ) {}
 
   //#region List
 
@@ -300,7 +300,6 @@ export class CloudService {
 
   //#endregion
 
-
   //#region Move
 
   async Move(
@@ -406,9 +405,16 @@ export class CloudService {
   //#region Multipart Upload
 
   async UploadCreateMultipartUpload(
-    { Key, ContentType, Metadata, TotalSize }: CloudCreateMultipartUploadRequestModel,
+    {
+      Key,
+      ContentType,
+      Metadata,
+      TotalSize,
+    }: CloudCreateMultipartUploadRequestModel,
     User: UserContext,
+    sessionToken?: string,
   ): Promise<CloudCreateMultipartUploadResponseModel> {
+    await this.EnsureUploadAccess(Key, User.id, sessionToken);
     return this.CloudUploadService.UploadCreateMultipartUpload(
       { Key, ContentType, Metadata, TotalSize },
       User,
@@ -422,7 +428,9 @@ export class CloudService {
   async UploadGetMultipartPartUrl(
     { Key, UploadId, PartNumber }: CloudGetMultipartPartUrlRequestModel,
     User: UserContext,
+    sessionToken?: string,
   ): Promise<CloudGetMultipartPartUrlResponseModel> {
+    await this.EnsureUploadAccess(Key, User.id, sessionToken);
     return this.CloudUploadService.UploadGetMultipartPartUrl(
       { Key, UploadId, PartNumber },
       User,
@@ -437,7 +445,9 @@ export class CloudService {
     { Key, UploadId, PartNumber }: CloudUploadPartRequestModel,
     file: Express.Multer.File,
     User: UserContext,
+    sessionToken?: string,
   ): Promise<CloudUploadPartResponseModel> {
+    await this.EnsureUploadAccess(Key, User.id, sessionToken);
     return this.CloudUploadService.UploadPart(
       { Key, UploadId, PartNumber, File: file },
       User,
@@ -451,7 +461,9 @@ export class CloudService {
   async UploadCompleteMultipartUpload(
     { Key, UploadId, Parts }: CloudCompleteMultipartUploadRequestModel,
     User: UserContext,
+    sessionToken?: string,
   ): Promise<CloudCompleteMultipartUploadResponseModel> {
+    await this.EnsureUploadAccess(Key, User.id, sessionToken);
     return this.CloudUploadService.UploadCompleteMultipartUpload(
       { Key, UploadId, Parts },
       User,
@@ -521,7 +533,9 @@ export class CloudService {
     { Path, IsEncrypted }: DirectoryCreateRequestModel,
     passphrase: string | undefined,
     User: UserContext,
+    sessionToken?: string,
   ): Promise<DirectoryResponseModel> {
+    await this.EnsureDirectoryAccess(Path, User.id, sessionToken);
     return this.CloudDirectoryService.DirectoryCreate(
       { Path, IsEncrypted },
       passphrase,
@@ -536,7 +550,9 @@ export class CloudService {
     { Path, Name }: DirectoryRenameRequestModel,
     passphrase: string | undefined,
     User: UserContext,
+    sessionToken?: string,
   ): Promise<DirectoryResponseModel> {
+    await this.EnsureDirectoryAccess(Path, User.id, sessionToken);
     return this.CloudDirectoryService.DirectoryRename(
       { Path, Name },
       passphrase,
@@ -551,8 +567,14 @@ export class CloudService {
     { Path }: DirectoryDeleteRequestModel,
     passphrase: string | undefined,
     User: UserContext,
+    sessionToken?: string,
   ): Promise<boolean> {
-    return this.CloudDirectoryService.DirectoryDelete({ Path }, passphrase, User);
+    await this.EnsureDirectoryAccess(Path, User.id, sessionToken);
+    return this.CloudDirectoryService.DirectoryDelete(
+      { Path },
+      passphrase,
+      User,
+    );
   }
 
   /**
@@ -588,7 +610,9 @@ export class CloudService {
     { Path }: DirectoryConvertToEncryptedRequestModel,
     passphrase: string | undefined,
     User: UserContext,
+    sessionToken?: string,
   ): Promise<DirectoryResponseModel> {
+    await this.EnsureDirectoryAccess(Path, User.id, sessionToken);
     return this.CloudDirectoryService.DirectoryConvertToEncrypted(
       { Path },
       passphrase,
@@ -603,10 +627,68 @@ export class CloudService {
     { Path }: DirectoryDecryptRequestModel,
     passphrase: string | undefined,
     User: UserContext,
+    sessionToken?: string,
   ): Promise<DirectoryResponseModel> {
-    return this.CloudDirectoryService.DirectoryDecrypt({ Path }, passphrase, User);
+    await this.EnsureDirectoryAccess(Path, User.id, sessionToken);
+    return this.CloudDirectoryService.DirectoryDecrypt(
+      { Path },
+      passphrase,
+      User,
+    );
   }
 
-
   //#endregion
+
+  private GetParentDirectoryPath(key: string): string {
+    const normalized = NormalizeDirectoryPath(key);
+    if (!normalized) {
+      return '';
+    }
+    const parts = normalized.split('/').filter((part) => !!part);
+    if (parts.length <= 1) {
+      return '';
+    }
+    parts.pop();
+    return parts.join('/');
+  }
+
+  private async EnsureUploadAccess(
+    key: string,
+    userId: string,
+    sessionToken?: string,
+  ): Promise<void> {
+    const folderPath = this.GetParentDirectoryPath(key);
+    const accessCheck = await this.CheckEncryptedFolderAccess(
+      folderPath,
+      userId,
+      sessionToken,
+    );
+
+    if (accessCheck.isEncrypted && !accessCheck.hasAccess) {
+      throw new HttpException(
+        `Access denied. Folder "${accessCheck.encryptingFolder}" is encrypted. Unlock it first via POST /Cloud/Directories/Unlock`,
+        HttpStatus.FORBIDDEN,
+      );
+    }
+  }
+
+  private async EnsureDirectoryAccess(
+    path: string,
+    userId: string,
+    sessionToken?: string,
+  ): Promise<void> {
+    const normalizedPath = NormalizeDirectoryPath(path);
+    const accessCheck = await this.CheckEncryptedFolderAccess(
+      normalizedPath,
+      userId,
+      sessionToken,
+    );
+
+    if (accessCheck.isEncrypted && !accessCheck.hasAccess) {
+      throw new HttpException(
+        `Access denied. Folder "${accessCheck.encryptingFolder}" is encrypted. Unlock it first via POST /Cloud/Directories/Unlock`,
+        HttpStatus.FORBIDDEN,
+      );
+    }
+  }
 }
