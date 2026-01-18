@@ -27,6 +27,12 @@ import {
   CloudCompleteMultipartUploadResponseModel,
   CloudCreateMultipartUploadRequestModel,
   CloudCreateMultipartUploadResponseModel,
+  CloudExtractZipStartRequestModel,
+  CloudExtractZipStartResponseModel,
+  CloudExtractZipStatusRequestModel,
+  CloudExtractZipStatusResponseModel,
+  CloudExtractZipCancelRequestModel,
+  CloudExtractZipCancelResponseModel,
   CloudKeyRequestModel,
   CloudGetMultipartPartUrlRequestModel,
   CloudGetMultipartPartUrlResponseModel,
@@ -332,6 +338,46 @@ export class CloudController {
     @User() user: UserContext,
   ): Promise<CloudCompleteMultipartUploadResponseModel> {
     return this.cloudService.UploadCompleteMultipartUpload(model, user);
+  }
+
+  @ApiOperation({
+    summary: 'Start zip extraction',
+    description:
+      'Starts an async job to extract a previously uploaded .zip file.',
+  })
+  @Post('Upload/ExtractZip/Start')
+  @ApiSuccessResponse(CloudExtractZipStartResponseModel)
+  async ExtractZipStart(
+    @Body() model: CloudExtractZipStartRequestModel,
+    @User() user: UserContext,
+  ): Promise<CloudExtractZipStartResponseModel> {
+    return this.cloudService.ExtractZipStart(model, user);
+  }
+
+  @ApiOperation({
+    summary: 'Get zip extraction status',
+    description: 'Returns the current status/progress of a zip extraction job.',
+  })
+  @Get('Upload/ExtractZip/Status')
+  @ApiSuccessResponse(CloudExtractZipStatusResponseModel)
+  async ExtractZipStatus(
+    @Query() model: CloudExtractZipStatusRequestModel,
+    @User() user: UserContext,
+  ): Promise<CloudExtractZipStatusResponseModel> {
+    return this.cloudService.ExtractZipStatus(model, user);
+  }
+
+  @ApiOperation({
+    summary: 'Cancel zip extraction',
+    description: 'Cancels a zip extraction job if it is pending or running.',
+  })
+  @Post('Upload/ExtractZip/Cancel')
+  @ApiSuccessResponse(CloudExtractZipCancelResponseModel)
+  async ExtractZipCancel(
+    @Body() model: CloudExtractZipCancelRequestModel,
+    @User() user: UserContext,
+  ): Promise<CloudExtractZipCancelResponseModel> {
+    return this.cloudService.ExtractZipCancel(model, user);
   }
 
   @ApiOperation({

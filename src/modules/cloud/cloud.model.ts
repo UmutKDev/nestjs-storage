@@ -380,6 +380,62 @@ export class CloudCompleteMultipartUploadRequestModel {
   Parts: Array<CloudMultipartPartModel>;
 }
 
+export class CloudExtractZipStartRequestModel {
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  @Transform(({ value }) => S3KeyConverter(value))
+  Key: string;
+}
+
+export class CloudExtractZipStartResponseModel {
+  @Expose()
+  @ApiProperty()
+  JobId: string;
+}
+
+export class CloudExtractZipStatusRequestModel {
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  JobId: string;
+}
+
+export class CloudExtractZipStatusResponseModel {
+  @Expose()
+  @ApiProperty()
+  JobId: string;
+
+  @Expose()
+  @ApiProperty()
+  State: string;
+
+  @Expose()
+  @ApiProperty({ required: false, type: Object })
+  Progress?: Record<string, unknown>;
+
+  @Expose()
+  @ApiProperty({ required: false })
+  ExtractedPath?: string;
+
+  @Expose()
+  @ApiProperty({ required: false })
+  FailedReason?: string;
+}
+
+export class CloudExtractZipCancelRequestModel {
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  JobId: string;
+}
+
+export class CloudExtractZipCancelResponseModel {
+  @Expose()
+  @ApiProperty()
+  Cancelled: boolean;
+}
+
 export class CloudCompleteMultipartUploadResponseModel {
   @Expose()
   @ApiProperty()

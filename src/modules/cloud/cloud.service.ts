@@ -15,7 +15,14 @@ import {
   S3Client,
   UploadPartCommand,
 } from '@aws-sdk/client-s3';
-import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
+import {
+  HttpException,
+  HttpStatus,
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+  OnModuleInit,
+} from '@nestjs/common';
 import {
   createCipheriv,
   createDecipheriv,
@@ -25,12 +32,20 @@ import {
 import { InjectAws } from 'aws-sdk-v3-nest';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import sharp from 'sharp';
-import { Readable } from 'stream';
+import { PassThrough, Readable } from 'stream';
+import { Job, Queue, Worker } from 'bullmq';
+import IORedis, { RedisOptions } from 'ioredis';
 import {
   CloudAbortMultipartUploadRequestModel,
   CloudBreadCrumbModel,
   CloudCompleteMultipartUploadRequestModel,
   CloudCompleteMultipartUploadResponseModel,
+  CloudExtractZipStartRequestModel,
+  CloudExtractZipStartResponseModel,
+  CloudExtractZipStatusRequestModel,
+  CloudExtractZipStatusResponseModel,
+  CloudExtractZipCancelRequestModel,
+  CloudExtractZipCancelResponseModel,
   CloudCreateMultipartUploadRequestModel,
   CloudCreateMultipartUploadResponseModel,
   CloudKeyRequestModel,
@@ -78,6 +93,7 @@ import { Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { asyncLocalStorage } from '@common/context/context.service';
 import { Response } from 'express';
+import * as unzipper from 'unzipper';
 
 type EncryptedFolderRecord = {
   ciphertext: string;
@@ -92,8 +108,26 @@ type EncryptedFolderManifest = {
   folders: Record<string, EncryptedFolderRecord>;
 };
 
+type ZipExtractJobData = {
+  userId: string;
+  key: string;
+};
+
+type ZipExtractJobResult = {
+  extractedPath: string;
+};
+
+type ZipExtractProgress = {
+  phase: 'extract';
+  entriesProcessed: number;
+  totalEntries: number | null;
+  bytesRead: number;
+  totalBytes: number;
+  currentEntry?: string;
+};
+
 @Injectable()
-export class CloudService {
+export class CloudService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(CloudService.name);
   private readonly Buckets = {
     Storage: 'storage',
@@ -119,6 +153,34 @@ export class CloudService {
   private readonly EncryptedFolderAlgorithm = 'aes-256-gcm';
   private readonly IsSignedUrlProcessing =
     process.env.S3_PROTOCOL_SIGNED_URL_PROCESSING === 'true';
+  private readonly IsRedisEnabled =
+    (process.env.REDIS_ENABLED ?? 'true').toLowerCase() !== 'false';
+  private readonly ZipExtractQueueName = 'cloud-zip-extract';
+  private readonly ZipExtractCancelKeyPrefix = 'cloud:zip-extract:cancel:';
+  private readonly ZipExtractCancelTtlSeconds = 6 * 60 * 60; // 6 hours
+  private readonly ZipExtractJobConcurrency = Math.max(
+    1,
+    parseInt(process.env.ZIP_EXTRACT_JOB_CONCURRENCY ?? '1', 10),
+  );
+  private readonly ZipExtractEntryConcurrency = Math.max(
+    1,
+    parseInt(process.env.ZIP_EXTRACT_ENTRY_CONCURRENCY ?? '3', 10),
+  );
+  private readonly ZipExtractProgressEntriesStep = Math.max(
+    1,
+    parseInt(process.env.ZIP_EXTRACT_PROGRESS_ENTRIES ?? '5', 10),
+  );
+  private readonly ZipExtractProgressBytesStep = Math.max(
+    1,
+    parseInt(
+      process.env.ZIP_EXTRACT_PROGRESS_BYTES ?? `${5 * 1024 * 1024}`,
+      10,
+    ),
+  );
+  private zipExtractQueue?: Queue<ZipExtractJobData, ZipExtractJobResult>;
+  private zipExtractWorker?: Worker<ZipExtractJobData, ZipExtractJobResult>;
+  private zipExtractQueueConnection?: IORedis;
+  private zipExtractWorkerConnection?: IORedis;
   private Prefix = null;
   @InjectRepository(UserSubscriptionEntity)
   private userSubscriptionRepository: Repository<UserSubscriptionEntity>;
@@ -126,6 +188,78 @@ export class CloudService {
 
   constructor(private readonly redisService: RedisService) {
     console.log(this.IsSignedUrlProcessing);
+  }
+
+  async onModuleInit(): Promise<void> {
+    if (!this.IsRedisEnabled) {
+      this.logger.warn(
+        'Redis is disabled; zip extraction queue will not be available.',
+      );
+      return;
+    }
+
+    const options = this.BuildRedisConnectionOptions();
+    if (!options) {
+      this.logger.warn(
+        'Redis connection options are missing; zip extraction queue will not be available.',
+      );
+      return;
+    }
+
+    this.zipExtractQueueConnection = new IORedis(options);
+    this.zipExtractWorkerConnection = new IORedis(options);
+
+    this.zipExtractQueue = new Queue(this.ZipExtractQueueName, {
+      connection: this.zipExtractQueueConnection,
+      defaultJobOptions: {
+        removeOnComplete: { count: 100 },
+        removeOnFail: { count: 100 },
+      },
+    });
+
+    this.zipExtractWorker = new Worker(
+      this.ZipExtractQueueName,
+      async (job) => this.ProcessZipExtractJob(job),
+      {
+        connection: this.zipExtractWorkerConnection,
+        concurrency: this.ZipExtractJobConcurrency,
+      },
+    );
+
+    this.zipExtractWorker.on('error', (error) => {
+      this.logger.error('Zip extraction worker error', error);
+    });
+  }
+
+  async onModuleDestroy(): Promise<void> {
+    if (this.zipExtractWorker) {
+      await this.zipExtractWorker.close();
+    }
+    if (this.zipExtractQueue) {
+      await this.zipExtractQueue.close();
+    }
+    if (this.zipExtractWorkerConnection) {
+      await this.zipExtractWorkerConnection.quit();
+    }
+    if (this.zipExtractQueueConnection) {
+      await this.zipExtractQueueConnection.quit();
+    }
+  }
+
+  private BuildRedisConnectionOptions(): RedisOptions | null {
+    const host = process.env.REDIS_HOSTNAME;
+    const portValue = process.env.REDIS_PORT ?? '';
+    const port = parseInt(portValue, 10);
+    if (!host || Number.isNaN(port)) {
+      return null;
+    }
+    return {
+      host,
+      port,
+      password: process.env.REDIS_PASSWORD,
+      maxRetriesPerRequest: null,
+      enableReadyCheck: false,
+    };
   }
 
   // Default download speeds (bytes per second) mapped by subscription slug
@@ -420,19 +554,19 @@ export class CloudService {
     return parts.join(':');
   }
 
-  /**
-   * Invalidate list objects cache for a user's path.
-   * Call this when objects are added, deleted, moved, or renamed.
-   */
-  async InvalidateListObjectsCache(
-    userId: string,
-    path?: string,
-  ): Promise<void> {
-    const pattern = path
-      ? `cloud:list-objects:${userId}:${path.replace(/^\/+|\/+$/g, '') || 'root'}:*`
-      : `cloud:list-objects:${userId}:*`;
-    await this.redisService.delByPattern(pattern);
-  }
+  // /**
+  //  * Invalidate list objects cache for a user's path.
+  //  * Call this when objects are added, deleted, moved, or renamed.
+  //  */
+  // async InvalidateListObjectsCache(
+  //   userId: string,
+  //   path?: string,
+  // ): Promise<void> {
+  //   const pattern = path
+  //     ? `cloud:list-objects:${userId}:${path.replace(/^\/+|\/+$/g, '') || 'root'}:*`
+  //     : `cloud:list-objects:${userId}:*`;
+  //   await this.redisService.delByPattern(pattern);
+  // }
 
   /**
    * Extract parent folder path from a key.
@@ -1039,7 +1173,7 @@ export class CloudService {
     { SourceKeys, DestinationKey }: CloudMoveRequestModel,
     User: UserContext,
   ): Promise<boolean> {
-    const foldersToInvalidate = new Set<string>();
+    // const foldersToInvalidate = new Set<string>();
 
     try {
       for await (const sourceKey of SourceKeys) {
@@ -1068,24 +1202,24 @@ export class CloudService {
         );
 
         // Collect folders to invalidate
-        foldersToInvalidate.add(this.GetParentFolderPath(sourceKey));
+        // foldersToInvalidate.add(this.GetParentFolderPath(sourceKey));
       }
 
       // Add destination folder and its parent (in case destination folder is newly created)
-      const normalizedDestination = (DestinationKey || '').replace(
-        /^\/+|\/+$/g,
-        '',
-      );
-      foldersToInvalidate.add(normalizedDestination);
-      const destinationParent = this.GetParentFolderPath(normalizedDestination);
-      if (destinationParent !== normalizedDestination) {
-        foldersToInvalidate.add(destinationParent);
-      }
+      // const normalizedDestination = (DestinationKey || '').replace(
+      //   /^\/+|\/+$/g,
+      //   '',
+      // );
+      // foldersToInvalidate.add(normalizedDestination);
+      // const destinationParent = this.GetParentFolderPath(normalizedDestination);
+      // if (destinationParent !== normalizedDestination) {
+      //   foldersToInvalidate.add(destinationParent);
+      // }
 
       // Invalidate cache for all affected folders
-      for (const folder of foldersToInvalidate) {
-        await this.InvalidateListObjectsCache(User.id, folder || undefined);
-      }
+      // for (const folder of foldersToInvalidate) {
+      //   await this.InvalidateListObjectsCache(User.id, folder || undefined);
+      // }
     } catch (error) {
       if (this.NotFoundErrorCodes.includes(error.name)) {
         throw new HttpException(Codes.Error.Cloud.FILE_NOT_FOUND, 404);
@@ -1106,7 +1240,7 @@ export class CloudService {
   ): Promise<boolean> {
     // mark _options as used to avoid unused-parameter errors
     void _options;
-    const foldersToInvalidate = new Set<string>();
+    // const foldersToInvalidate = new Set<string>();
 
     try {
       for await (const item of Items) {
@@ -1118,13 +1252,13 @@ export class CloudService {
         );
 
         // Collect parent folder to invalidate
-        foldersToInvalidate.add(this.GetParentFolderPath(item.Key));
+        // foldersToInvalidate.add(this.GetParentFolderPath(item.Key));
       }
 
-      // Invalidate cache for all affected folders
-      for (const folder of foldersToInvalidate) {
-        await this.InvalidateListObjectsCache(User.id, folder || undefined);
-      }
+      // // Invalidate cache for all affected folders
+      // for (const folder of foldersToInvalidate) {
+      //   await this.InvalidateListObjectsCache(User.id, folder || undefined);
+      // }
     } catch (error) {
       if (this.NotFoundErrorCodes.includes(error.name)) {
         throw new HttpException(Codes.Error.Cloud.FILE_NOT_FOUND, 404);
@@ -1154,8 +1288,8 @@ export class CloudService {
     );
 
     // Invalidate parent folder cache
-    const parentFolder = this.GetParentFolderPath(Key);
-    await this.InvalidateListObjectsCache(User.id, parentFolder || undefined);
+    // const parentFolder = this.GetParentFolderPath(Key);
+    // await this.InvalidateListObjectsCache(User.id, parentFolder || undefined);
 
     return true;
   }
@@ -1317,8 +1451,8 @@ export class CloudService {
       );
 
       // Invalidate cache for parent folder (both source and target are in same parent)
-      const parentFolder = this.GetParentFolderPath(sourcePath);
-      await this.InvalidateListObjectsCache(User.id, parentFolder || undefined);
+      // const parentFolder = this.GetParentFolderPath(sourcePath);
+      // await this.InvalidateListObjectsCache(User.id, parentFolder || undefined);
 
       return true;
     } catch (error) {
@@ -1623,14 +1757,13 @@ export class CloudService {
       }),
     );
 
-    let metadata = {};
-    if (IsImageFile(Key)) {
-      metadata = await this.ProcessImageMetadata(KeyBuilder([User.id, Key]));
-    }
+    const metadata = await this.MetadataProcessor(
+      KeyBuilder([User.id, Key]),
+    );
 
     // Invalidate cache for the folder where the file was uploaded
-    const parentFolder = this.GetParentFolderPath(Key);
-    await this.InvalidateListObjectsCache(User.id, parentFolder || undefined);
+    // const parentFolder = this.GetParentFolderPath(Key);
+    // await this.InvalidateListObjectsCache(User.id, parentFolder || undefined);
 
     return plainToInstance(CloudCompleteMultipartUploadResponseModel, {
       Location: command.Location,
@@ -1644,6 +1777,15 @@ export class CloudService {
   //#endregion
 
   //#region Image Metadata Processing
+
+  private async MetadataProcessor(
+    key: string,
+  ): Promise<Record<string, string>> {
+    if (IsImageFile(key)) {
+      return this.ProcessImageMetadata(key);
+    }
+    return {};
+  }
 
   private async ProcessFileMetadata(
     key: string,
@@ -1790,6 +1932,370 @@ export class CloudService {
   }
 
   //#endregion
+
+  async ExtractZipStart(
+    { Key }: CloudExtractZipStartRequestModel,
+    User: UserContext,
+  ): Promise<CloudExtractZipStartResponseModel> {
+    if (!this.IsZipKey(Key)) {
+      throw new HttpException(
+        'Only .zip files can be extracted.',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    this.EnsureZipExtractQueue();
+
+    const job = await this.zipExtractQueue.add('extract', {
+      key: Key,
+      userId: User.id,
+    });
+
+    return plainToInstance(CloudExtractZipStartResponseModel, {
+      JobId: job.id?.toString() ?? '',
+    });
+  }
+
+  async ExtractZipStatus(
+    { JobId }: CloudExtractZipStatusRequestModel,
+    User: UserContext,
+  ): Promise<CloudExtractZipStatusResponseModel> {
+    this.EnsureZipExtractQueue();
+
+    const job = await this.zipExtractQueue.getJob(JobId);
+    if (!job) {
+      throw new HttpException('Job not found.', HttpStatus.NOT_FOUND);
+    }
+    if (job.data.userId !== User.id) {
+      throw new HttpException('Access denied.', HttpStatus.FORBIDDEN);
+    }
+
+    const state = await job.getState();
+    const progress = job.progress as ZipExtractProgress | undefined;
+    const result = job.returnvalue as ZipExtractJobResult | undefined;
+
+    return plainToInstance(CloudExtractZipStatusResponseModel, {
+      JobId: job.id?.toString() ?? JobId,
+      State: state,
+      Progress: progress,
+      ExtractedPath: result?.extractedPath,
+      FailedReason: job.failedReason || undefined,
+    });
+  }
+
+  async ExtractZipCancel(
+    { JobId }: CloudExtractZipCancelRequestModel,
+    User: UserContext,
+  ): Promise<CloudExtractZipCancelResponseModel> {
+    this.EnsureZipExtractQueue();
+
+    const job = await this.zipExtractQueue.getJob(JobId);
+    if (!job) {
+      throw new HttpException('Job not found.', HttpStatus.NOT_FOUND);
+    }
+    if (job.data.userId !== User.id) {
+      throw new HttpException('Access denied.', HttpStatus.FORBIDDEN);
+    }
+
+    const state = await job.getState();
+    if (state === 'completed' || state === 'failed') {
+      return plainToInstance(CloudExtractZipCancelResponseModel, {
+        Cancelled: false,
+      });
+    }
+
+    if (state === 'waiting' || state === 'delayed') {
+      await job.remove();
+      return plainToInstance(CloudExtractZipCancelResponseModel, {
+        Cancelled: true,
+      });
+    }
+
+    await this.redisService.set(
+      this.GetZipExtractCancelKey(JobId),
+      true,
+      this.ZipExtractCancelTtlSeconds,
+    );
+
+    return plainToInstance(CloudExtractZipCancelResponseModel, {
+      Cancelled: true,
+    });
+  }
+
+  private EnsureZipExtractQueue(): void {
+    if (!this.zipExtractQueue) {
+      throw new HttpException(
+        'Zip extraction queue is not available.',
+        HttpStatus.SERVICE_UNAVAILABLE,
+      );
+    }
+  }
+
+  private GetZipExtractCancelKey(jobId: string): string {
+    return `${this.ZipExtractCancelKeyPrefix}${jobId}`;
+  }
+
+  private async ProcessZipExtractJob(
+    job: Job<ZipExtractJobData, ZipExtractJobResult>,
+  ): Promise<ZipExtractJobResult> {
+    const cancelKey = this.GetZipExtractCancelKey(job.id?.toString() ?? '');
+    const key = job.data.key;
+
+    if (!this.IsZipKey(key)) {
+      throw new Error('Only .zip files can be extracted.');
+    }
+
+    const user = { id: job.data.userId } as UserContext;
+
+    try {
+      const extractedPrefix = await this.ExtractZipToFolder(key, user, {
+        onProgress: async (progress) => {
+          await job.updateProgress(progress);
+        },
+        shouldCancel: async () => {
+          const cancelled = await this.redisService.get<boolean>(cancelKey);
+          return cancelled === true;
+        },
+      });
+
+      // const parentFolder = this.GetParentFolderPath(key);
+      // await this.InvalidateListObjectsCache(user.id, parentFolder || undefined);
+      // await this.InvalidateListObjectsCache(
+      //   user.id,
+      //   extractedPrefix || undefined,
+      // );
+
+      return { extractedPath: extractedPrefix };
+    } finally {
+      if (cancelKey) {
+        await this.redisService.del(cancelKey);
+      }
+    }
+  }
+
+  private IsZipKey(key: string): boolean {
+    return /\.zip$/i.test(key || '');
+  }
+
+  private JoinKey(...parts: string[]): string {
+    return parts
+      .map((part) => (part || '').replace(/^\/+|\/+$/g, ''))
+      .filter((part) => !!part)
+      .join('/');
+  }
+
+  private BuildZipExtractPrefix(key: string): string {
+    const normalized = (key || '').replace(/^\/+|\/+$/g, '');
+    const parts = normalized.split('/').filter((part) => !!part);
+    const filename = parts.pop() || '';
+    const baseName = filename.replace(/\.zip$/i, '').trim();
+    const safeBase = baseName || filename || 'extracted';
+    const parent = parts.join('/');
+    return this.JoinKey(parent, safeBase);
+  }
+
+  private NormalizeZipEntryPath(entryPath: string): string | null {
+    const normalized = (entryPath || '')
+      .replace(/\\/g, '/')
+      .replace(/^\/+/, '');
+    const segments = normalized.split('/').filter((segment) => !!segment);
+    if (!segments.length) {
+      return null;
+    }
+    if (segments.some((segment) => segment === '.' || segment === '..')) {
+      return null;
+    }
+    return segments.join('/');
+  }
+
+  private async ExtractZipToFolder(
+    key: string,
+    User: UserContext,
+    options?: {
+      onProgress?: (progress: ZipExtractProgress) => Promise<void> | void;
+      shouldCancel?: () => Promise<boolean> | boolean;
+    },
+  ): Promise<string> {
+    const sourceKey = KeyBuilder([User.id, key]);
+    const extractPrefix = this.BuildZipExtractPrefix(key);
+
+    try {
+      const object = await this.s3.send(
+        new GetObjectCommand({
+          Bucket: this.Buckets.Storage,
+          Key: sourceKey,
+        }),
+      );
+
+      const body = object.Body as Readable;
+      if (!body) {
+        throw new HttpException(
+          'Zip file is empty or unreadable.',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      const totalBytes = Number(object.ContentLength ?? 0);
+      const progress = {
+        entriesProcessed: 0,
+        totalEntries: null as number | null,
+        bytesRead: 0,
+        totalBytes,
+      };
+      let lastProgressEntries = 0;
+      let lastProgressBytes = 0;
+
+      const maybeReportProgress = async (
+        currentEntry?: string,
+        force = false,
+      ) => {
+        if (!options?.onProgress) {
+          return;
+        }
+        const entriesDelta = progress.entriesProcessed - lastProgressEntries;
+        const bytesDelta = progress.bytesRead - lastProgressBytes;
+        if (
+          !force &&
+          entriesDelta < this.ZipExtractProgressEntriesStep &&
+          bytesDelta < this.ZipExtractProgressBytesStep
+        ) {
+          return;
+        }
+        lastProgressEntries = progress.entriesProcessed;
+        lastProgressBytes = progress.bytesRead;
+        await options.onProgress({
+          phase: 'extract',
+          entriesProcessed: progress.entriesProcessed,
+          totalEntries: progress.totalEntries,
+          bytesRead: progress.bytesRead,
+          totalBytes: progress.totalBytes,
+          currentEntry,
+        });
+      };
+
+      const countingStream = new PassThrough();
+      countingStream.on('data', (chunk) => {
+        progress.bytesRead += chunk.length;
+      });
+
+      const parser = body
+        .pipe(countingStream)
+        .pipe(unzipper.Parse({ forceStream: true }));
+
+      const inFlight = new Set<Promise<void>>();
+      const enqueue = async (task: Promise<void>) => {
+        inFlight.add(task);
+        const cleanup = () => inFlight.delete(task);
+        task.then(cleanup).catch(cleanup);
+        if (inFlight.size >= this.ZipExtractEntryConcurrency) {
+          await Promise.race(inFlight);
+        }
+      };
+
+      let progressInterval: NodeJS.Timeout | null = null;
+      if (options?.onProgress) {
+        progressInterval = setInterval(() => {
+          void maybeReportProgress();
+        }, 1000);
+        await options.onProgress({
+          phase: 'extract',
+          entriesProcessed: progress.entriesProcessed,
+          totalEntries: progress.totalEntries,
+          bytesRead: progress.bytesRead,
+          totalBytes: progress.totalBytes,
+        });
+      }
+
+      try {
+        for await (const entry of parser) {
+          if (options?.shouldCancel) {
+            const cancelled = await options.shouldCancel();
+            if (cancelled) {
+              entry.autodrain();
+              throw new Error('Zip extraction cancelled.');
+            }
+          }
+
+          const normalizedPath = this.NormalizeZipEntryPath(entry.path);
+          if (!normalizedPath) {
+            entry.autodrain();
+            continue;
+          }
+
+          if (entry.type === 'Directory') {
+            const directoryKey = this.JoinKey(
+              extractPrefix,
+              normalizedPath,
+              this.EmptyFolderPlaceholder,
+            );
+            const task = this.s3
+              .send(
+                new PutObjectCommand({
+                  Bucket: this.Buckets.Storage,
+                  Key: KeyBuilder([User.id, directoryKey]),
+                  Body: '',
+                }),
+              )
+              .then(async () => {
+                progress.entriesProcessed += 1;
+                await maybeReportProgress(normalizedPath);
+              });
+            await enqueue(task);
+            entry.autodrain();
+            continue;
+          }
+
+          const targetKey = this.JoinKey(extractPrefix, normalizedPath);
+          const filename = normalizedPath.split('/').pop() || '';
+          const extension = filename.includes('.')
+            ? filename.split('.').pop() || ''
+            : '';
+          const contentType = extension
+            ? MimeTypeFromExtension(extension) || undefined
+            : undefined;
+
+        const task = this.s3
+          .send(
+            new PutObjectCommand({
+              Bucket: this.Buckets.Storage,
+              Key: KeyBuilder([User.id, targetKey]),
+              Body: entry,
+              ContentType: contentType,
+            }),
+          )
+          .then(async () => {
+            await this.MetadataProcessor(KeyBuilder([User.id, targetKey]));
+            progress.entriesProcessed += 1;
+            await maybeReportProgress(normalizedPath);
+          });
+          await enqueue(task);
+        }
+
+        await Promise.all(inFlight);
+        if (options?.onProgress) {
+          await options.onProgress({
+            phase: 'extract',
+            entriesProcessed: progress.entriesProcessed,
+            totalEntries: progress.totalEntries,
+            bytesRead: progress.bytesRead,
+            totalBytes: progress.totalBytes,
+          });
+        }
+      } finally {
+        if (progressInterval) {
+          clearInterval(progressInterval);
+        }
+      }
+    } catch (error) {
+      this.logger.error(
+        `Failed to extract zip for key ${key} into ${extractPrefix}`,
+        error,
+      );
+      throw error;
+    }
+
+    return extractPrefix;
+  }
 
   //#region Abort Multipart Upload
 
@@ -1984,19 +2490,19 @@ export class CloudService {
       }
 
       // Invalidate cache for the folder(s) affected
-      const sourceFolder = this.GetParentFolderPath(Key);
-      await this.InvalidateListObjectsCache(User.id, sourceFolder || undefined);
+      // const sourceFolder = this.GetParentFolderPath(Key);
+      // await this.InvalidateListObjectsCache(User.id, sourceFolder || undefined);
 
-      // If renamed (different target), also invalidate target folder
-      if (targetRelative !== Key) {
-        const targetFolder = this.GetParentFolderPath(targetRelative);
-        if (targetFolder !== sourceFolder) {
-          await this.InvalidateListObjectsCache(
-            User.id,
-            targetFolder || undefined,
-          );
-        }
-      }
+      // // If renamed (different target), also invalidate target folder
+      // if (targetRelative !== Key) {
+      //   const targetFolder = this.GetParentFolderPath(targetRelative);
+      //   if (targetFolder !== sourceFolder) {
+      //     await this.InvalidateListObjectsCache(
+      //       User.id,
+      //       targetFolder || undefined,
+      //     );
+      //   }
+      // }
 
       // return the updated object info (note: Key for Find should be relative to user)
       return this.Find({ Key: targetRelative }, User);
@@ -2199,7 +2705,7 @@ export class CloudService {
     }
 
     // Invalidate any active sessions for this path
-    await this.InvalidateDirectorySession(User.id, normalizedPath);
+    // await this.InvalidateDirectorySession(User.id, normalizedPath);
 
     return true;
   }
@@ -2321,7 +2827,7 @@ export class CloudService {
       );
     }
 
-    await this.InvalidateDirectorySession(User.id, normalizedPath);
+    // await this.InvalidateDirectorySession(User.id, normalizedPath);
     return true;
   }
 
@@ -2447,7 +2953,7 @@ export class CloudService {
     await this.SaveEncryptedFolderManifest(User, manifest);
 
     // Invalidate any active sessions
-    await this.InvalidateDirectorySession(User.id, normalizedPath);
+    // await this.InvalidateDirectorySession(User.id, normalizedPath);
 
     return plainToInstance(DirectoryResponseModel, {
       Path: normalizedPath,
@@ -2555,13 +3061,13 @@ export class CloudService {
     return `encrypted-folder:session:${userId}:${normalizedPath}`;
   }
 
-  private async InvalidateDirectorySession(
-    userId: string,
-    folderPath: string,
-  ): Promise<void> {
-    const cacheKey = this.BuildSessionKey(userId, folderPath);
-    await this.redisService.del(cacheKey);
-  }
+  // private async InvalidateDirectorySession(
+  //   userId: string,
+  //   folderPath: string,
+  // ): Promise<void> {
+  //   const cacheKey = this.BuildSessionKey(userId, folderPath);
+  //   await this.redisService.del(cacheKey);
+  // }
 
   private async GetEncryptedFolderManifestByUserId(
     userId: string,
