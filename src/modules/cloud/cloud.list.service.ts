@@ -17,11 +17,7 @@ import {
   CloudObjectModel,
 } from './cloud.model';
 import { CloudBreadcrumbLevelType } from '@common/enums';
-import {
-  IsImageFile,
-  KeyBuilder,
-  MimeTypeFromExtension,
-} from '@common/helpers/cast.helper';
+import { KeyBuilder, MimeTypeFromExtension } from '@common/helpers/cast.helper';
 import { CloudS3Service } from './cloud.s3.service';
 import { CloudMetadataService } from './cloud.metadata.service';
 import { NormalizeDirectoryPath } from './cloud.utils';
@@ -461,7 +457,6 @@ export class CloudListService {
     for (const content of Contents) {
       let metadata: Record<string, string> = {};
       let contentType: string | undefined = undefined;
-      let width = 0;
 
       if (IsMetadataProcessing) {
         const head = await this.CloudS3Service.Send(
@@ -474,7 +469,6 @@ export class CloudListService {
           head.Metadata,
         );
         contentType = head.ContentType;
-        width = Number(head.Metadata?.width) || 0;
       }
 
       const ObjectCommand = new GetObjectCommand({
@@ -482,18 +476,11 @@ export class CloudListService {
         Key: content.Key,
       });
 
-      const ImageBuilder =
-        IsImageFile(content.Key || '') && width
-          ? `?w=${width / (width > 3000 ? 4 : width > 2500 ? 3 : width > 2000 ? 2.5 : width > 1000 ? 2 : 1)}`
-          : '';
-
-      const SignedUrl =
-        (IsSignedUrlProcessing
-          ? await getSignedUrl(this.CloudS3Service.GetClient(), ObjectCommand, {
-              expiresIn: this.PresignedUrlExpirySeconds,
-            })
-          : this.CloudS3Service.GetPublicEndpoint() + '/' + content.Key) +
-        ImageBuilder;
+      const SignedUrl = IsSignedUrlProcessing
+        ? await getSignedUrl(this.CloudS3Service.GetClient(), ObjectCommand, {
+            expiresIn: this.PresignedUrlExpirySeconds,
+          })
+        : this.CloudS3Service.GetPublicEndpoint() + '/' + content.Key;
 
       const Name = content.Key?.split('/').pop();
       const Extension = Name?.includes('.') ? Name.split('.').pop() : '';
@@ -519,5 +506,4 @@ export class CloudListService {
     }
     return processedContents;
   }
-
 }
