@@ -514,9 +514,11 @@ export class CloudListService {
     });
 
     const SignedUrl = IsSignedUrlProcessing
-      ? await getSignedUrl(this.CloudS3Service.GetClient(), ObjectCommand, {
-          expiresIn: this.PresignedUrlExpirySeconds,
-        })
+      ? this.ReplaceSignedUrlHost(
+          await getSignedUrl(this.CloudS3Service.GetClient(), ObjectCommand, {
+            expiresIn: this.PresignedUrlExpirySeconds,
+          }),
+        )
       : this.CloudS3Service.GetPublicEndpoint() + '/' + content.Key;
 
     const Name = content.Key?.split('/').pop();
@@ -529,7 +531,7 @@ export class CloudListService {
         (contentType ?? MimeTypeFromExtension(Extension)) ||
         'application/octet-stream',
       Path: {
-        Host: this.CloudS3Service.GetPublicEndpoint(),
+        Host: this.CloudS3Service.GetPublicHostname(),
         Key: content.Key.replace('' + User.id + '/', ''),
         Url: SignedUrl,
       },
@@ -540,5 +542,22 @@ export class CloudListService {
         ? content.LastModified.toISOString()
         : '',
     };
+  }
+
+  private ReplaceSignedUrlHost(url: string): string {
+    const publicEndpoint = process.env.STORAGE_S3_PUBLIC_ENDPOINT;
+    if (!publicEndpoint) {
+      return url;
+    }
+
+    try {
+      const signedUrl = new URL(url);
+      const endpointUrl = new URL(publicEndpoint);
+      signedUrl.protocol = endpointUrl.protocol;
+      signedUrl.host = endpointUrl.host;
+      return signedUrl.toString();
+    } catch {
+      return url;
+    }
   }
 }

@@ -9,8 +9,7 @@ export class CloudS3Service {
     Photos: 'Photos',
   };
 
-  private readonly PublicEndpoint =
-    process.env.STORAGE_S3_PUBLIC_ENDPOINT + this.Buckets.Storage;
+  private readonly PublicEndpoint = process.env.STORAGE_S3_PUBLIC_ENDPOINT;
 
   private readonly NotFoundErrorCodes = ['NoSuchKey', 'NotFound'];
 
@@ -21,7 +20,12 @@ export class CloudS3Service {
   }
 
   GetPublicEndpoint(): string {
-    return this.PublicEndpoint;
+    return this.PublicEndpoint + '/' + this.Buckets.Storage;
+  }
+
+  GetPublicHostname(): string {
+    const url = new URL(this.PublicEndpoint);
+    return url.hostname;
   }
 
   IsNotFoundError(error: { name?: string } | undefined): boolean {

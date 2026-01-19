@@ -48,7 +48,7 @@ export class CloudObjectService {
         Extension: Key?.includes('.') ? Key.split('.').pop() : undefined,
         MimeType: command.ContentType,
         Path: {
-          Host: this.CloudS3Service.GetPublicEndpoint(),
+          Host: this.CloudS3Service.GetPublicHostname(),
           Key: Key.replace('' + User.id + '/', ''),
           Url: Key,
         },
