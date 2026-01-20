@@ -335,6 +335,11 @@ export class CloudZipService implements OnModuleInit, OnModuleDestroy {
   ): Promise<string> {
     const sourceKey = KeyBuilder([User.id, key]);
     const extractPrefix = BuildZipExtractPrefix(key);
+    const normalizedKey = (key || '').replace(/^\/+|\/+$/g, '');
+    const keyParts = normalizedKey.split('/').filter((part) => !!part);
+    const filename = keyParts.pop() || '';
+    const baseName = filename.replace(/\.zip$/i, '').trim();
+    const zipBase = baseName || filename || 'extracted';
     let totalUncompressedBytes = 0;
 
     try {
@@ -439,6 +444,13 @@ export class CloudZipService implements OnModuleInit, OnModuleDestroy {
             entry.autodrain();
             continue;
           }
+          const effectivePath = normalizedPath.startsWith(`${zipBase}/`)
+            ? normalizedPath.slice(zipBase.length + 1)
+            : normalizedPath;
+          if (!effectivePath) {
+            entry.autodrain();
+            continue;
+          }
 
           progress.entriesProcessed += 1;
           if (progress.entriesProcessed > this.ZipExtractMaxEntries) {
@@ -483,7 +495,7 @@ export class CloudZipService implements OnModuleInit, OnModuleDestroy {
           if (entry.type === 'Directory') {
             const directoryKey = JoinKey(
               extractPrefix,
-              normalizedPath,
+              effectivePath,
               this.EmptyFolderPlaceholder,
             );
             const task = this.CloudS3Service.Send(
@@ -493,20 +505,23 @@ export class CloudZipService implements OnModuleInit, OnModuleDestroy {
                 Body: '',
               }),
             ).then(async () => {
-              await maybeReportProgress(normalizedPath);
+              await maybeReportProgress(effectivePath);
             });
             await enqueue(task);
             entry.autodrain();
             continue;
           }
 
-          const targetKey = JoinKey(extractPrefix, normalizedPath);
-          const filename = normalizedPath.split('/').pop() || '';
+          const targetKey = JoinKey(extractPrefix, effectivePath);
+          const filename = effectivePath.split('/').pop() || '';
           const extension = filename.includes('.')
             ? filename.split('.').pop() || ''
             : '';
           const contentType = extension
             ? MimeTypeFromExtension(extension) || undefined
+            : undefined;
+          const contentLength = Number.isFinite(entryUncompressedSize)
+            ? entryUncompressedSize
             : undefined;
 
           const task = this.CloudS3Service.Send(
@@ -515,12 +530,13 @@ export class CloudZipService implements OnModuleInit, OnModuleDestroy {
               Key: KeyBuilder([User.id, targetKey]),
               Body: entry,
               ContentType: contentType,
+              ContentLength: contentLength,
             }),
           ).then(async () => {
             await this.CloudMetadataService.MetadataProcessor(
               KeyBuilder([User.id, targetKey]),
             );
-            await maybeReportProgress(normalizedPath);
+            await maybeReportProgress(effectivePath);
           });
           await enqueue(task);
         }
