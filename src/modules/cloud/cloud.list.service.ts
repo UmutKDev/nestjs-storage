@@ -17,10 +17,15 @@ import {
   CloudObjectModel,
 } from './cloud.model';
 import { CloudBreadcrumbLevelType } from '@common/enums';
-import { KeyBuilder, MimeTypeFromExtension } from '@common/helpers/cast.helper';
+import {
+  IsImageFile,
+  KeyBuilder,
+  MimeTypeFromExtension,
+} from '@common/helpers/cast.helper';
 import { CloudS3Service } from './cloud.s3.service';
 import { CloudMetadataService } from './cloud.metadata.service';
 import { NormalizeDirectoryPath } from './cloud.utils';
+import { RedisService } from '@modules/redis/redis.service';
 
 @Injectable()
 export class CloudListService {
@@ -34,6 +39,15 @@ export class CloudListService {
     parseInt(process.env.CLOUD_LIST_METADATA_CONCURRENCY ?? '5', 10),
   );
   private readonly PresignedUrlExpirySeconds = 3600;
+  private readonly DirectoryThumbnailLimit = 4;
+  private readonly DirectoryThumbnailMaxFolders = 4;
+  private readonly DirectoryThumbnailCacheTTLSeconds = Math.max(
+    1,
+    parseInt(
+      process.env.CLOUD_LIST_THUMBNAIL_CACHE_TTL_SECONDS ?? '86400',
+      10,
+    ),
+  );
   private readonly EmptyFolderPlaceholder = '.emptyFolderPlaceholder';
   private readonly IsSignedUrlProcessing =
     process.env.S3_PROTOCOL_SIGNED_URL_PROCESSING === 'true';
@@ -43,6 +57,7 @@ export class CloudListService {
   constructor(
     private readonly CloudS3Service: CloudS3Service,
     private readonly CloudMetadataService: CloudMetadataService,
+    private readonly RedisService: RedisService,
   ) {}
 
   async List(
@@ -264,6 +279,8 @@ export class CloudListService {
         EncryptedFolders,
         SessionToken,
         ValidateDirectorySession,
+        true,
+        this.IsSignedUrlProcessing,
       );
 
       return {
@@ -331,6 +348,8 @@ export class CloudListService {
       EncryptedFolders,
       SessionToken,
       ValidateDirectorySession,
+      true,
+      this.IsSignedUrlProcessing,
     );
 
     let totalCount = aggregated.length;
@@ -403,6 +422,8 @@ export class CloudListService {
       folderPath: string,
       sessionToken: string,
     ) => Promise<unknown>,
+    IncludeThumbnails = false,
+    IsSignedUrlProcessing = false,
   ): Promise<CloudDirectoryModel[]> {
     const CommonPrefixesFiltered = CommonPrefixes.filter(
       (cp) => !cp.Prefix.includes('.secure/'),
@@ -443,6 +464,33 @@ export class CloudListService {
           IsLocked: isEncrypted ? isLocked : false,
         });
       }
+    }
+
+    if (IncludeThumbnails && directories.length > 0) {
+      const concurrency = Math.min(
+        this.MetadataProcessingConcurrency,
+        directories.length,
+      );
+      let currentIndex = 0;
+      const worker = async () => {
+        while (true) {
+          const index = currentIndex++;
+          if (index >= directories.length) {
+            break;
+          }
+          const directory = directories[index];
+          if (directory.IsEncrypted && directory.IsLocked) {
+            directory.Thumbnails = [];
+            continue;
+          }
+          directory.Thumbnails = await this.ListDirectoryThumbnails(
+            directory.Prefix,
+            User,
+            IsSignedUrlProcessing,
+          );
+        }
+      };
+      await Promise.all(Array.from({ length: concurrency }, () => worker()));
     }
     return directories;
   }
@@ -542,6 +590,231 @@ export class CloudListService {
         ? content.LastModified.toISOString()
         : '',
     };
+  }
+
+  private async ListDirectoryThumbnails(
+    directoryPrefix: string,
+    User: UserContext,
+    IsSignedUrlProcessing: boolean,
+  ): Promise<CloudObjectModel[]> {
+    const normalizedPrefix = NormalizeDirectoryPath(directoryPrefix);
+    if (!normalizedPrefix) {
+      return [];
+    }
+
+    const prefix = KeyBuilder([User.id, normalizedPrefix]);
+    const cacheKey = this.BuildDirectoryThumbnailCacheKey(
+      User.id,
+      normalizedPrefix,
+      IsSignedUrlProcessing,
+    );
+    const cached = await this.RedisService.get<CloudObjectModel[]>(cacheKey);
+    if (cached !== undefined) {
+      return cached;
+    }
+
+    const thumbnails: CloudObjectModel[] = [];
+    const foldersUsed = new Set<string>();
+    const folderOrder: string[] = [];
+    const folderBuckets = new Map<string, CloudObjectModel[]>();
+    let continuationToken: string | undefined = undefined;
+
+    const totalBucketItems = (): number =>
+      Array.from(folderBuckets.values()).reduce(
+        (total, bucket) => total + bucket.length,
+        0,
+      );
+
+    while (true) {
+      const command = await this.CloudS3Service.Send(
+        new ListObjectsV2Command({
+          Bucket: this.CloudS3Service.GetBuckets().Storage,
+          Prefix: prefix,
+          MaxKeys: this.MaxListObjects,
+          ContinuationToken: continuationToken,
+        }),
+      );
+
+      for (const content of command.Contents ?? []) {
+        const key = content.Key;
+        if (!key) {
+          continue;
+        }
+        if (this.IsDirectory(key)) {
+          continue;
+        }
+        if (!IsImageFile(key)) {
+          continue;
+        }
+        const groupKey = this.GetThumbnailGroupKey(prefix, key);
+        if (
+          groupKey &&
+          !foldersUsed.has(groupKey) &&
+          foldersUsed.size >= this.DirectoryThumbnailMaxFolders
+        ) {
+          continue;
+        }
+        if (groupKey) {
+          if (!foldersUsed.has(groupKey)) {
+            foldersUsed.add(groupKey);
+            folderOrder.push(groupKey);
+            folderBuckets.set(groupKey, []);
+          }
+          const bucket = folderBuckets.get(groupKey);
+          if (bucket && bucket.length < this.DirectoryThumbnailLimit) {
+            bucket.push(
+              await this.BuildObjectModel(
+                content,
+                User,
+                false,
+                IsSignedUrlProcessing,
+              ),
+            );
+          }
+          continue;
+        }
+
+        if (!foldersUsed.has('root')) {
+          foldersUsed.add('root');
+          folderOrder.push('root');
+          folderBuckets.set('root', []);
+        }
+        const rootBucket = folderBuckets.get('root');
+        if (rootBucket && rootBucket.length < this.DirectoryThumbnailLimit) {
+          rootBucket.push(
+            await this.BuildObjectModel(
+              content,
+              User,
+              false,
+              IsSignedUrlProcessing,
+            ),
+          );
+        }
+      }
+
+      if (
+        totalBucketItems() >= this.DirectoryThumbnailLimit &&
+        foldersUsed.size >= this.DirectoryThumbnailMaxFolders
+      ) {
+        break;
+      }
+
+      if (!command.IsTruncated) {
+        break;
+      }
+      continuationToken = command.NextContinuationToken;
+    }
+
+    while (thumbnails.length < this.DirectoryThumbnailLimit) {
+      let added = false;
+      for (const folderKey of folderOrder) {
+        const bucket = folderBuckets.get(folderKey);
+        if (!bucket || bucket.length === 0) {
+          continue;
+        }
+        const item = bucket.shift();
+        if (item) {
+          thumbnails.push(item);
+          added = true;
+          if (thumbnails.length >= this.DirectoryThumbnailLimit) {
+            break;
+          }
+        }
+      }
+      if (!added) {
+        break;
+      }
+    }
+
+    const ttlSeconds = IsSignedUrlProcessing
+      ? Math.min(
+          this.DirectoryThumbnailCacheTTLSeconds,
+          Math.max(1, this.PresignedUrlExpirySeconds - 60),
+        )
+      : this.DirectoryThumbnailCacheTTLSeconds;
+    await this.RedisService.set(cacheKey, thumbnails, ttlSeconds);
+
+    return thumbnails;
+  }
+
+  private BuildDirectoryThumbnailCacheKey(
+    userId: string,
+    directoryPrefix: string,
+    isSigned: boolean,
+  ): string {
+    const mode = isSigned ? 'signed' : 'public';
+    return `cloud:dir-thumbnails:${mode}:${userId}:${directoryPrefix}`;
+  }
+
+  async InvalidateDirectoryThumbnailCache(
+    userId: string,
+    directoryPath: string,
+  ): Promise<void> {
+    const normalized = NormalizeDirectoryPath(directoryPath);
+    if (!normalized) {
+      return;
+    }
+    const ancestors = this.GetDirectoryAncestors(normalized);
+    for (const path of ancestors) {
+      await this.RedisService.del(
+        this.BuildDirectoryThumbnailCacheKey(userId, path, false),
+      );
+      await this.RedisService.del(
+        this.BuildDirectoryThumbnailCacheKey(userId, path, true),
+      );
+    }
+  }
+
+  async InvalidateThumbnailCacheForObjectKey(
+    userId: string,
+    objectKey: string,
+  ): Promise<void> {
+    const parent = this.GetParentDirectoryPath(objectKey);
+    if (!parent) {
+      return;
+    }
+    await this.InvalidateDirectoryThumbnailCache(userId, parent);
+  }
+
+  private GetDirectoryAncestors(path: string): string[] {
+    const normalized = NormalizeDirectoryPath(path);
+    if (!normalized) {
+      return [];
+    }
+    const parts = normalized.split('/').filter((part) => !!part);
+    const ancestors: string[] = [];
+    for (let i = parts.length; i >= 1; i -= 1) {
+      ancestors.push(parts.slice(0, i).join('/'));
+    }
+    return ancestors;
+  }
+
+  private GetParentDirectoryPath(path: string): string {
+    const normalized = NormalizeDirectoryPath(path);
+    if (!normalized) {
+      return '';
+    }
+    const parts = normalized.split('/').filter((part) => !!part);
+    if (parts.length <= 1) {
+      return '';
+    }
+    parts.pop();
+    return parts.join('/');
+  }
+
+  private GetThumbnailGroupKey(
+    prefix: string,
+    objectKey: string,
+  ): string | null {
+    if (!objectKey.startsWith(prefix)) {
+      return null;
+    }
+    const relative = objectKey.slice(prefix.length);
+    const parts = relative.split('/').filter((part) => !!part);
+    if (parts.length <= 1) {
+      return 'root';
+    }
+    return parts[0];
   }
 
   private ReplaceSignedUrlHost(url: string): string {

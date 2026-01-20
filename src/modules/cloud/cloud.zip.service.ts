@@ -31,6 +31,7 @@ import {
 } from './cloud.utils';
 import { RedisService } from '@modules/redis/redis.service';
 import { CloudUsageService } from './cloud.usage.service';
+import { CloudListService } from './cloud.list.service';
 
 type ZipExtractJobData = {
   userId: string;
@@ -111,6 +112,7 @@ export class CloudZipService implements OnModuleInit, OnModuleDestroy {
     private readonly CloudS3Service: CloudS3Service,
     private readonly CloudMetadataService: CloudMetadataService,
     private readonly CloudUsageService: CloudUsageService,
+    private readonly CloudListService: CloudListService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -309,6 +311,11 @@ export class CloudZipService implements OnModuleInit, OnModuleDestroy {
           return cancelled === true;
         },
       });
+
+      await this.CloudListService.InvalidateDirectoryThumbnailCache(
+        user.id,
+        extractedPrefix,
+      );
 
       return { extractedPath: extractedPrefix };
     } finally {

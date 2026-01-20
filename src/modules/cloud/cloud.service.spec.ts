@@ -231,9 +231,12 @@ describe('CloudService Update', () => {
     let call = 0;
     s3.send.mockImplementation((cmd: any) => {
       if (cmd instanceof ListObjectsV2Command) {
-        call++;
-        if (call === 1) return Promise.resolve(page1);
-        return Promise.resolve(page2);
+        const prefix = cmd.input?.Prefix;
+        if (prefix === 'user-id/') {
+          call++;
+          return Promise.resolve(call === 1 ? page1 : page2);
+        }
+        return Promise.resolve({ Contents: [], IsTruncated: false });
       }
       return Promise.resolve({});
     });

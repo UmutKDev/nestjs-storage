@@ -330,6 +330,18 @@ export class CloudService {
       { SourceKeys, DestinationKey },
       User,
     );
+    for (const sourceKey of SourceKeys) {
+      await this.CloudListService.InvalidateThumbnailCacheForObjectKey(
+        User.id,
+        sourceKey,
+      );
+    }
+    if (DestinationKey) {
+      await this.CloudListService.InvalidateDirectoryThumbnailCache(
+        User.id,
+        DestinationKey,
+      );
+    }
     await this.SetIdempotentResult(
       User.id,
       'move',
@@ -367,6 +379,10 @@ export class CloudService {
           item.Key,
           User,
         );
+        await this.CloudListService.InvalidateDirectoryThumbnailCache(
+          User.id,
+          item.Key,
+        );
         continue;
       }
       try {
@@ -392,6 +408,12 @@ export class CloudService {
         { Items: files },
         User,
       );
+      for (const file of files) {
+        await this.CloudListService.InvalidateThumbnailCacheForObjectKey(
+          User.id,
+          file.Key,
+        );
+      }
       await this.CloudUsageService.DecrementUsage(User.id, bytesToDecrement);
       await this.SetIdempotentResult(
         User.id,
@@ -413,7 +435,12 @@ export class CloudService {
     { Key }: CloudKeyRequestModel,
     User: UserContext,
   ): Promise<boolean> {
-    return this.CloudDirectoryService.CreateDirectory({ Key }, User);
+    const result = await this.CloudDirectoryService.CreateDirectory(
+      { Key },
+      User,
+    );
+    await this.CloudListService.InvalidateDirectoryThumbnailCache(User.id, Key);
+    return result;
   }
 
   async RenameDirectory(
@@ -421,11 +448,24 @@ export class CloudService {
     User: UserContext,
     options?: { allowEncryptedDirectories?: boolean },
   ): Promise<boolean> {
-    return this.CloudDirectoryService.RenameDirectory(
+    const result = await this.CloudDirectoryService.RenameDirectory(
       { Key, Name },
       User,
       options,
     );
+    await this.CloudListService.InvalidateDirectoryThumbnailCache(
+      User.id,
+      Key,
+    );
+    if (Name) {
+      const parent = this.GetParentDirectoryPath(Key);
+      const renamedPath = parent ? `${parent}/${Name}` : Name;
+      await this.CloudListService.InvalidateDirectoryThumbnailCache(
+        User.id,
+        renamedPath,
+      );
+    }
+    return result;
   }
 
   async GetEncryptedFolderSet(User: UserContext): Promise<Set<string>> {
@@ -559,6 +599,10 @@ export class CloudService {
     await this.CloudUsageService.IncrementUsage(User.id, uploadedSize);
     await this.EnsureUploadedObjectWithinLimits(Key, User, uploadedSize);
     await this.CloudScanService.EnqueueScan(User.id, Key);
+    await this.CloudListService.InvalidateThumbnailCacheForObjectKey(
+      User.id,
+      Key,
+    );
     await this.SetIdempotentResult(
       User.id,
       'upload-complete',
@@ -614,7 +658,15 @@ export class CloudService {
     { Key, Name, Metadata }: CloudUpdateRequestModel,
     User: UserContext,
   ): Promise<CloudObjectModel> {
-    return this.CloudObjectService.Update({ Key, Name, Metadata }, User);
+    const result = await this.CloudObjectService.Update(
+      { Key, Name, Metadata },
+      User,
+    );
+    await this.CloudListService.InvalidateThumbnailCacheForObjectKey(
+      User.id,
+      Key,
+    );
+    return result;
   }
 
   //#endregion
@@ -636,11 +688,16 @@ export class CloudService {
     sessionToken?: string,
   ): Promise<DirectoryResponseModel> {
     await this.EnsureDirectoryAccess(Path, User.id, sessionToken);
-    return this.CloudDirectoryService.DirectoryCreate(
+    const result = await this.CloudDirectoryService.DirectoryCreate(
       { Path, IsEncrypted },
       passphrase,
       User,
     );
+    await this.CloudListService.InvalidateDirectoryThumbnailCache(
+      User.id,
+      Path,
+    );
+    return result;
   }
 
   /**
@@ -653,11 +710,24 @@ export class CloudService {
     sessionToken?: string,
   ): Promise<DirectoryResponseModel> {
     await this.EnsureDirectoryAccess(Path, User.id, sessionToken);
-    return this.CloudDirectoryService.DirectoryRename(
+    const result = await this.CloudDirectoryService.DirectoryRename(
       { Path, Name },
       passphrase,
       User,
     );
+    await this.CloudListService.InvalidateDirectoryThumbnailCache(
+      User.id,
+      Path,
+    );
+    if (Name) {
+      const parent = this.GetParentDirectoryPath(Path);
+      const renamedPath = parent ? `${parent}/${Name}` : Name;
+      await this.CloudListService.InvalidateDirectoryThumbnailCache(
+        User.id,
+        renamedPath,
+      );
+    }
+    return result;
   }
 
   /**
@@ -670,11 +740,16 @@ export class CloudService {
     sessionToken?: string,
   ): Promise<boolean> {
     await this.EnsureDirectoryAccess(Path, User.id, sessionToken);
-    return this.CloudDirectoryService.DirectoryDelete(
+    const result = await this.CloudDirectoryService.DirectoryDelete(
       { Path },
       passphrase,
       User,
     );
+    await this.CloudListService.InvalidateDirectoryThumbnailCache(
+      User.id,
+      Path,
+    );
+    return result;
   }
 
   /**
@@ -686,11 +761,16 @@ export class CloudService {
     passphrase: string | undefined,
     User: UserContext,
   ): Promise<DirectoryUnlockResponseModel> {
-    return this.CloudDirectoryService.DirectoryUnlock(
+    const result = await this.CloudDirectoryService.DirectoryUnlock(
       { Path },
       passphrase,
       User,
     );
+    await this.CloudListService.InvalidateDirectoryThumbnailCache(
+      User.id,
+      Path,
+    );
+    return result;
   }
 
   /**
@@ -700,7 +780,15 @@ export class CloudService {
     { Path }: DirectoryLockRequestModel,
     User: UserContext,
   ): Promise<boolean> {
-    return this.CloudDirectoryService.DirectoryLock({ Path }, User);
+    const result = await this.CloudDirectoryService.DirectoryLock(
+      { Path },
+      User,
+    );
+    await this.CloudListService.InvalidateDirectoryThumbnailCache(
+      User.id,
+      Path,
+    );
+    return result;
   }
 
   /**
@@ -713,11 +801,16 @@ export class CloudService {
     sessionToken?: string,
   ): Promise<DirectoryResponseModel> {
     await this.EnsureDirectoryAccess(Path, User.id, sessionToken);
-    return this.CloudDirectoryService.DirectoryConvertToEncrypted(
+    const result = await this.CloudDirectoryService.DirectoryConvertToEncrypted(
       { Path },
       passphrase,
       User,
     );
+    await this.CloudListService.InvalidateDirectoryThumbnailCache(
+      User.id,
+      Path,
+    );
+    return result;
   }
 
   /**
@@ -730,11 +823,16 @@ export class CloudService {
     sessionToken?: string,
   ): Promise<DirectoryResponseModel> {
     await this.EnsureDirectoryAccess(Path, User.id, sessionToken);
-    return this.CloudDirectoryService.DirectoryDecrypt(
+    const result = await this.CloudDirectoryService.DirectoryDecrypt(
       { Path },
       passphrase,
       User,
     );
+    await this.CloudListService.InvalidateDirectoryThumbnailCache(
+      User.id,
+      Path,
+    );
+    return result;
   }
 
   //#endregion

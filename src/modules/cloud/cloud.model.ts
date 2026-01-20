@@ -47,27 +47,6 @@ export class CloudPathModel {
   Url: string;
 }
 
-export class CloudDirectoryModel {
-  @Expose()
-  @ApiProperty()
-  Name: string;
-
-  @Expose()
-  @ApiProperty()
-  Prefix: string;
-
-  @Expose()
-  @ApiProperty({ default: false })
-  IsEncrypted?: boolean = false;
-
-  @Expose()
-  @ApiProperty({
-    default: true,
-    description: 'True if encrypted folder is locked (no valid session)',
-  })
-  IsLocked?: boolean = true;
-}
-
 export class CloudMetadataDefaultModel {
   @Expose()
   @ApiProperty()
@@ -116,6 +95,32 @@ export class CloudObjectModel {
   @Expose()
   @ApiProperty()
   Size: number;
+}
+
+export class CloudDirectoryModel {
+  @Expose()
+  @ApiProperty()
+  Name: string;
+
+  @Expose()
+  @ApiProperty()
+  Prefix: string;
+
+  @Expose()
+  @ApiProperty({ default: false })
+  IsEncrypted?: boolean = false;
+
+  @Expose()
+  @ApiProperty({
+    default: true,
+    description: 'True if encrypted folder is locked (no valid session)',
+  })
+  IsLocked?: boolean = true;
+
+  @Expose()
+  @ApiProperty({ required: false, type: CloudObjectModel, isArray: true })
+  @Type(() => CloudObjectModel)
+  Thumbnails?: Array<CloudObjectModel> = [];
 }
 
 export class CloudViewModel {
