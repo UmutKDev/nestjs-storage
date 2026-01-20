@@ -20,6 +20,10 @@ WORKDIR /usr/src/app
 
 COPY yarn.lock package*.json ./
 
-COPY --from=development /usr/src/app/ ./
+RUN yarn install --production=false
+
+COPY . .
+
+RUN yarn run build && rm -rf node_modules && yarn install --production --frozen-lockfile && yarn run sentry:sourcemaps
 
 ENTRYPOINT ["node", "dist/main"]
