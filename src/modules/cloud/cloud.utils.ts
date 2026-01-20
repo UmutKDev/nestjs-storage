@@ -30,6 +30,15 @@ export const NormalizeZipEntryPath = (entryPath: string): string | null => {
   if (!segments.length) {
     return null;
   }
+  if (segments[0] === '__MACOSX') {
+    return null;
+  }
+  if (segments.some((segment) => segment === '.DS_Store')) {
+    return null;
+  }
+  if (segments.some((segment) => segment.startsWith('._'))) {
+    return null;
+  }
   if (segments.some((segment) => segment === '.' || segment === '..')) {
     return null;
   }
