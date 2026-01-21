@@ -43,10 +43,7 @@ export class CloudListService {
   private readonly DirectoryThumbnailMaxFolders = 4;
   private readonly DirectoryThumbnailCacheTTLSeconds = Math.max(
     1,
-    parseInt(
-      process.env.CLOUD_LIST_THUMBNAIL_CACHE_TTL_SECONDS ?? '86400',
-      10,
-    ),
+    parseInt(process.env.CLOUD_LIST_THUMBNAIL_CACHE_TTL_SECONDS ?? '86400', 10),
   );
   private readonly EmptyFolderPlaceholder = '.emptyFolderPlaceholder';
   private readonly IsSignedUrlProcessing =
@@ -556,18 +553,12 @@ export class CloudListService {
       contentType = head.ContentType;
     }
 
-    const ObjectCommand = new GetObjectCommand({
-      Bucket: this.CloudS3Service.GetBuckets().Storage,
-      Key: content.Key,
-    });
-
-    const SignedUrl = IsSignedUrlProcessing
-      ? this.ReplaceSignedUrlHost(
-          await getSignedUrl(this.CloudS3Service.GetClient(), ObjectCommand, {
-            expiresIn: this.PresignedUrlExpirySeconds,
-          }),
-        )
-      : this.CloudS3Service.GetPublicEndpoint() + '/' + content.Key;
+    const SignedUrl = await this.SignedUrlBuilder(
+      content,
+      IsSignedUrlProcessing,
+      this.CloudS3Service,
+      this.PresignedUrlExpirySeconds,
+    );
 
     const Name = content.Key?.split('/').pop();
     const Extension = Name?.includes('.') ? Name.split('.').pop() : '';
@@ -580,7 +571,7 @@ export class CloudListService {
         'application/octet-stream',
       Path: {
         Host: this.CloudS3Service.GetPublicHostname(),
-        Key: content.Key.replace('' + User.id + '/', ''),
+        Key: this.CloudS3Service.GetKey(content.Key!, User.id),
         Url: SignedUrl,
       },
       Metadata: metadata,
@@ -832,5 +823,27 @@ export class CloudListService {
     } catch {
       return url;
     }
+  }
+
+  async SignedUrlBuilder(
+    content: _Object,
+    IsSignedUrlProcessing: boolean,
+    CloudS3Service: CloudS3Service,
+    PresignedUrlExpirySeconds: number,
+  ): Promise<string> {
+    const ObjectCommand = new GetObjectCommand({
+      Bucket: CloudS3Service.GetBuckets().Storage,
+      Key: content.Key,
+    });
+
+    if (IsSignedUrlProcessing) {
+      return this.ReplaceSignedUrlHost(
+        await getSignedUrl(CloudS3Service.GetClient(), ObjectCommand, {
+          expiresIn: PresignedUrlExpirySeconds,
+        }),
+      );
+    }
+
+    return CloudS3Service.GetUrl(content.Key!);
   }
 }

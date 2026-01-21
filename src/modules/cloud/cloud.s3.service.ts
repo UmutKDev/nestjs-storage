@@ -28,6 +28,14 @@ export class CloudS3Service {
     return url.hostname;
   }
 
+  GetKey(key: string, userId: string): string {
+    return key.replace('' + userId + '/', '');
+  }
+
+  GetUrl(key: string): string {
+    return `${this.PublicEndpoint}/${this.Buckets.Storage}/${key}`;
+  }
+
   IsNotFoundError(error: { name?: string } | undefined): boolean {
     const code = error?.name;
     return !!code && this.NotFoundErrorCodes.includes(code);
