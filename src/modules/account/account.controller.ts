@@ -9,10 +9,6 @@ import {
 } from './account.model';
 import { User } from '@common/decorators/user.decorator';
 import { AuthenticationService } from '../authentication/authentication.service';
-import {
-  AuthenticationTwoFactorGenerateResponseModel,
-  AuthenticationTwoFactorVerifyRequestModel,
-} from '../authentication/authentication.model';
 
 @Controller('Account')
 @ApiTags('Account')
@@ -47,39 +43,6 @@ export class AccountController {
     @Body() model: AccountChangePasswordRequestModel,
   ): Promise<boolean> {
     return await this.accountService.ChangePassword({ user, model });
-  }
-
-  @Post('TwoFactor/Generate')
-  @ApiSuccessResponse(AuthenticationTwoFactorGenerateResponseModel)
-  @ApiOperation({ summary: 'Generate a new 2FA secret for the current user' })
-  async GenerateTwoFactorSecret(
-    @User() user: UserContext,
-  ): Promise<AuthenticationTwoFactorGenerateResponseModel> {
-    return this.authenticationService.GenerateTwoFactorSecret({ user });
-  }
-
-  @Post('TwoFactor/Enable')
-  @ApiSuccessResponse('boolean')
-  @ApiOperation({
-    summary: 'Confirm the 2FA secret and enable mandatory token checks',
-  })
-  async EnableTwoFactor(
-    @User() user: UserContext,
-    @Body() body: AuthenticationTwoFactorVerifyRequestModel,
-  ): Promise<boolean> {
-    return this.authenticationService.EnableTwoFactor({ user, body });
-  }
-
-  @Post('TwoFactor/Disable')
-  @ApiSuccessResponse('boolean')
-  @ApiOperation({
-    summary: 'Disable 2FA after validating the authenticator code',
-  })
-  async DisableTwoFactor(
-    @User() user: UserContext,
-    @Body() body: AuthenticationTwoFactorVerifyRequestModel,
-  ): Promise<boolean> {
-    return this.authenticationService.DisableTwoFactor({ user, body });
   }
 
   // @Post('Upload/Image')

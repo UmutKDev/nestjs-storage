@@ -55,7 +55,6 @@ export class JwtAuthenticationGuard extends AuthGuard('jwt') {
         status: true,
         lastLoginAt: true,
         image: true,
-        isTwoFactorEnabled: true,
       },
     });
 
@@ -71,7 +70,6 @@ export class JwtAuthenticationGuard extends AuthGuard('jwt') {
       status: foundUser.status,
       lastLogin: foundUser.lastLoginAt,
       image: foundUser.image,
-      isTwoFactorEnabled: foundUser.isTwoFactorEnabled,
     } as UserContext;
 
     return true;

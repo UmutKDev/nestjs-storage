@@ -47,10 +47,6 @@ export class UserViewModel implements UserEntity {
   image: string;
 
   @Expose()
-  @ApiProperty({ default: false })
-  isTwoFactorEnabled: boolean;
-
-  @Expose()
   @ApiProperty({ enum: Role, default: Role.USER })
   role: string;
 
@@ -80,7 +76,6 @@ export class UserBodyRequestModel extends OmitType(UserViewModel, [
   'id',
   'password',
   'date',
-  'isTwoFactorEnabled',
 ] as const) {}
 
 export class UserPostBodyRequestModel extends UserBodyRequestModel {

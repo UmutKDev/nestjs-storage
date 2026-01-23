@@ -25,7 +25,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       status: payload.status,
       lastLogin: payload.lastLogin,
       image: payload.image,
-      isTwoFactorEnabled: payload.isTwoFactorEnabled,
     };
   }
 }

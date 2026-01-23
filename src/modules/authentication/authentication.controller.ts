@@ -8,8 +8,6 @@ import {
   AuthenticationSignInRequestModel,
   AuthenticationSignUpRequestModel,
   AuthenticationTokenResponseModel,
-  AuthenticationVerifyCredentialsRequestModel,
-  AuthenticationVerifyCredentialsResponseModel,
 } from './authentication.model';
 import { Public } from '@common/decorators/public.decorator';
 import { Request } from 'express';
@@ -30,18 +28,6 @@ export class AuthenticationController {
     @Req() request: Request,
   ): Promise<AuthenticationTokenResponseModel> {
     return this.authenticationService.Login(body, request);
-  }
-
-  @Post('VerifyCredentials')
-  @ApiSuccessResponse(AuthenticationVerifyCredentialsResponseModel)
-  @Public()
-  @ApiOperation({
-    summary: 'Check whether the provided email/password pair is valid and if 2FA applies',
-  })
-  async VerifyCredentials(
-    @Body() body: AuthenticationVerifyCredentialsRequestModel,
-  ): Promise<AuthenticationVerifyCredentialsResponseModel> {
-    return this.authenticationService.VerifyCredentials(body);
   }
 
   @Post('Register')
@@ -92,5 +78,4 @@ export class AuthenticationController {
   ): Promise<boolean> {
     return this.authenticationService.ResetPassword({ email });
   }
-
 }

@@ -53,7 +53,6 @@ export class RefreshTokenStrategy extends PassportStrategy(
       status: payload.status,
       lastLogin: payload.lastLogin,
       image: payload.image,
-      isTwoFactorEnabled: payload.isTwoFactorEnabled,
     };
   }
 }

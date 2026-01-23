@@ -9,10 +9,6 @@ import {
   AuthenticationSignInRequestModel,
   AuthenticationSignUpRequestModel,
   AuthenticationTokenResponseModel,
-  AuthenticationTwoFactorGenerateResponseModel,
-  AuthenticationTwoFactorVerifyRequestModel,
-  AuthenticationVerifyCredentialsRequestModel,
-  AuthenticationVerifyCredentialsResponseModel,
   JWTPayloadModel,
   JWTTokenDecodeResponseModel,
 } from './authentication.model';
@@ -37,74 +33,10 @@ export class AuthenticationService {
     private mailService: MailService,
   ) {}
 
-  private getTwoFactorIssuer(): string {
-    return process.env.APP_NAME || 'Storage';
-  }
-
-  private ensureTwoFactorCodeIfRequired(
-    user: Pick<UserEntity, 'isTwoFactorEnabled' | 'twoFactorSecret'>,
-    token?: string,
-  ): void {
-    if (!user.isTwoFactorEnabled) {
-      return;
-    }
-
-    if (!user.twoFactorSecret) {
-      throw new HttpException(Codes.Error.TwoFactor.NOT_SETUP, 400);
-    }
-
-    if (!token) {
-      throw new HttpException(Codes.Error.TwoFactor.REQUIRED, 403);
-    }
-
-    const isValid = authenticator.verify({
-      token,
-      secret: user.twoFactorSecret,
-    });
-
-    if (!isValid) {
-      throw new HttpException(Codes.Error.TwoFactor.INVALID, 403);
-    }
-  }
-
-  private async getUserWithTwoFactorSecret(
-    userId: string,
-  ): Promise<UserEntity> {
-    return this.userRepository
-      .createQueryBuilder('user')
-      .select([
-        'user.id',
-        'user.email',
-        'user.isTwoFactorEnabled',
-        'user.role',
-        'user.status',
-      ])
-      .addSelect('user.twoFactorSecret')
-      .where('user.id = :userId', { userId })
-      .getOneOrFail()
-      .catch((error: Error) => {
-        if (
-          error.name === Codes.Error.Database.EntityMetadataNotFoundError ||
-          error.name === Codes.Error.Database.EntityNotFoundError
-        ) {
-          throw new HttpException(Codes.Error.User.NOT_FOUND, 404);
-        }
-
-        throw error;
-      });
-  }
-
   private buildJwtPayload(
     user: Pick<
       UserEntity,
-      | 'id'
-      | 'fullName'
-      | 'email'
-      | 'role'
-      | 'status'
-      | 'lastLoginAt'
-      | 'image'
-      | 'isTwoFactorEnabled'
+      'id' | 'fullName' | 'email' | 'role' | 'status' | 'lastLoginAt' | 'image'
     >,
     loginDate?: Date | null,
   ): JWTPayloadModel {
@@ -116,12 +48,11 @@ export class AuthenticationService {
       status: user.status,
       lastLogin: loginDate ?? user.lastLoginAt,
       image: user.image,
-      isTwoFactorEnabled: user.isTwoFactorEnabled,
     };
   }
 
   async Login(
-    { email, password, twoFactorCode }: AuthenticationSignInRequestModel,
+    { email, password }: AuthenticationSignInRequestModel,
     request?: Request,
   ): Promise<AuthenticationTokenResponseModel> {
     const queryBuilder = this.userRepository
@@ -135,9 +66,7 @@ export class AuthenticationService {
         'user.status',
         'user.lastLoginAt',
         'user.image',
-        'user.isTwoFactorEnabled',
       ])
-      .addSelect('user.twoFactorSecret')
       .where('user.email = :email', { email });
 
     const user = await queryBuilder.getOneOrFail().catch((error: Error) => {
@@ -160,8 +89,6 @@ export class AuthenticationService {
       throw new HttpException(Codes.Error.User.SUSPENDED, 403);
     }
 
-    this.ensureTwoFactorCodeIfRequired(user, twoFactorCode);
-
     const loginDate = user.role !== Role.ADMIN ? null : new Date();
 
     if (loginDate) {
@@ -183,45 +110,6 @@ export class AuthenticationService {
     const payload = this.buildJwtPayload(user, loginDate);
 
     return this.generateTokens(payload, request);
-  }
-
-  async VerifyCredentials({
-    email,
-    password,
-  }: AuthenticationVerifyCredentialsRequestModel): Promise<AuthenticationVerifyCredentialsResponseModel> {
-    const defaultResponse = plainToInstance(
-      AuthenticationVerifyCredentialsResponseModel,
-      {
-        isValid: false,
-        twoFactorRequired: false,
-      },
-    );
-
-    const user = await this.userRepository
-      .createQueryBuilder('user')
-      .select(['user.id', 'user.status', 'user.isTwoFactorEnabled'])
-      .addSelect('user.password')
-      .where('user.email = :email', { email })
-      .getOne()
-      .catch(() => null);
-
-    if (!user) {
-      return defaultResponse;
-    }
-
-    const isPasswordValid = await argon2.verify(user.password, password);
-    if (!isPasswordValid) {
-      return defaultResponse;
-    }
-
-    if (user.status === Status.SUSPENDED || user.status === Status.INACTIVE) {
-      return defaultResponse;
-    }
-
-    return plainToInstance(AuthenticationVerifyCredentialsResponseModel, {
-      isValid: true,
-      twoFactorRequired: user.isTwoFactorEnabled,
-    });
   }
 
   async RefreshToken({
@@ -288,7 +176,6 @@ export class AuthenticationService {
         status: user.status,
         lastLogin: user.lastLoginAt,
         image: user.image,
-        isTwoFactorEnabled: user.isTwoFactorEnabled,
       };
 
       return this.generateTokens(newPayload, request);
@@ -316,7 +203,6 @@ export class AuthenticationService {
         password: password,
         status: Status.ACTIVE,
         role: Role.USER,
-        isTwoFactorEnabled: false,
       });
 
       // await this.mailService.sendMail({
@@ -338,7 +224,6 @@ export class AuthenticationService {
         status: newUser.status,
         lastLogin: newUser.lastLoginAt,
         image: newUser.image,
-        isTwoFactorEnabled: newUser.isTwoFactorEnabled,
       };
 
       await queryRunner.commitTransaction();
@@ -507,105 +392,5 @@ export class AuthenticationService {
     }
 
     return user;
-  }
-
-  async GenerateTwoFactorSecret({
-    user,
-  }: {
-    user: UserContext;
-  }): Promise<AuthenticationTwoFactorGenerateResponseModel> {
-    const existingUser = await this.getUserWithTwoFactorSecret(user.id);
-
-    if (existingUser.isTwoFactorEnabled) {
-      throw new HttpException(Codes.Error.TwoFactor.ALREADY_ENABLED, 400);
-    }
-
-    const secret = authenticator.generateSecret();
-    const otpauthUrl = authenticator.keyuri(
-      existingUser.email,
-      this.getTwoFactorIssuer(),
-      secret,
-    );
-
-    await this.userRepository.update(existingUser.id, {
-      twoFactorSecret: secret,
-      isTwoFactorEnabled: false,
-    });
-
-    return plainToInstance(AuthenticationTwoFactorGenerateResponseModel, {
-      secret,
-      otpauthUrl,
-    });
-  }
-
-  async EnableTwoFactor({
-    user,
-    body,
-  }: {
-    user: UserContext;
-    body: AuthenticationTwoFactorVerifyRequestModel;
-  }): Promise<boolean> {
-    const existingUser = await this.getUserWithTwoFactorSecret(user.id);
-
-    if (existingUser.isTwoFactorEnabled) {
-      throw new HttpException(Codes.Error.TwoFactor.ALREADY_ENABLED, 400);
-    }
-
-    if (!existingUser.twoFactorSecret) {
-      throw new HttpException(Codes.Error.TwoFactor.SECRET_NOT_FOUND, 400);
-    }
-
-    const isValid = authenticator.verify({
-      token: body.code,
-      secret: existingUser.twoFactorSecret,
-    });
-
-    if (!isValid) {
-      throw new HttpException(Codes.Error.TwoFactor.INVALID, 400);
-    }
-
-    await this.userRepository.update(existingUser.id, {
-      isTwoFactorEnabled: true,
-    });
-
-    await this.RevokeAllUserTokens(existingUser.id);
-
-    return true;
-  }
-
-  async DisableTwoFactor({
-    user,
-    body,
-  }: {
-    user: UserContext;
-    body: AuthenticationTwoFactorVerifyRequestModel;
-  }): Promise<boolean> {
-    const existingUser = await this.getUserWithTwoFactorSecret(user.id);
-
-    if (!existingUser.isTwoFactorEnabled) {
-      throw new HttpException(Codes.Error.TwoFactor.NOT_ENABLED, 400);
-    }
-
-    if (!existingUser.twoFactorSecret) {
-      throw new HttpException(Codes.Error.TwoFactor.SECRET_NOT_FOUND, 400);
-    }
-
-    const isValid = authenticator.verify({
-      token: body.code,
-      secret: existingUser.twoFactorSecret,
-    });
-
-    if (!isValid) {
-      throw new HttpException(Codes.Error.TwoFactor.INVALID, 400);
-    }
-
-    await this.userRepository.update(existingUser.id, {
-      isTwoFactorEnabled: false,
-      twoFactorSecret: null,
-    });
-
-    await this.RevokeAllUserTokens(existingUser.id);
-
-    return true;
   }
 }

@@ -101,7 +101,6 @@ export declare global {
     email: string;
     role: Role;
     status: Status;
-    isTwoFactorEnabled?: boolean;
   }
 
   interface Request {
@@ -156,17 +155,6 @@ export declare global {
 
       const enum Subscription {
         NOT_FOUND = 'SU-001',
-      }
-
-      const enum TwoFactor {
-        REQUIRED = 'TF-001',
-        INVALID = 'TF-002',
-        NOT_SETUP = 'TF-003',
-        ALREADY_ENABLED = 'TF-004',
-        NOT_ENABLED = 'TF-005',
-        SECRET_NOT_FOUND = 'TF-006',
-        INVALID_CODE_FORMAT = 'TF-007',
-        INVALID_CHALLENGE = 'TF-008',
       }
     }
   }
