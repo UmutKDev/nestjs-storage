@@ -809,7 +809,7 @@ export class CloudListService {
   }
 
   private ReplaceSignedUrlHost(url: string): string {
-    const publicEndpoint = process.env.STORAGE_S3_PUBLIC_ENDPOINT;
+    const publicEndpoint = process.env.S3_PUBLIC_ENDPOINT;
     if (!publicEndpoint) {
       return url;
     }

@@ -9,7 +9,7 @@ export class CloudS3Service {
     Photos: 'Photos',
   };
 
-  private readonly PublicEndpoint = process.env.STORAGE_S3_PUBLIC_ENDPOINT;
+  private readonly PublicEndpoint = process.env.S3_PUBLIC_ENDPOINT;
 
   private readonly NotFoundErrorCodes = ['NoSuchKey', 'NotFound'];
 

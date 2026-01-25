@@ -36,11 +36,11 @@ export declare global {
       S3_PROTOCOL_ACCESS_KEY_SECRET?: string;
       S3_PROTOCOL_SIGNED_URL_PROCESSING?: string;
 
-      STORAGE_S3_MAX_SOCKETS?: string;
-      STORAGE_S3_ENDPOINT?: string;
-      STORAGE_S3_PUBLIC_ENDPOINT?: string;
-      STORAGE_S3_FORCE_PATH_STYLE?: string;
-      STORAGE_S3_REGION?: string;
+      S3_MAX_SOCKETS?: string;
+      S3_ENDPOINT?: string;
+      S3_PUBLIC_ENDPOINT?: string;
+      S3_FORCE_PATH_STYLE?: string;
+      S3_REGION?: string;
 
       // Redis Configuration
       REDIS_HOSTNAME: string;

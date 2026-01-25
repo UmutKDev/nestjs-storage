@@ -71,7 +71,7 @@ export const SizeFormatter = ({
 };
 
 export const CDNPathResolver = (path: string): string => {
-  return path ? process.env.STORAGE_S3_PUBLIC_ENDPOINT + '/' + path : path;
+  return path ? process.env.S3_PUBLIC_ENDPOINT + '/' + path : path;
 };
 
 export const IsImageFile = (name: string): boolean => {
