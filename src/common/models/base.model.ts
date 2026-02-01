@@ -10,61 +10,61 @@ export class BaseStatusModel {
     type: 'string',
     default: ['OK'],
   })
-  messages: Array<string>;
+  Messages: Array<string>;
   @ApiProperty({
     default: 200,
   })
-  code: number;
+  Code: number;
   @ApiProperty()
-  timestamp: string;
+  Timestamp: string;
   @ApiProperty()
-  path: string;
+  Path: string;
 }
 
 export class BaseResponseModel<T> {
   @ApiProperty()
-  result: T;
+  Result: T;
 
   @ApiProperty()
-  status: BaseStatusModel;
+  Status: BaseStatusModel;
 }
 
 export class ArrayResponseModel<T> {
   @ApiProperty()
-  options: PaginationResponseModel;
+  Options: PaginationResponseModel;
 
   @ApiProperty({
     isArray: true,
     type: Array<T>,
   })
-  items: Array<T>;
+  Items: Array<T>;
 }
 
 export class BaseDateModel {
   @ApiProperty()
-  created: Date;
+  Created: Date;
 
   @ApiProperty()
-  updated: Date;
+  Updated: Date;
 }
 
 export class BaseCreateModel {
   @ApiProperty()
-  created: Date;
+  Created: Date;
 }
 
 export class BaseAuthorModel {
   @Expose()
   @ApiProperty()
-  created: UserEntity;
+  Created: UserEntity;
 
   @Expose()
   @ApiProperty()
-  modified: UserEntity;
+  Modified: UserEntity;
 }
 
 export class BaseIdRequestModel {
   @ApiProperty({ format: 'uuid' })
   @IsUUID()
-  id: string;
+  Id: string;
 }

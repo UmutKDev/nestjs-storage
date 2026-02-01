@@ -1,5 +1,4 @@
 import { BaseDateModel } from '@common/models/base.model';
-import { UserEntity } from '@entities//user.entity';
 import { ApiProperty, OmitType } from '@nestjs/swagger';
 import { IsEmail, IsOptional, IsPhoneNumber, IsString } from 'class-validator';
 import { Role, Status } from '@common/enums';
@@ -11,61 +10,61 @@ import { UserSubscriptionEntity } from '@entities/user-subscription.entity';
 export class UserDateModel extends BaseDateModel {
   @ApiProperty()
   @Expose()
-  lastLogin: Date;
+  LastLogin: Date;
 }
 
-export class UserViewModel implements UserEntity {
+export class UserViewModel {
   @Expose()
   @ApiProperty({ format: 'uuid' })
-  id: string;
+  Id: string;
 
   @Expose()
   @ApiProperty({
     format: 'email',
   })
   @IsEmail()
-  email: string;
+  Email: string;
 
   @Expose()
   @ApiProperty()
   @IsString()
-  fullName: string;
+  FullName: string;
 
   @Expose()
   @ApiProperty()
   @IsPhoneNumber('TR')
-  phoneNumber: string;
+  PhoneNumber: string;
 
   @ApiProperty()
-  password: string;
+  Password: string;
 
   @Expose()
   @ApiProperty()
   @Transform(({ value }) => CDNPathResolver(value), {
     toClassOnly: true,
   })
-  image: string;
+  Image: string;
 
   @Expose()
   @ApiProperty({ enum: Role, default: Role.USER })
-  role: string;
+  Role: string;
 
   @Expose()
   @ApiProperty({ enum: Status })
-  status: string;
+  Status: string;
 
   @Expose()
   @ApiProperty({ type: UserSubscriptionResponseModel })
   @Type(() => UserSubscriptionResponseModel)
-  subscription: UserSubscriptionEntity;
+  Subscription: UserSubscriptionEntity;
 
   @Expose()
   @ApiProperty({ type: UserDateModel })
-  date: UserDateModel;
+  Date: UserDateModel;
 }
 
 export class UserResponseModel extends OmitType(UserViewModel, [
-  'password',
+  'Password',
 ] as const) {}
 
 export class UserListResponseModel extends UserResponseModel {}
@@ -73,34 +72,34 @@ export class UserListResponseModel extends UserResponseModel {}
 export class UserFindResponseModel extends UserResponseModel {}
 
 export class UserBodyRequestModel extends OmitType(UserViewModel, [
-  'id',
-  'password',
-  'date',
+  'Id',
+  'Password',
+  'Date',
 ] as const) {}
 
 export class UserPostBodyRequestModel extends UserBodyRequestModel {
   @IsOptional()
-  fullName: string;
+  FullName: string;
 
   @IsOptional()
-  role: Role;
+  Role: Role;
 
   @IsOptional()
-  status: Status;
+  Status: Status;
 }
 
 export class UserPutBodyRequestModel extends OmitType(UserBodyRequestModel, [
-  'email',
+  'Email',
 ] as const) {
   @IsOptional()
-  fullName: string;
+  FullName: string;
 
   @IsOptional()
-  phoneNumber: string;
+  PhoneNumber: string;
 
   @IsOptional()
-  role: Role;
+  Role: Role;
 
   @IsOptional()
-  status: Status;
+  Status: Status;
 }

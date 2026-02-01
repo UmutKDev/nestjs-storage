@@ -66,11 +66,11 @@ export class UserController {
   @Put('Edit/:id')
   @ApiSuccessResponse('boolean')
   async Edit(
-    @Param() { id }: BaseIdRequestModel,
+    @Param() { Id }: BaseIdRequestModel,
     @Body() model: UserPutBodyRequestModel,
   ): Promise<boolean> {
     return await this.userService.Edit({
-      id,
+      id: Id,
       model: model,
     });
   }

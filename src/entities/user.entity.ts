@@ -15,45 +15,45 @@ import { UserDateModel } from 'src/modules/user/user.model';
 @Entity({ name: 'User' })
 export class UserEntity {
   @PrimaryGeneratedColumn('uuid')
-  id: string;
+  Id: string;
 
   @Index({ fulltext: true })
   @Column({ unique: true })
-  email: string;
+  Email: string;
 
   @Index({ fulltext: true })
   @Column({ nullable: true, default: null })
-  fullName: string;
+  FullName: string;
 
   @Index({ fulltext: true })
   @Column({ nullable: true, default: null })
-  phoneNumber: string;
+  PhoneNumber: string;
 
   @Column({ select: false })
-  password: string;
+  Password: string;
 
   @Column({ nullable: true, default: null })
-  image: string;
+  Image: string;
 
   @Column({
     type: 'enum',
     enum: Role,
     default: Role.USER,
   })
-  role: string;
+  Role: string;
 
   @Column({
     type: 'enum',
     enum: Status,
     default: Status.PENDING,
   })
-  status: string;
+  Status: string;
 
-  get date(): UserDateModel {
+  get Date(): UserDateModel {
     return {
-      created: this.createdAt,
-      updated: this.updatedAt,
-      lastLogin: this.lastLoginAt,
+      Created: this.CreatedAt,
+      Updated: this.UpdatedAt,
+      LastLogin: this.LastLoginAt,
     };
   }
 
@@ -61,20 +61,20 @@ export class UserEntity {
     type: 'timestamp',
     nullable: true,
   })
-  lastLoginAt?: Date;
+  LastLoginAt?: Date;
 
   @CreateDateColumn()
-  createdAt?: Date;
+  CreatedAt?: Date;
 
   @UpdateDateColumn()
-  updatedAt?: Date;
+  UpdatedAt?: Date;
 
   @DeleteDateColumn()
-  deletedAt?: Date;
+  DeletedAt?: Date;
 
   // user subscription (current only)
-  @OneToOne(() => UserSubscriptionEntity, (us) => us.user)
-  subscription?: UserSubscriptionEntity;
+  @OneToOne(() => UserSubscriptionEntity, (us) => us.User)
+  Subscription?: UserSubscriptionEntity;
 
   constructor(partial: Partial<UserEntity>) {
     Object.assign(this, partial);

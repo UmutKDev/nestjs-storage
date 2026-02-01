@@ -186,7 +186,7 @@ export class CloudZipService implements OnModuleInit, OnModuleDestroy {
 
     const job = await this.ZipExtractQueue.add('extract', {
       key: Key,
-      userId: User.id,
+      userId: User.Id,
     });
 
     return plainToInstance(CloudExtractZipStartResponseModel, {
@@ -204,7 +204,7 @@ export class CloudZipService implements OnModuleInit, OnModuleDestroy {
     if (!job) {
       throw new HttpException('Job not found.', HttpStatus.NOT_FOUND);
     }
-    if (job.data.userId !== User.id) {
+    if (job.data.userId !== User.Id) {
       throw new HttpException('Access denied.', HttpStatus.FORBIDDEN);
     }
 
@@ -231,7 +231,7 @@ export class CloudZipService implements OnModuleInit, OnModuleDestroy {
     if (!job) {
       throw new HttpException('Job not found.', HttpStatus.NOT_FOUND);
     }
-    if (job.data.userId !== User.id) {
+    if (job.data.userId !== User.Id) {
       throw new HttpException('Access denied.', HttpStatus.FORBIDDEN);
     }
 
@@ -299,7 +299,7 @@ export class CloudZipService implements OnModuleInit, OnModuleDestroy {
       throw new Error('Only .zip files can be extracted.');
     }
 
-    const user = { id: job.data.userId } as UserContext;
+    const user = { Id: job.data.userId } as UserContext;
 
     try {
       const extractedPrefix = await this.ExtractZipToFolder(key, user, {
@@ -313,7 +313,7 @@ export class CloudZipService implements OnModuleInit, OnModuleDestroy {
       });
 
       await this.CloudListService.InvalidateDirectoryThumbnailCache(
-        user.id,
+        user.Id,
         extractedPrefix,
       );
 
@@ -333,7 +333,7 @@ export class CloudZipService implements OnModuleInit, OnModuleDestroy {
       shouldCancel?: () => Promise<boolean> | boolean;
     },
   ): Promise<string> {
-    const sourceKey = KeyBuilder([User.id, key]);
+    const sourceKey = KeyBuilder([User.Id, key]);
     const extractPrefix = BuildZipExtractPrefix(key);
     const normalizedKey = (key || '').replace(/^\/+|\/+$/g, '');
     const keyParts = normalizedKey.split('/').filter((part) => !!part);
@@ -501,7 +501,7 @@ export class CloudZipService implements OnModuleInit, OnModuleDestroy {
             const task = this.CloudS3Service.Send(
               new PutObjectCommand({
                 Bucket: this.CloudS3Service.GetBuckets().Storage,
-                Key: KeyBuilder([User.id, directoryKey]),
+                Key: KeyBuilder([User.Id, directoryKey]),
                 Body: '',
               }),
             ).then(async () => {
@@ -527,14 +527,14 @@ export class CloudZipService implements OnModuleInit, OnModuleDestroy {
           const task = this.CloudS3Service.Send(
             new PutObjectCommand({
               Bucket: this.CloudS3Service.GetBuckets().Storage,
-              Key: KeyBuilder([User.id, targetKey]),
+              Key: KeyBuilder([User.Id, targetKey]),
               Body: entry,
               ContentType: contentType,
               ContentLength: contentLength,
             }),
           ).then(async () => {
             await this.CloudMetadataService.MetadataProcessor(
-              KeyBuilder([User.id, targetKey]),
+              KeyBuilder([User.Id, targetKey]),
             );
             await maybeReportProgress(effectivePath);
           });
@@ -566,7 +566,7 @@ export class CloudZipService implements OnModuleInit, OnModuleDestroy {
 
     if (totalUncompressedBytes > 0) {
       await this.CloudUsageService.IncrementUsage(
-        User.id,
+        User.Id,
         totalUncompressedBytes,
       );
     }

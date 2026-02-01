@@ -38,17 +38,17 @@ export class HttpExceptionFilter implements ExceptionFilter {
         : HttpStatus.INTERNAL_SERVER_ERROR;
 
     const statusResponse: BaseStatusModel = {
-      messages: httpMessage instanceof Array ? httpMessage : [httpMessage],
-      code: httpStatus,
-      timestamp: dayjs().utc().format(),
-      path: httpAdapter.getRequestUrl(ctx.getRequest()),
+      Messages: httpMessage instanceof Array ? httpMessage : [httpMessage],
+      Code: httpStatus,
+      Timestamp: dayjs().utc().format(),
+      Path: httpAdapter.getRequestUrl(ctx.getRequest()),
     };
 
     httpAdapter.reply(
       ctx.getResponse(),
       {
-        result: null,
-        status: statusResponse,
+        Result: null,
+        Status: statusResponse,
       },
       httpStatus,
     );

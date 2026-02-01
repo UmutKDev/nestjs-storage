@@ -15,7 +15,6 @@ import {
   SubscriptionPostBodyRequestModel,
   SubscriptionPutBodyRequestModel,
   SubscribeAsAdminRequestModel,
-  UserSubscriptionResponseModel,
 } from './subscription.model';
 import {
   ApiSuccessArrayResponse,
@@ -43,7 +42,7 @@ export class SubscriptionController {
   async Find(
     @Param() model: BaseIdRequestModel,
   ): Promise<SubscriptionFindResponseModel> {
-    return await this.subscriptionService.Find({ id: model.id });
+    return await this.subscriptionService.Find({ id: model.Id });
   }
 
   @Post('Create')
@@ -57,31 +56,31 @@ export class SubscriptionController {
   @Put('Edit/:id')
   @ApiSuccessResponse('boolean')
   async Edit(
-    @Param() { id }: BaseIdRequestModel,
+    @Param() { Id }: BaseIdRequestModel,
     @Body() model: SubscriptionPutBodyRequestModel,
   ): Promise<boolean> {
-    return await this.subscriptionService.Edit({ id, model });
+    return await this.subscriptionService.Edit({ id: Id, model });
   }
 
   @Delete('Delete/:id')
   @ApiSuccessResponse('boolean')
   async Delete(@Param() model: BaseIdRequestModel): Promise<boolean> {
-    return await this.subscriptionService.Delete({ id: model.id });
+    return await this.subscriptionService.Delete({ id: model.Id });
   }
 
   @Post('Assign')
   @ApiSuccessResponse('boolean')
   async Assign(@Body() model: SubscribeAsAdminRequestModel): Promise<boolean> {
     return await this.subscriptionService.SubscribeAsAdmin({
-      userId: model.userId,
-      subscriptionId: model.subscriptionId,
-      isTrial: model.isTrial,
+      userId: model.UserId,
+      subscriptionId: model.SubscriptionId,
+      isTrial: model.IsTrial,
     });
   }
 
   @Delete('Unsubscribe/:id')
   @ApiSuccessResponse('boolean')
   async Unsubscribe(@Param() model: BaseIdRequestModel): Promise<boolean> {
-    return await this.subscriptionService.Unsubscribe({ id: model.id });
+    return await this.subscriptionService.Unsubscribe({ id: model.Id });
   }
 }

@@ -82,7 +82,7 @@ export class CloudDirectoryService {
     await this.CloudS3Service.Send(
       new PutObjectCommand({
         Bucket: this.CloudS3Service.GetBuckets().Storage,
-        Key: KeyBuilder([User.id, directoryKey]),
+        Key: KeyBuilder([User.Id, directoryKey]),
         Body: '',
       }),
     );
@@ -156,10 +156,10 @@ export class CloudDirectoryService {
 
     const bucket = this.CloudS3Service.GetBuckets().Storage;
     const sourcePrefixFull = EnsureTrailingSlash(
-      KeyBuilder([User.id, sourcePath]),
+      KeyBuilder([User.Id, sourcePath]),
     );
     const targetPrefixFull = EnsureTrailingSlash(
-      KeyBuilder([User.id, normalizedTargetPath]),
+      KeyBuilder([User.Id, normalizedTargetPath]),
     );
 
     try {
@@ -421,7 +421,7 @@ export class CloudDirectoryService {
       return 0;
     }
 
-    const prefix = EnsureTrailingSlash(KeyBuilder([User.id, normalized]));
+    const prefix = EnsureTrailingSlash(KeyBuilder([User.Id, normalized]));
     let continuationToken: string | undefined = undefined;
     let totalBytes = 0;
 
@@ -457,7 +457,7 @@ export class CloudDirectoryService {
     } while (continuationToken);
 
     if (totalBytes > 0) {
-      await this.CloudUsageService.DecrementUsage(User.id, totalBytes);
+      await this.CloudUsageService.DecrementUsage(User.Id, totalBytes);
     }
 
     return totalBytes;
@@ -513,7 +513,7 @@ export class CloudDirectoryService {
       folderKey = this.DecryptFolderKey(passphrase, entry);
     } catch {
       this.Logger.warn(
-        `Failed to unlock encrypted folder ${normalizedPath} for user ${User.id}`,
+        `Failed to unlock encrypted folder ${normalizedPath} for user ${User.Id}`,
       );
       throw new HttpException('Invalid passphrase', HttpStatus.BAD_REQUEST);
     }
@@ -529,7 +529,7 @@ export class CloudDirectoryService {
       expiresAt,
     };
 
-    const cacheKey = this.BuildSessionKey(User.id, encryptedFolderPath);
+    const cacheKey = this.BuildSessionKey(User.Id, encryptedFolderPath);
     await this.RedisService.set(
       cacheKey,
       session,
@@ -537,7 +537,7 @@ export class CloudDirectoryService {
     );
 
     if (normalizedPath !== encryptedFolderPath) {
-      const childCacheKey = this.BuildSessionKey(User.id, normalizedPath);
+      const childCacheKey = this.BuildSessionKey(User.Id, normalizedPath);
       await this.RedisService.set(
         childCacheKey,
         session,
@@ -567,7 +567,7 @@ export class CloudDirectoryService {
     }
 
     await this.RedisService.delByPattern(
-      `encrypted-folder:session:${User.id}:${normalizedPath}*`,
+      `encrypted-folder:session:${User.Id}:${normalizedPath}*`,
     );
 
     return true;
@@ -604,7 +604,7 @@ export class CloudDirectoryService {
     const ensureTrailingSlash = (value: string): string =>
       value.endsWith('/') ? value : value + '/';
     const directoryPrefix = ensureTrailingSlash(
-      KeyBuilder([User.id, normalizedPath]),
+      KeyBuilder([User.Id, normalizedPath]),
     );
 
     const listResponse = await this.CloudS3Service.Send(
@@ -832,7 +832,7 @@ export class CloudDirectoryService {
   private async GetEncryptedFolderManifest(
     User: UserContext,
   ): Promise<EncryptedFolderManifest> {
-    const manifestKey = KeyBuilder([User.id, this.EncryptedFoldersManifestKey]);
+    const manifestKey = KeyBuilder([User.Id, this.EncryptedFoldersManifestKey]);
 
     try {
       const command = await this.CloudS3Service.Send(
@@ -895,7 +895,7 @@ export class CloudDirectoryService {
     User: UserContext,
     manifest: EncryptedFolderManifest,
   ): Promise<void> {
-    const manifestKey = KeyBuilder([User.id, this.EncryptedFoldersManifestKey]);
+    const manifestKey = KeyBuilder([User.Id, this.EncryptedFoldersManifestKey]);
 
     await this.CloudS3Service.Send(
       new PutObjectCommand({
@@ -976,6 +976,6 @@ export class CloudDirectoryService {
   private async GetEncryptedFolderManifestByUserId(
     userId: string,
   ): Promise<EncryptedFolderManifest> {
-    return this.GetEncryptedFolderManifest({ id: userId } as UserContext);
+    return this.GetEncryptedFolderManifest({ Id: userId } as UserContext);
   }
 }

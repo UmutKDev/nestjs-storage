@@ -5,6 +5,7 @@ import {
   CanActivate,
   ExecutionContext,
   UnauthorizedException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 
@@ -17,20 +18,32 @@ export class RoleGuard implements CanActivate {
       context.getHandler(),
       context.getClass(),
     ]);
+
     if (!requiredRoles) {
       return true;
     }
+
     const request = context.switchToHttp().getRequest();
-
-    if (request.route.path.includes('Authentication')) return true;
-
     const user = request.user;
 
-    if (!user) throw new UnauthorizedException();
+    if (!user) {
+      throw new UnauthorizedException('Authentication required');
+    }
 
-    if (user.status === Status.SUSPENDED || user.status === Status.INACTIVE)
-      throw new UnauthorizedException();
+    if (user.Status === Status.SUSPENDED) {
+      throw new ForbiddenException('Account suspended');
+    }
 
-    return requiredRoles.some((role) => user.role?.includes(role));
+    if (user.Status === Status.INACTIVE) {
+      throw new ForbiddenException('Account inactive');
+    }
+
+    const hasRole = requiredRoles.some((role) => user.Role?.includes(role));
+
+    if (!hasRole) {
+      throw new ForbiddenException('Insufficient permissions');
+    }
+
+    return true;
   }
 }

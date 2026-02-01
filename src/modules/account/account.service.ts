@@ -25,8 +25,8 @@ export class AccountService {
   }): Promise<AccountProfileResponseModel> {
     const query = await this.userRepository
       .findOneOrFail({
-        where: { id: user.id },
-        relations: ['subscription'],
+        where: { Id: user.Id },
+        relations: ['Subscription'],
       })
       .catch((error: Error) => {
         if (
@@ -39,9 +39,15 @@ export class AccountService {
       });
 
     const userQuery: AccountProfileResponseModel = {
-      ...query,
-      subscription: query.subscription,
-      date: query.date,
+      Id: query.Id,
+      Email: query.Email,
+      FullName: query.FullName,
+      PhoneNumber: query.PhoneNumber,
+      Image: query.Image,
+      Role: query.Role,
+      Status: query.Status,
+      Subscription: query.Subscription,
+      Date: query.Date,
     };
 
     return plainToInstance(AccountProfileResponseModel, userQuery);
@@ -55,19 +61,25 @@ export class AccountService {
     model: AccountPutBodyRequestModel;
   }): Promise<boolean> {
     const findedNumber = await this.userRepository.findOneBy({
-      phoneNumber: model.phoneNumber,
+      PhoneNumber: model.PhoneNumber,
     });
 
     if (
-      findedNumber?.phoneNumber &&
-      model.phoneNumber &&
-      findedNumber.id !== user.id
+      findedNumber?.PhoneNumber &&
+      model.PhoneNumber &&
+      findedNumber.Id !== user.Id
     ) {
       throw new HttpException('This phoneNumber number already exist', 400);
     }
 
     try {
-      await this.userRepository.update({ id: user.id }, model);
+      await this.userRepository.update(
+        { Id: user.Id },
+        {
+          FullName: model.FullName,
+          PhoneNumber: model.PhoneNumber,
+        },
+      );
 
       return true;
     } catch (error) {
@@ -84,8 +96,8 @@ export class AccountService {
   }): Promise<boolean> {
     const rUser = await this.userRepository
       .findOneOrFail({
-        where: { id: user.id },
-        select: ['id', 'password'],
+        where: { Id: user.Id },
+        select: ['Id', 'Password'],
       })
       .catch((error: Error) => {
         if (
@@ -98,8 +110,8 @@ export class AccountService {
       });
 
     const comparePassword = await argon2.verify(
-      rUser?.password,
-      model.current_password,
+      rUser?.Password,
+      model.CurrentPassword,
     );
 
     if (!comparePassword) {
@@ -107,8 +119,8 @@ export class AccountService {
     }
 
     await this.userRepository.update(
-      { id: user.id },
-      { password: model.new_password },
+      { Id: user.Id },
+      { Password: model.NewPassword },
     );
 
     return true;
@@ -123,14 +135,14 @@ export class AccountService {
   // }): Promise<string> {
   //   const uploadCloud = await this.uploadService
   //     .uploadOne({
-  //       userId: user.id,
+  //       userId: user.Id,
   //       name: 'image',
-  //       subPath: `${CloudPaths.USER}/${user.id}`,
+  //       subPath: `${CloudPaths.USER}/${user.Id}`,
   //       file: image,
   //     })
   //     .then(async (e) => {
   //       await this.userRepository.update(
-  //         { id: user.id },
+  //         { Id: user.Id },
   //         { image: e.path.key },
   //       );
   //       return e;

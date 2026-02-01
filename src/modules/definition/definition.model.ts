@@ -1,76 +1,75 @@
 import { BaseDateModel } from '@common/models/base.model';
 import { DefinitionGroupEntity } from '@entities//definition-group.entity';
-import { DefinitionEntity } from '@entities//definition.entity';
 import { ApiProperty, PickType } from '@nestjs/swagger';
 import { Expose, Type } from 'class-transformer';
 
-export class DefinitionViewModel implements DefinitionEntity {
+export class DefinitionViewModel {
   @Expose()
   @ApiProperty({ format: 'uuid' })
-  id: string;
+  Id: string;
 
   @Expose()
   @ApiProperty()
   // @Transform(({ value }) => slugify(value))
-  code: string;
+  Code: string;
 
   @Expose()
   @ApiProperty()
-  value: string;
+  Value: string;
 
   @Expose()
   @ApiProperty()
-  description: string;
+  Description: string;
 
   @Expose()
   @ApiProperty()
-  image: string;
+  Image: string;
 
   @Expose()
   @ApiProperty()
-  isDefault: boolean;
+  IsDefault: boolean;
 
   @Expose()
   @ApiProperty()
-  isSystem: boolean;
+  IsSystem: boolean;
 
   @Expose()
   @ApiProperty({ type: () => DefinitionDefinitionGroupResponseModel })
   @Type(() => DefinitionDefinitionGroupResponseModel)
-  definitionGroup: DefinitionGroupEntity;
+  DefinitionGroup: DefinitionGroupEntity;
 
   @Expose()
   @ApiProperty({ type: BaseDateModel })
-  date: BaseDateModel;
+  Date: BaseDateModel;
 }
 
-export class DefinitionGroupViewModel implements DefinitionGroupEntity {
+export class DefinitionGroupViewModel {
   @Expose()
   @ApiProperty({ format: 'uuid' })
-  id: string;
+  Id: string;
 
   @Expose()
   @ApiProperty()
-  code: string;
+  Code: string;
 
   @Expose()
   @ApiProperty()
-  description: string;
+  Description: string;
 
   @Expose()
   @ApiProperty()
-  isCommon: boolean;
+  IsCommon: boolean;
 
   @Expose()
   @ApiProperty({ type: BaseDateModel })
-  date: BaseDateModel;
+  Date: BaseDateModel;
 }
 
 export class DefinitionResponseModel extends DefinitionViewModel {}
 
 export class DefinitionDefinitionGroupResponseModel extends PickType(
   DefinitionResponseModel,
-  ['code'] as const,
+  ['Code'] as const,
 ) {}
 
 export class DefinitionGroupResponseModel extends DefinitionGroupViewModel {}

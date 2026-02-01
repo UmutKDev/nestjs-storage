@@ -16,43 +16,43 @@ import { BaseDateModel } from '@common/models/base.model';
 @Entity({ name: 'Definition' })
 export class DefinitionEntity {
   @PrimaryGeneratedColumn('uuid')
-  id: string;
+  Id: string;
 
   @Column({ unique: true, type: 'enum', enum: Definitions })
-  code: string;
+  Code: string;
 
   @Column()
-  value: string;
+  Value: string;
 
   @Column({ nullable: true, default: null })
-  description: string;
+  Description: string;
 
   @Column({ nullable: true, default: null })
-  image: string;
+  Image: string;
 
   @Column({ type: 'boolean', default: false })
-  isDefault: boolean;
+  IsDefault: boolean;
 
   @Column({ type: 'boolean', default: false })
-  isSystem: boolean;
+  IsSystem: boolean;
 
   @ManyToOne(() => DefinitionGroupEntity)
-  @JoinColumn()
-  definitionGroup: Relation<DefinitionGroupEntity>;
+  @JoinColumn({ name: 'DefinitionGroupId' })
+  DefinitionGroup: Relation<DefinitionGroupEntity>;
 
-  get date(): BaseDateModel {
+  get Date(): BaseDateModel {
     return {
-      created: this.createdAt,
-      updated: this.updatedAt,
+      Created: this.CreatedAt,
+      Updated: this.UpdatedAt,
     };
   }
 
   @CreateDateColumn()
-  createdAt?: Date;
+  CreatedAt?: Date;
 
   @UpdateDateColumn()
-  updatedAt?: Date;
+  UpdatedAt?: Date;
 
   @DeleteDateColumn()
-  deletedAt?: Date;
+  DeletedAt?: Date;
 }

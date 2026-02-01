@@ -1,196 +1,114 @@
 import { HttpException, Injectable } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
 import * as argon2 from 'argon2';
-import { authenticator } from 'otplib';
-import { jwtConstants } from './authentication.constants';
 import {
-  AuthenticationDecodeTokenBodyRequestModel,
-  AuthenticationRefreshTokenRequestModel,
-  AuthenticationSignInRequestModel,
-  AuthenticationSignUpRequestModel,
-  AuthenticationTokenResponseModel,
-  JWTPayloadModel,
-  JWTTokenDecodeResponseModel,
+  LoginRequestModel,
+  RegisterRequestModel,
+  ResetPasswordRequestModel,
+  AuthResponseModel,
+  SessionViewModel,
 } from './authentication.model';
 import { MailService } from '../mail/mail.service';
 import { passwordGenerator } from '@common/helpers/cast.helper';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { UserEntity } from '@entities/user.entity';
-import { RefreshTokenEntity } from '@entities/refresh-token.entity';
 import { Role, Status } from '@common/enums';
 import { Request } from 'express';
 import { plainToInstance } from 'class-transformer';
+import { SessionService } from './session/session.service';
+import { TwoFactorService } from './two-factor/two-factor.service';
+import { PasskeyService } from './passkey/passkey.service';
 
 @Injectable()
 export class AuthenticationService {
   constructor(
     @InjectRepository(UserEntity)
-    private userRepository: Repository<UserEntity>,
-    @InjectRepository(RefreshTokenEntity)
-    private refreshTokenRepository: Repository<RefreshTokenEntity>,
-    private jwtService: JwtService,
-    private mailService: MailService,
+    private readonly userRepository: Repository<UserEntity>,
+    private readonly sessionService: SessionService,
+    private readonly twoFactorService: TwoFactorService,
+    private readonly passkeyService: PasskeyService,
+    private readonly mailService: MailService,
   ) {}
 
-  private buildJwtPayload(
-    user: Pick<
-      UserEntity,
-      'id' | 'fullName' | 'email' | 'role' | 'status' | 'lastLoginAt' | 'image'
-    >,
-    loginDate?: Date | null,
-  ): JWTPayloadModel {
-    return {
-      id: user.id,
-      fullName: user.fullName,
-      email: user.email,
-      role: user.role,
-      status: user.status,
-      lastLogin: loginDate ?? user.lastLoginAt,
-      image: user.image,
-    };
-  }
-
   async Login(
-    { email, password }: AuthenticationSignInRequestModel,
+    { Email, Password }: LoginRequestModel,
     request?: Request,
-  ): Promise<AuthenticationTokenResponseModel> {
-    const queryBuilder = this.userRepository
+  ): Promise<AuthResponseModel> {
+    const user = await this.userRepository
       .createQueryBuilder('user')
       .select([
-        'user.id',
-        'user.role',
-        'user.fullName',
-        'user.email',
-        'user.password',
-        'user.status',
-        'user.lastLoginAt',
-        'user.image',
+        'user.Id',
+        'user.Role',
+        'user.FullName',
+        'user.Email',
+        'user.Password',
+        'user.Status',
+        'user.LastLoginAt',
+        'user.Image',
       ])
-      .where('user.email = :email', { email });
+      .where('user.Email = :email', { email: Email })
+      .getOneOrFail()
+      .catch((error: Error) => {
+        if (
+          error.name === Codes.Error.Database.EntityMetadataNotFoundError ||
+          error.name === Codes.Error.Database.EntityNotFoundError
+        )
+          throw new HttpException(Codes.Error.User.NOT_FOUND, 400);
 
-    const user = await queryBuilder.getOneOrFail().catch((error: Error) => {
-      if (
-        error.name === Codes.Error.Database.EntityMetadataNotFoundError ||
-        error.name === Codes.Error.Database.EntityNotFoundError
-      )
-        throw new HttpException(Codes.Error.User.NOT_FOUND, 400);
+        throw error;
+      });
 
-      throw error;
-    });
-
-    const comparePassword = await argon2.verify(user?.password, password);
+    const comparePassword = await argon2.verify(user?.Password, Password);
 
     if (!comparePassword) {
       throw new HttpException(Codes.Error.User.NOT_FOUND, 400);
     }
 
-    if (user.status === Status.SUSPENDED) {
+    if (user.Status === Status.SUSPENDED) {
       throw new HttpException(Codes.Error.User.SUSPENDED, 403);
     }
 
-    const loginDate = user.role !== Role.ADMIN ? null : new Date();
+    const loginDate = user.Role !== Role.ADMIN ? null : new Date();
 
     if (loginDate) {
       await this.userRepository.update(
-        { id: user.id },
-        { lastLoginAt: loginDate },
+        { Id: user.Id },
+        { LastLoginAt: loginDate },
       );
-      user.lastLoginAt = loginDate;
+      user.LastLoginAt = loginDate;
     }
 
-    if (user.status === Status.PENDING) {
+    if (user.Status === Status.PENDING) {
       await this.userRepository.update(
-        { id: user.id },
-        { status: Status.ACTIVE },
+        { Id: user.Id },
+        { Status: Status.ACTIVE },
       );
-      user.status = Status.ACTIVE;
+      user.Status = Status.ACTIVE;
     }
 
-    const payload = this.buildJwtPayload(user, loginDate);
+    const requires2FA = await this.twoFactorService.isTwoFactorEnabled(user.Id);
 
-    return this.generateTokens(payload, request);
-  }
+    const ipAddress = request?.ip || request?.socket?.remoteAddress || '';
+    const userAgent = request?.headers['user-agent'] || '';
 
-  async RefreshToken({
-    refreshToken,
-    request,
-  }: {
-    refreshToken: AuthenticationRefreshTokenRequestModel['refreshToken'];
-    request?: Request;
-  }): Promise<AuthenticationTokenResponseModel> {
-    try {
-      // Verify refresh token
-      const payload = await this.jwtService.verifyAsync(refreshToken, {
-        secret: jwtConstants.refreshSecret,
-      });
+    const { SessionId, Session } = await this.sessionService.createSession(
+      user,
+      ipAddress,
+      userAgent,
+      requires2FA,
+    );
 
-      // Get all non-revoked tokens for this user and verify hash
-      const storedTokens = await this.refreshTokenRepository.find({
-        where: { userId: payload.id, isRevoked: false },
-      });
-
-      let storedRefreshToken = null;
-      for (const token of storedTokens) {
-        const isValid = await argon2.verify(token.token, refreshToken);
-        if (isValid) {
-          storedRefreshToken = token;
-          break;
-        }
-      }
-
-      if (!storedRefreshToken) {
-        throw new HttpException('Invalid refresh token', 401);
-      }
-
-      // Check if refresh token is expired
-      if (new Date() > storedRefreshToken.expiresAt) {
-        await this.refreshTokenRepository.update(
-          { id: storedRefreshToken.id },
-          { isRevoked: true },
-        );
-        throw new HttpException('Refresh token expired', 401);
-      }
-
-      // Get user data
-      const user = await this.userRepository.findOne({
-        where: { id: payload.id },
-      });
-
-      if (!user || user.status === Status.SUSPENDED) {
-        throw new HttpException('User not found or suspended', 401);
-      }
-
-      // Revoke old refresh token
-      await this.refreshTokenRepository.update(
-        { id: storedRefreshToken.id },
-        { isRevoked: true },
-      );
-
-      // Generate new tokens
-      const newPayload: JWTPayloadModel = {
-        id: user.id,
-        fullName: user.fullName,
-        email: user.email,
-        role: user.role,
-        status: user.status,
-        lastLogin: user.lastLoginAt,
-        image: user.image,
-      };
-
-      return this.generateTokens(newPayload, request);
-    } catch (error) {
-      if (error instanceof HttpException) {
-        throw error;
-      }
-      throw new HttpException('Invalid refresh token', 401);
-    }
+    return plainToInstance(AuthResponseModel, {
+      SessionId: SessionId,
+      ExpiresAt: Session.ExpiresAt,
+      RequiresTwoFactor: requires2FA,
+    });
   }
 
   async Register(
-    { email, password }: AuthenticationSignUpRequestModel,
+    { Email, Password }: RegisterRequestModel,
     request?: Request,
-  ): Promise<AuthenticationTokenResponseModel> {
+  ): Promise<AuthResponseModel> {
     const queryRunner =
       this.userRepository.manager.connection.createQueryRunner();
 
@@ -199,36 +117,30 @@ export class AuthenticationService {
 
     try {
       const newUser = new UserEntity({
-        email: email,
-        password: password,
-        status: Status.ACTIVE,
-        role: Role.USER,
+        Email: Email,
+        Password: Password,
+        Status: Status.ACTIVE,
+        Role: Role.USER,
       });
 
-      // await this.mailService.sendMail({
-      //   to: newUser.email,
-      //   subject: 'QR Menüye Hoşgeldin',
-      //   text: `Şifren: ${password}`,
-      //   html: WelcomeTemplate()
-      //     .replace('{Username}', newUser.email)
-      //     .replace('{Password}', password),
-      // });
-
       await queryRunner.manager.save(newUser);
-
-      const payload: JWTPayloadModel = {
-        id: newUser.id,
-        fullName: newUser.fullName,
-        email: newUser.email,
-        role: newUser.role,
-        status: newUser.status,
-        lastLogin: newUser.lastLoginAt,
-        image: newUser.image,
-      };
-
       await queryRunner.commitTransaction();
 
-      return this.generateTokens(payload, request);
+      const ipAddress = request?.ip || request?.socket?.remoteAddress || '';
+      const userAgent = request?.headers['user-agent'] || '';
+
+      const { SessionId, Session } = await this.sessionService.createSession(
+        newUser,
+        ipAddress,
+        userAgent,
+        false,
+      );
+
+      return plainToInstance(AuthResponseModel, {
+        SessionId: SessionId,
+        ExpiresAt: Session.ExpiresAt,
+        RequiresTwoFactor: false,
+      });
     } catch (error) {
       await queryRunner.rollbackTransaction();
       if (error.code === Codes.Error.Database.EntityConflictError) {
@@ -240,105 +152,51 @@ export class AuthenticationService {
     }
   }
 
-  private async generateTokens(
-    payload: JWTPayloadModel,
-    request?: Request,
-  ): Promise<AuthenticationTokenResponseModel> {
-    const [accessToken, refreshToken] = await Promise.all([
-      this.jwtService.signAsync(payload, {
-        secret: jwtConstants.secret,
-        expiresIn: jwtConstants.accessTokenExpiresIn,
-        subject: payload.id,
-      }),
-      this.jwtService.signAsync(payload, {
-        secret: jwtConstants.refreshSecret,
-        expiresIn: jwtConstants.refreshTokenExpiresIn,
-        subject: payload.id,
-      }),
-    ]);
-
-    // Store refresh token hash in database for security
-    const hashedToken = await argon2.hash(refreshToken);
-
-    const refreshTokenEntity = new RefreshTokenEntity({
-      token: hashedToken,
-      userId: payload.id,
-      expiresAt: new Date(Date.now() + jwtConstants.refreshTokenExpiresIn),
-      userAgent: request?.headers['user-agent'],
-      ipAddress: request?.ip || request?.socket?.remoteAddress,
-    });
-
-    await this.refreshTokenRepository.save(refreshTokenEntity);
-
-    const response: AuthenticationTokenResponseModel = {
-      accessToken,
-      refreshToken,
-      expiresIn: jwtConstants.accessTokenExpiresIn,
-    };
-
-    return plainToInstance(AuthenticationTokenResponseModel, response);
-  }
-
-  async RevokeRefreshToken(refreshToken: string): Promise<boolean> {
-    // Get all non-revoked tokens and find matching hash
-    const storedTokens = await this.refreshTokenRepository.find({
-      where: { isRevoked: false },
-    });
-
-    for (const token of storedTokens) {
-      try {
-        const isValid = await argon2.verify(token.token, refreshToken);
-        if (isValid) {
-          await this.refreshTokenRepository.update(
-            { id: token.id },
-            { isRevoked: true },
-          );
-          return true;
-        }
-      } catch (error) {
-        // Invalid hash format, skip
-        continue;
-      }
-    }
-
-    return false;
-  }
-
-  async RevokeAllUserTokens(userId: string): Promise<boolean> {
-    await this.refreshTokenRepository.update(
-      { userId, isRevoked: false },
-      { isRevoked: true },
-    );
+  async Logout(sessionId: string): Promise<boolean> {
+    await this.sessionService.revokeSession(sessionId);
     return true;
   }
 
-  async CleanupExpiredTokens(): Promise<number> {
-    const result = await this.refreshTokenRepository
-      .createQueryBuilder()
-      .delete()
-      .from(RefreshTokenEntity)
-      .where('expires_at < :now', { now: new Date() })
-      .execute();
-
-    return result.affected || 0;
+  async LogoutAll(userId: string): Promise<number> {
+    return this.sessionService.revokeAllUserSessions(userId);
   }
 
-  async DecodeToken({
-    token,
-  }: AuthenticationDecodeTokenBodyRequestModel): Promise<JWTTokenDecodeResponseModel> {
-    try {
-      return this.jwtService.verifyAsync(token, {
-        secret: jwtConstants.secret,
-      });
-    } catch (error) {
-      throw new HttpException(error, 400);
+  async LogoutOthers(
+    userId: string,
+    currentSessionId: string,
+  ): Promise<number> {
+    return this.sessionService.revokeOtherSessions(userId, currentSessionId);
+  }
+
+  async GetSessions(
+    userId: string,
+    currentSessionId?: string,
+  ): Promise<SessionViewModel[]> {
+    const sessions = await this.sessionService.getUserSessions(
+      userId,
+      currentSessionId,
+    );
+
+    return sessions.map((session) =>
+      plainToInstance(SessionViewModel, session),
+    );
+  }
+
+  async RevokeSession(userId: string, sessionId: string): Promise<boolean> {
+    const session = await this.sessionService.getSession(sessionId);
+
+    if (!session || session.UserId !== userId) {
+      throw new HttpException('Session not found', 404);
     }
+
+    await this.sessionService.revokeSession(sessionId);
+    return true;
   }
 
-  async ResetPassword({ email }): Promise<boolean> {
+  async ResetPassword({ Email }: ResetPasswordRequestModel): Promise<boolean> {
     const user = await this.userRepository
       .findOneOrFail({
-        where: { email },
+        where: { Email: Email },
       })
       .catch((error: Error) => {
         if (
@@ -353,15 +211,14 @@ export class AuthenticationService {
     const generatedPassword = passwordGenerator(12);
 
     await this.userRepository.update(
-      { id: user.id },
-      { password: generatedPassword },
+      { Id: user.Id },
+      { Password: generatedPassword },
     );
 
-    // Revoke all refresh tokens for this user
-    await this.RevokeAllUserTokens(user.id);
+    await this.sessionService.revokeAllUserSessions(user.Id);
 
     this.mailService.sendMail({
-      to: user.email,
+      to: user.Email,
       subject: 'Reset Password',
       text: `Your new password: ${generatedPassword}`,
     });
@@ -369,28 +226,61 @@ export class AuthenticationService {
     return true;
   }
 
-  async validateUser({
-    email,
-    password,
-  }: AuthenticationSignInRequestModel): Promise<UserEntity> {
+  async ValidateUser({
+    Email,
+    Password,
+  }: LoginRequestModel): Promise<UserEntity> {
     const user = await this.userRepository.findOne({
-      where: { email },
+      where: { Email: Email },
     });
 
-    const comparePassword = await argon2.verify(user?.password, password);
+    if (!user) {
+      throw new HttpException(Codes.Error.User.NOT_FOUND, 400);
+    }
+
+    const comparePassword = await argon2.verify(user?.Password, Password);
 
     if (!comparePassword) {
       throw new HttpException(Codes.Error.Password.WRONG, 400);
     }
 
-    if (user.status === Status.INACTIVE) {
+    if (user.Status === Status.INACTIVE) {
       throw new HttpException(Codes.Error.User.INACTIVE, 403);
     }
 
-    if (user.status === Status.SUSPENDED) {
+    if (user.Status === Status.SUSPENDED) {
       throw new HttpException(Codes.Error.User.SUSPENDED, 403);
     }
 
     return user;
+  }
+
+  async Verify2FA(sessionId: string, code: string): Promise<AuthResponseModel> {
+    const session = await this.sessionService.getSession(sessionId);
+
+    if (!session) {
+      throw new HttpException('Invalid session', 401);
+    }
+
+    if (!session.TwoFactorPending) {
+      throw new HttpException('Two-factor verification not required', 400);
+    }
+
+    const isValid = await this.twoFactorService.verifyCode(
+      session.UserId,
+      code,
+    );
+
+    if (!isValid) {
+      throw new HttpException('Invalid verification code', 400);
+    }
+
+    await this.sessionService.completeTwoFactorVerification(sessionId);
+
+    return plainToInstance(AuthResponseModel, {
+      SessionId: sessionId,
+      ExpiresAt: session.ExpiresAt,
+      RequiresTwoFactor: false,
+    });
   }
 }

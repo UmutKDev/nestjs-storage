@@ -32,20 +32,20 @@ export class CloudUsageService {
   async GetDownloadSpeedBytesPerSec(User: UserContext): Promise<number> {
     const userSubscription = await this.UserSubscriptionRepository.findOne({
       where: {
-        user: {
-          id: User.id,
+        User: {
+          Id: User.Id,
         },
       },
-      relations: ['subscription'],
+      relations: ['Subscription'],
     });
 
-    if (!userSubscription || !userSubscription.subscription) {
+    if (!userSubscription || !userSubscription.Subscription) {
       return this.DefaultDownloadSpeedBytesPerSec;
     }
 
-    const sub = userSubscription.subscription;
-    if (sub.features && typeof sub.features === 'object') {
-      const raw = (sub.features as Record<string, never>)[
+    const sub = userSubscription.Subscription;
+    if (sub.Features && typeof sub.Features === 'object') {
+      const raw = (sub.Features as Record<string, never>)[
         'downloadSpeedBytesPerSec'
       ];
       if (typeof raw === 'number' && raw > 0) {
@@ -53,8 +53,8 @@ export class CloudUsageService {
       }
     }
 
-    if (sub.slug && this.DefaultDownloadSpeeds[sub.slug]) {
-      return this.DefaultDownloadSpeeds[sub.slug];
+    if (sub.Slug && this.DefaultDownloadSpeeds[sub.Slug]) {
+      return this.DefaultDownloadSpeeds[sub.Slug];
     }
 
     return this.DefaultDownloadSpeedBytesPerSec;
@@ -65,33 +65,34 @@ export class CloudUsageService {
   ): Promise<CloudUserStorageUsageResponseModel> {
     const userSubscription = await this.UserSubscriptionRepository.findOne({
       where: {
-        user: {
-          id: User.id,
+        User: {
+          Id: User.Id,
         },
       },
+      relations: ['Subscription'],
     });
 
-    if (!userSubscription || !userSubscription?.subscription) {
+    if (!userSubscription || !userSubscription?.Subscription) {
       throw new HttpException(Codes.Error.Subscription.NOT_FOUND, 404);
     }
 
-    const totalSize = await this.GetOrSeedUsage(User.id);
+    const totalSize = await this.GetOrSeedUsage(User.Id);
 
     return plainToInstance(CloudUserStorageUsageResponseModel, {
       UsedStorageInBytes: totalSize,
       MaxStorageInBytes: userSubscription
-        ? userSubscription.subscription.storageLimitBytes
+        ? userSubscription.Subscription.StorageLimitBytes
         : null,
       IsLimitExceeded: userSubscription
-        ? userSubscription.subscription.storageLimitBytes !== null &&
-          totalSize > userSubscription.subscription.storageLimitBytes
+        ? userSubscription.Subscription.StorageLimitBytes !== null &&
+          totalSize > userSubscription.Subscription.StorageLimitBytes
         : false,
       UsagePercentage:
-        userSubscription && userSubscription.subscription.storageLimitBytes
-          ? (totalSize / userSubscription.subscription.storageLimitBytes) * 100
+        userSubscription && userSubscription.Subscription.StorageLimitBytes
+          ? (totalSize / userSubscription.Subscription.StorageLimitBytes) * 100
           : null,
       MaxUploadSizeBytes:
-        userSubscription.subscription.maxUploadSizeBytes ||
+        userSubscription.Subscription.MaxUploadSizeBytes ||
         this.MaxObjectSizeBytes,
     });
   }

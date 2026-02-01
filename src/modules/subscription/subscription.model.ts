@@ -9,72 +9,71 @@ import {
   IsUUID,
 } from 'class-validator';
 import { BaseDateModel } from '@common/models/base.model';
-import { SubscriptionEntity } from '@entities/subscription.entity';
 import { BillingCycle, SubscriptionStatus } from '@common/enums';
 
 export class SubscriptionDateModel extends BaseDateModel {}
 
-export class SubscriptionViewModel implements SubscriptionEntity {
+export class SubscriptionViewModel {
   @Expose()
   @ApiProperty({ format: 'uuid' })
-  id: string;
+  Id: string;
 
   @Expose()
   @ApiProperty()
   @IsString()
-  name: string;
+  Name: string;
 
   @Expose()
   @ApiProperty()
   @IsString()
-  slug: string;
+  Slug: string;
 
   @Expose()
   @ApiProperty({ required: false })
   @IsOptional()
-  description?: string;
+  Description?: string;
 
   @Expose()
   @ApiProperty({ description: 'Price in cents' })
   @IsInt()
   @IsPositive()
-  price: number;
+  Price: number;
 
   @Expose()
   @ApiProperty({ default: 'USD' })
   @IsString()
-  currency: string;
+  Currency: string;
 
   @Expose()
   @ApiProperty({ enum: BillingCycle })
-  billingCycle: string;
+  BillingCycle: string;
 
   @Expose()
   @ApiProperty({ description: 'Storage limit in bytes - 0 means unlimited' })
   @IsInt()
-  storageLimitBytes: number;
+  StorageLimitBytes: number;
 
   @Expose()
   @ApiProperty({ required: false })
   @IsOptional()
-  maxObjectCount?: number | null;
+  MaxObjectCount?: number | null;
 
   @Expose()
   @ApiProperty({ required: false })
   @IsOptional()
-  features?: Record<string, unknown> | null;
+  Features?: Record<string, unknown> | null;
 
   @Expose()
   @ApiProperty({ enum: SubscriptionStatus })
-  status: string;
+  Status: string;
 
   @Expose()
   @ApiProperty({ type: SubscriptionDateModel })
-  date: SubscriptionDateModel;
+  Date: SubscriptionDateModel;
 }
 
 export class SubscriptionResponseModel extends OmitType(SubscriptionViewModel, [
-  'price',
+  'Price',
 ] as const) {}
 
 export class SubscriptionListResponseModel extends SubscriptionResponseModel {}
@@ -83,14 +82,14 @@ export class SubscriptionFindResponseModel extends SubscriptionResponseModel {}
 
 export class SubscriptionBodyRequestModel extends OmitType(
   SubscriptionViewModel,
-  ['id', 'date'] as const,
+  ['Id', 'Date'] as const,
 ) {}
 
 export class SubscriptionPostBodyRequestModel extends SubscriptionBodyRequestModel {}
 
 export class SubscriptionPutBodyRequestModel extends OmitType(
   SubscriptionBodyRequestModel,
-  ['slug'] as const,
+  ['Slug'] as const,
 ) {}
 
 /* -------------------------------------------- */
@@ -100,75 +99,75 @@ export class SubscriptionPutBodyRequestModel extends OmitType(
 export class UserSubscriptionViewModel {
   @Expose()
   @ApiProperty({ format: 'uuid' })
-  id: string;
+  Id: string;
 
   @Expose()
   @ApiProperty({ format: 'uuid' })
-  userId: string;
+  UserId: string;
 
   @Expose()
   @ApiProperty({ format: 'uuid' })
-  subscriptionId: string;
+  SubscriptionId: string;
 
   @Expose()
   @ApiProperty()
-  startAt: Date;
+  StartAt: Date;
 
   @Expose()
   @ApiProperty({ required: false })
-  endAt?: Date | null;
+  EndAt?: Date | null;
 
   @Expose()
   @ApiProperty()
-  isTrial: boolean;
+  IsTrial: boolean;
 
   @Expose()
   @ApiProperty({ description: 'Price as cents' })
-  price: number;
+  Price: number;
 
   @Expose()
   @ApiProperty({ required: false })
-  currency?: string;
+  Currency?: string;
 
   @Expose()
   @ApiProperty({ required: false })
-  providerSubscriptionId?: string | null;
+  ProviderSubscriptionId?: string | null;
 
   @Expose()
   @ApiProperty({ required: false, type: SubscriptionResponseModel })
   @Type(() => SubscriptionResponseModel)
-  subscription?: SubscriptionResponseModel;
+  Subscription?: SubscriptionResponseModel;
 
   @Expose()
   @ApiProperty({ type: BaseDateModel })
   @Type(() => BaseDateModel)
-  date: BaseDateModel;
+  Date: BaseDateModel;
 }
 
 export class UserSubscriptionResponseModel extends OmitType(
   UserSubscriptionViewModel,
-  ['userId', 'subscriptionId', 'providerSubscriptionId'] as const,
+  ['UserId', 'SubscriptionId', 'ProviderSubscriptionId'] as const,
 ) {}
 
 export class SubscribeRequestModel {
   @ApiProperty({ format: 'uuid' })
   @IsNotEmpty()
   @IsUUID()
-  subscriptionId: string;
+  SubscriptionId: string;
 
   @ApiProperty({ required: false })
-  isTrial?: boolean;
+  IsTrial?: boolean;
 
   @ApiProperty({ required: false })
-  providerSubscriptionId?: string;
+  ProviderSubscriptionId?: string;
 }
 
 export class SubscribeAsAdminRequestModel extends SubscribeRequestModel {
   @ApiProperty({ format: 'uuid' })
-  userId: string;
+  UserId: string;
 }
 
 export class UnsubscribeRequestModel {
   @ApiProperty({ format: 'uuid' })
-  id: string;
+  Id: string;
 }

@@ -39,19 +39,19 @@ export class UserService {
     const queryBuilder = this.userRepository
       .createQueryBuilder('user')
       .select(['user'])
-      .skip(model.skip)
-      .take(model.take)
+      .skip(model.Skip)
+      .take(model.Take)
       .withDeleted();
 
-    if (model.search) {
+    if (model.Search) {
       queryBuilder.andWhere(
         new Brackets((qb) => {
-          qb.where('user.email LIKE :search', { search: `%${model.search}%` })
-            .orWhere('user.fullName LIKE :search', {
-              search: `%${model.search}%`,
+          qb.where('user.Email LIKE :search', { search: `%${model.Search}%` })
+            .orWhere('user.FullName LIKE :search', {
+              search: `%${model.Search}%`,
             })
             .orWhere('user.phoneNumber LIKE :search', {
-              search: `%${model.search}%`,
+              search: `%${model.Search}%`,
             });
         }),
       );
@@ -59,7 +59,7 @@ export class UserService {
 
     const [result, count] = await queryBuilder.getManyAndCount();
 
-    request.totalRowCount = count;
+    request.TotalRowCount = count;
 
     return plainToInstance(UserResponseModel, result);
   }
@@ -72,7 +72,7 @@ export class UserService {
     const queryBuilder = this.userRepository
       .createQueryBuilder('user')
       .select(['user'])
-      .where('user.id = :id', { id: model.id });
+      .where('user.Id = :id', { id: model.Id });
 
     const query = await queryBuilder.getOneOrFail().catch((error) => {
       if (error.name === Codes.Error.Database.EntityNotFoundError)
@@ -91,23 +91,23 @@ export class UserService {
   }): Promise<boolean> {
     const existingUser = await this.userRepository
       .createQueryBuilder('user')
-      .select(['user.id', 'user.email', 'user.phoneNumber'])
-      .where('user.status = :status', { status: Status.ACTIVE })
+      .select(['user.Id', 'user.Email', 'user.phoneNumber'])
+      .where('user.Status = :status', { status: Status.ACTIVE })
       .andWhere(
         new Brackets((qb) => {
-          qb.where('user.email = :email', { email: model.email }).orWhere(
+          qb.where('user.Email = :email', { email: model.Email }).orWhere(
             'user.phoneNumber = :phoneNumber',
-            { phoneNumber: model.phoneNumber },
+            { phoneNumber: model.PhoneNumber },
           );
         }),
       )
       .getOne();
 
     if (existingUser) {
-      if (existingUser.email === model.email) {
+      if (existingUser.Email === model.Email) {
         throw new HttpException(Codes.Error.Email.ALREADY_EXISTS, 400);
       }
-      if (existingUser.phoneNumber === model.phoneNumber) {
+      if (existingUser.PhoneNumber === model.PhoneNumber) {
         throw new HttpException(Codes.Error.PhoneNumber.ALREADY_EXISTS, 400);
       }
     }
@@ -115,17 +115,21 @@ export class UserService {
     const password = passwordGenerator(12);
 
     const newUser = this.userRepository.create({
-      ...model,
-      status: Status.ACTIVE,
+      Email: model.Email,
+      FullName: model.FullName,
+      PhoneNumber: model.PhoneNumber,
+      Image: model.Image,
+      Role: model.Role,
+      Status: Status.ACTIVE,
     });
 
     await this.userRepository.save(newUser);
 
     await this.mailService.sendMail({
-      to: newUser.email,
+      to: newUser.Email,
       subject: 'QR Menüye Hoşgeldin',
       html: WelcomeTemplate()
-        .replace('{Username}', newUser.email)
+        .replace('{Username}', newUser.Email)
         .replace('{Password}', password),
     });
 
@@ -141,8 +145,8 @@ export class UserService {
   }): Promise<boolean> {
     const queryBuilder = this.userRepository
       .createQueryBuilder('user')
-      .select(['user.id', 'user.role'])
-      .where('user.id = :id', { id });
+      .select(['user.Id', 'user.Role'])
+      .where('user.Id = :id', { id });
 
     await queryBuilder.getOneOrFail().catch((error) => {
       if (error.name === Codes.Error.Database.EntityNotFoundError)
@@ -151,7 +155,16 @@ export class UserService {
       throw error;
     });
 
-    await this.userRepository.update({ id }, model);
+    await this.userRepository.update(
+      { Id: id },
+      {
+        FullName: model.FullName,
+        PhoneNumber: model.PhoneNumber,
+        Image: model.Image,
+        Role: model.Role,
+        Status: model.Status,
+      },
+    );
 
     return true;
   }
@@ -163,13 +176,13 @@ export class UserService {
     user: UserContext;
     model: BaseIdRequestModel;
   }): Promise<boolean> {
-    if (user.id === model.id)
+    if (user.Id === model.Id)
       throw new HttpException("You can't delete yourself", 400);
 
     const queryBuilder = this.userRepository
       .createQueryBuilder('user')
-      .select(['user.id', 'user.role'])
-      .where('user.id = :id', { id: model.id });
+      .select(['user.Id', 'user.Role'])
+      .where('user.Id = :id', { id: model.Id });
 
     const existingUser = await queryBuilder.getOneOrFail().catch((error) => {
       if (error.name === Codes.Error.Database.EntityNotFoundError)
@@ -178,10 +191,10 @@ export class UserService {
       throw error;
     });
 
-    if (existingUser.role === Role.ADMIN)
+    if (existingUser.Role === Role.ADMIN)
       throw new HttpException("You can't delete admin user", 403);
 
-    await this.userRepository.softDelete({ id: existingUser.id });
+    await this.userRepository.softDelete({ Id: existingUser.Id });
 
     return true;
   }

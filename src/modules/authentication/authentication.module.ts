@@ -1,53 +1,59 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
-import { JwtModule } from '@nestjs/jwt';
+import { TypeOrmModule } from '@nestjs/typeorm';
+
 import { AuthenticationService } from './authentication.service';
 import { AuthenticationController } from './authentication.controller';
-import { jwtConstants } from './authentication.constants';
-// import { AuthenticationGuard } from './guards/authentication.guard';
+
+import { SessionService } from './session/session.service';
+import { PasskeyService } from './passkey/passkey.service';
+import { TwoFactorService } from './two-factor/two-factor.service';
+import { ApiKeyService } from './api-key/api-key.service';
+
+import { CombinedAuthGuard } from './guards/combined-auth.guard';
 import { RoleGuard } from './guards/role.guard';
-import { MailModule } from '../mail/mail.module';
-import { PassportModule } from '@nestjs/passport';
-import { LocalStrategy } from './strategies/local.strategy';
-import { JwtStrategy } from './strategies/jwt.strategy';
-import { RefreshTokenStrategy } from './strategies/refresh-token.strategy';
-import { JwtAuthenticationGuard } from './guards/jwt-authentication.guard';
-import { TypeOrmModule } from '@nestjs/typeorm';
+
 import { UserEntity } from '@entities/user.entity';
-import { RefreshTokenEntity } from '@entities/refresh-token.entity';
-import { UserSubscriber } from 'src/subscribers/user.subscriber';
+import { PasskeyEntity } from '@entities/passkey.entity';
+import { TwoFactorEntity } from '@entities/two-factor.entity';
+import { ApiKeyEntity } from '@entities/api-key.entity';
+
+import { MailModule } from '../mail/mail.module';
+import { RedisModule } from '../redis/redis.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([UserEntity, RefreshTokenEntity]),
-    UserSubscriber,
-    PassportModule,
+    TypeOrmModule.forFeature([
+      UserEntity,
+      PasskeyEntity,
+      TwoFactorEntity,
+      ApiKeyEntity,
+    ]),
     MailModule,
-    JwtModule.register({
-      global: true,
-      secret: jwtConstants.secret,
-      signOptions: {
-        expiresIn: jwtConstants.accessTokenExpiresIn,
-        issuer: process.env.APP_URL,
-        audience: 'Storage',
-      },
-    }),
+    RedisModule,
   ],
   controllers: [AuthenticationController],
   providers: [
     AuthenticationService,
-    LocalStrategy,
-    JwtStrategy,
-    RefreshTokenStrategy,
+    SessionService,
+    PasskeyService,
+    TwoFactorService,
+    ApiKeyService,
     {
       provide: APP_GUARD,
-      useClass: JwtAuthenticationGuard,
+      useClass: CombinedAuthGuard,
     },
     {
       provide: APP_GUARD,
       useClass: RoleGuard,
     },
   ],
-  exports: [AuthenticationService],
+  exports: [
+    AuthenticationService,
+    SessionService,
+    PasskeyService,
+    TwoFactorService,
+    ApiKeyService,
+  ],
 })
 export class AuthenticationModule {}

@@ -31,7 +31,7 @@ export const ApiSuccessResponse = <GenericType extends Type<unknown>>(
           },
           {
             properties: {
-              result: {
+              Result: {
                 title:
                   typeof type === 'function'
                     ? type.name.replace('Model', 'ResultModel')
@@ -64,17 +64,17 @@ export const ApiSuccessResponse = <GenericType extends Type<unknown>>(
           },
           {
             properties: {
-              result: {
+              Result: {
                 title: 'StringResponseResultModel',
                 type: null,
               },
-              status: {
+              Status: {
                 properties: {
-                  code: {
+                  Code: {
                     type: 'number',
                     example: 500,
                   },
-                  message: {
+                  Message: {
                     type: 'string',
                     example: 'Internal Server Error',
                   },
@@ -101,13 +101,13 @@ export const ApiSuccessArrayResponse = (type: Type) =>
             type: 'object',
             title: type.name.replace('Model', 'ListModel'),
             properties: {
-              result: {
+              Result: {
                 allOf: [
                   { $ref: getSchemaPath(ArrayResponseModel) },
                   {
                     type: 'object',
                     properties: {
-                      items: {
+                      Items: {
                         type: 'array',
                         items: { $ref: getSchemaPath(type) },
                       },
@@ -131,17 +131,17 @@ export const ApiSuccessArrayResponse = (type: Type) =>
           },
           {
             properties: {
-              result: {
+              Result: {
                 title: 'StringResponseResultModel',
                 type: 'string',
               },
-              status: {
+              Status: {
                 properties: {
-                  code: {
+                  Code: {
                     type: 'number',
                     example: 500,
                   },
-                  message: {
+                  Message: {
                     type: 'string',
                     example: 'Internal Server Error',
                   },

@@ -8,7 +8,6 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
   DeleteDateColumn,
-  Index,
 } from 'typeorm';
 import { UserEntity } from './user.entity';
 import { SubscriptionEntity } from './subscription.entity';
@@ -18,50 +17,54 @@ import { BaseDateModel } from '@common/models/base.model';
 @Entity({ name: 'UserSubscription' })
 export class UserSubscriptionEntity {
   @PrimaryGeneratedColumn('uuid')
-  id: string;
+  Id: string;
 
   @Column({ type: 'timestamp', nullable: false })
-  startAt: Date;
+  StartAt: Date;
 
   @Column({ type: 'timestamp', nullable: true, default: null })
-  endAt?: Date | null;
+  EndAt?: Date | null;
 
   @Column({ nullable: true })
-  currency?: string;
+  Currency?: string;
 
-  @Column({ type: 'enum', enum: BillingCycle, default: BillingCycle.MONTHLY })
-  billingCycle: string;
+  @Column({
+    type: 'enum',
+    enum: BillingCycle,
+    default: BillingCycle.MONTHLY,
+  })
+  BillingCycle: string;
 
   @Column({
     type: 'enum',
     enum: SubscriptionStatus,
     default: SubscriptionStatus.ACTIVE,
   })
-  status: string;
+  Status: string;
 
-  get date(): BaseDateModel {
+  get Date(): BaseDateModel {
     return {
-      created: this.createdAt,
-      updated: this.updatedAt,
+      Created: this.CreatedAt,
+      Updated: this.UpdatedAt,
     };
   }
 
   @CreateDateColumn()
-  createdAt?: Date;
+  CreatedAt?: Date;
 
   @UpdateDateColumn()
-  updatedAt?: Date;
+  UpdatedAt?: Date;
 
   @DeleteDateColumn()
-  deletedAt?: Date;
+  DeletedAt?: Date;
 
   @OneToOne(() => UserEntity, { onDelete: 'CASCADE', eager: true })
-  @JoinColumn({ name: 'userId' })
-  user: UserEntity;
+  @JoinColumn({ name: 'UserId' })
+  User: UserEntity;
 
   @ManyToOne(() => SubscriptionEntity, { onDelete: 'CASCADE', eager: true })
-  @JoinColumn({ name: 'subscriptionId' })
-  subscription: SubscriptionEntity;
+  @JoinColumn({ name: 'SubscriptionId' })
+  Subscription: SubscriptionEntity;
 
   constructor(partial: Partial<UserSubscriptionEntity>) {
     Object.assign(this, partial);

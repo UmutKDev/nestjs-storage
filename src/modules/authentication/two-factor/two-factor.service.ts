@@ -1,0 +1,243 @@
+import { Injectable, HttpException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { TwoFactorEntity } from '@entities/two-factor.entity';
+import { TwoFactorMethod } from '@common/enums/authentication.enum';
+import { authenticator } from 'otplib';
+import * as argon2 from 'argon2';
+import { randomBytes } from 'crypto';
+import {
+  TwoFactorSetupResponseModel,
+  TwoFactorBackupCodesResponseModel,
+  TwoFactorStatusResponseModel,
+} from '../authentication.model';
+import { plainToInstance } from 'class-transformer';
+
+@Injectable()
+export class TwoFactorService {
+  private readonly ISSUER = process.env.APP_NAME || 'Storage';
+  private readonly BACKUP_CODE_COUNT = 10;
+
+  constructor(
+    @InjectRepository(TwoFactorEntity)
+    private readonly twoFactorRepository: Repository<TwoFactorEntity>,
+  ) {
+    // Configure TOTP settings
+    authenticator.options = {
+      digits: 6,
+      step: 30,
+      window: 1,
+    };
+  }
+
+  private generateBackupCodes(): string[] {
+    const codes: string[] = [];
+    for (let i = 0; i < this.BACKUP_CODE_COUNT; i++) {
+      const code = randomBytes(4).toString('hex').toUpperCase();
+      codes.push(`${code.slice(0, 4)}-${code.slice(4)}`);
+    }
+    return codes;
+  }
+
+  private async hashBackupCodes(codes: string[]): Promise<string[]> {
+    return Promise.all(codes.map((code) => argon2.hash(code)));
+  }
+
+  async setupTotp(
+    userId: string,
+    email: string,
+  ): Promise<TwoFactorSetupResponseModel> {
+    // Check if already has 2FA enabled
+    const existing = await this.twoFactorRepository.findOne({
+      where: { UserId: userId, IsEnabled: true },
+    });
+
+    if (existing) {
+      throw new HttpException('Two-factor authentication is already enabled', 400);
+    }
+
+    // Generate secret
+    const secret = authenticator.generateSecret();
+    const otpAuthUrl = authenticator.keyuri(email, this.ISSUER, secret);
+
+    // Create or update 2FA record (not enabled yet)
+    let twoFactor = await this.twoFactorRepository.findOne({
+      where: { UserId: userId },
+    });
+
+    if (twoFactor) {
+      twoFactor.Secret = secret;
+      twoFactor.Method = TwoFactorMethod.TOTP;
+      twoFactor.IsVerified = false;
+    } else {
+      twoFactor = new TwoFactorEntity({
+        UserId: userId,
+        Method: TwoFactorMethod.TOTP,
+        Secret: secret,
+        IsEnabled: false,
+        IsVerified: false,
+      });
+    }
+
+    await this.twoFactorRepository.save(twoFactor);
+
+    return plainToInstance(TwoFactorSetupResponseModel, {
+      Secret: secret,
+      Issuer: this.ISSUER,
+      AccountName: email,
+      OtpAuthUrl: otpAuthUrl,
+    });
+  }
+
+  async verifyAndEnableTotp(
+    userId: string,
+    code: string,
+  ): Promise<TwoFactorBackupCodesResponseModel> {
+    const twoFactor = await this.twoFactorRepository.findOne({
+      where: { UserId: userId, Method: TwoFactorMethod.TOTP },
+    });
+
+    if (!twoFactor || !twoFactor.Secret) {
+      throw new HttpException('TOTP setup not found', 400);
+    }
+
+    // Verify the code
+    const isValid = authenticator.verify({
+      token: code,
+      secret: twoFactor.Secret,
+    });
+
+    if (!isValid) {
+      throw new HttpException('Invalid verification code', 400);
+    }
+
+    // Generate backup codes
+    const backupCodes = this.generateBackupCodes();
+    const hashedCodes = await this.hashBackupCodes(backupCodes);
+
+    // Enable 2FA
+    twoFactor.IsEnabled = true;
+    twoFactor.IsVerified = true;
+    twoFactor.BackupCodes = hashedCodes;
+    twoFactor.LastVerifiedAt = new Date();
+
+    await this.twoFactorRepository.save(twoFactor);
+
+    return plainToInstance(TwoFactorBackupCodesResponseModel, {
+      BackupCodes: backupCodes,
+    });
+  }
+
+  async verifyCode(userId: string, code: string): Promise<boolean> {
+    const twoFactor = await this.twoFactorRepository.findOne({
+      where: { UserId: userId, IsEnabled: true },
+    });
+
+    if (!twoFactor) {
+      return false;
+    }
+
+    // Try TOTP first
+    if (twoFactor.Secret) {
+      const isValid = authenticator.verify({
+        token: code,
+        secret: twoFactor.Secret,
+      });
+
+      if (isValid) {
+        await this.twoFactorRepository.update(
+          { Id: twoFactor.Id },
+          { LastVerifiedAt: new Date() },
+        );
+        return true;
+      }
+    }
+
+    // Try backup codes
+    for (let i = 0; i < twoFactor.BackupCodes.length; i++) {
+      const hashedCode = twoFactor.BackupCodes[i];
+      if (hashedCode) {
+        try {
+          const isValid = await argon2.verify(hashedCode, code.replace('-', '').toUpperCase());
+          if (isValid) {
+            // Remove used backup code
+            const newCodes = [...twoFactor.BackupCodes];
+            newCodes[i] = null;
+            await this.twoFactorRepository.update(
+              { Id: twoFactor.Id },
+              {
+                BackupCodes: newCodes.filter(Boolean),
+                LastVerifiedAt: new Date(),
+              },
+            );
+            return true;
+          }
+        } catch {
+          continue;
+        }
+      }
+    }
+
+    return false;
+  }
+
+  async disableTotp(userId: string, code: string): Promise<boolean> {
+    const isValid = await this.verifyCode(userId, code);
+    if (!isValid) {
+      throw new HttpException('Invalid verification code', 400);
+    }
+
+    await this.twoFactorRepository.delete({ UserId: userId });
+    return true;
+  }
+
+  async regenerateBackupCodes(
+    userId: string,
+    code: string,
+  ): Promise<TwoFactorBackupCodesResponseModel> {
+    const isValid = await this.verifyCode(userId, code);
+    if (!isValid) {
+      throw new HttpException('Invalid verification code', 400);
+    }
+
+    const twoFactor = await this.twoFactorRepository.findOne({
+      where: { UserId: userId, IsEnabled: true },
+    });
+
+    if (!twoFactor) {
+      throw new HttpException('Two-factor authentication not enabled', 400);
+    }
+
+    const backupCodes = this.generateBackupCodes();
+    const hashedCodes = await this.hashBackupCodes(backupCodes);
+
+    twoFactor.BackupCodes = hashedCodes;
+    await this.twoFactorRepository.save(twoFactor);
+
+    return plainToInstance(TwoFactorBackupCodesResponseModel, {
+      BackupCodes: backupCodes,
+    });
+  }
+
+  async getStatus(userId: string, hasPasskey: boolean): Promise<TwoFactorStatusResponseModel> {
+    const twoFactor = await this.twoFactorRepository.findOne({
+      where: { UserId: userId },
+    });
+
+    const backupCodesRemaining = twoFactor?.BackupCodes?.filter(Boolean).length || 0;
+
+    return plainToInstance(TwoFactorStatusResponseModel, {
+      IsEnabled: twoFactor?.IsEnabled || false,
+      Method: twoFactor?.Method || null,
+      HasPasskey: hasPasskey,
+      BackupCodesRemaining: backupCodesRemaining,
+    });
+  }
+
+  async isTwoFactorEnabled(userId: string): Promise<boolean> {
+    const twoFactor = await this.twoFactorRepository.findOne({
+      where: { UserId: userId, IsEnabled: true },
+    });
+    return !!twoFactor;
+  }
+}

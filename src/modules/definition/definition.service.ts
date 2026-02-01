@@ -30,18 +30,18 @@ export class DefinitionService {
 
     const queryBuilder = this.definitionGroupRepository
       .createQueryBuilder('definitionGroup')
-      .skip(model.skip)
-      .take(model.take);
+      .skip(model.Skip)
+      .take(model.Take);
 
-    if (model.search) {
+    if (model.Search) {
       queryBuilder.where('definitionGroup.code LIKE :search', {
-        search: `%${model.search}%`,
+        search: `%${model.Search}%`,
       });
     }
 
     const [result, count] = await queryBuilder.getManyAndCount();
 
-    request.totalRowCount = count;
+    request.TotalRowCount = count;
 
     return plainToInstance(DefinitionGroupResponseModel, result);
   }
@@ -61,18 +61,18 @@ export class DefinitionService {
       .leftJoinAndSelect('definition.definitionGroup', 'definitionGroup')
       .select(['definition', 'definitionGroup.code'])
       .where('definitionGroup.code = :groupCode', { groupCode })
-      .skip(model.skip)
-      .take(model.take);
+      .skip(model.Skip)
+      .take(model.Take);
 
-    if (model.search) {
+    if (model.Search) {
       queryBuilder.andWhere('definition.code LIKE :search', {
-        search: `%${model.search}%`,
+        search: `%${model.Search}%`,
       });
     }
 
     const [result, count] = await queryBuilder.getManyAndCount();
 
-    request.totalRowCount = count;
+    request.TotalRowCount = count;
 
     return plainToInstance(DefinitionResponseModel, result);
   }

@@ -70,7 +70,7 @@ export class CloudListService {
   ): Promise<CloudListResponseModel> {
     const cleanedPath = Path ? Path.replace(/^\/+|\/+$/g, '') : '';
 
-    let prefix = KeyBuilder([User.id, cleanedPath]);
+    let prefix = KeyBuilder([User.Id, cleanedPath]);
     if (!prefix.endsWith('/')) {
       prefix = prefix + '/';
     }
@@ -114,22 +114,22 @@ export class CloudListService {
       Path,
       Delimiter,
       IsMetadataProcessing,
-      search,
-      skip,
-      take,
+      Search,
+      Skip,
+      Take,
     }: CloudListRequestModel,
     User: UserContext,
   ): Promise<{ Objects: CloudObjectModel[]; TotalCount: number }> {
     const cleanedPath = Path ? Path.replace(/^\/+|\/+$/g, '') : '';
 
-    let prefix = KeyBuilder([User.id, cleanedPath]);
+    let prefix = KeyBuilder([User.Id, cleanedPath]);
     if (!prefix.endsWith('/')) {
       prefix = prefix + '/';
     }
 
-    const skipValue = typeof skip === 'number' && skip > 0 ? skip : 0;
+    const skipValue = typeof Skip === 'number' && Skip > 0 ? Skip : 0;
     const takeValue =
-      typeof take === 'number' && take > 0 ? take : this.MaxListObjects;
+      typeof Take === 'number' && Take > 0 ? Take : this.MaxListObjects;
 
     if (!skipValue && takeValue === this.MaxListObjects) {
       const command = await this.CloudS3Service.Send(
@@ -167,8 +167,8 @@ export class CloudListService {
         MaxKeys: maxKeys,
       };
 
-      if (isFirstRequest && search) {
-        params.StartAfter = search;
+      if (isFirstRequest && Search) {
+        params.StartAfter = Search;
       }
       if (continuationToken) {
         params.ContinuationToken = continuationToken;
@@ -252,7 +252,7 @@ export class CloudListService {
   ): Promise<{ Directories: CloudDirectoryModel[]; TotalCount: number }> {
     const cleanedPath = Path ? Path.replace(/^\/+|\/+$/g, '') : '';
 
-    let prefix = KeyBuilder([User.id, cleanedPath]);
+    let prefix = KeyBuilder([User.Id, cleanedPath]);
     if (!prefix.endsWith('/')) {
       prefix = prefix + '/';
     }
@@ -438,7 +438,7 @@ export class CloudListService {
           '',
         );
         const DirectoryPrefix: string = commonPrefix.Prefix.replace(
-          User.id + '/',
+          User.Id + '/',
           '',
         );
         const normalizedPrefix = NormalizeDirectoryPath(DirectoryPrefix);
@@ -447,7 +447,7 @@ export class CloudListService {
         let isLocked = true;
         if (isEncrypted && SessionToken && ValidateDirectorySession) {
           const session = await ValidateDirectorySession(
-            User.id,
+            User.Id,
             normalizedPrefix,
             SessionToken,
           );
@@ -571,7 +571,7 @@ export class CloudListService {
         'application/octet-stream',
       Path: {
         Host: this.CloudS3Service.GetPublicHostname(),
-        Key: this.CloudS3Service.GetKey(content.Key!, User.id),
+        Key: this.CloudS3Service.GetKey(content.Key!, User.Id),
         Url: SignedUrl,
       },
       Metadata: metadata,
@@ -593,9 +593,9 @@ export class CloudListService {
       return [];
     }
 
-    const prefix = KeyBuilder([User.id, normalizedPrefix]);
+    const prefix = KeyBuilder([User.Id, normalizedPrefix]);
     const cacheKey = this.BuildDirectoryThumbnailCacheKey(
-      User.id,
+      User.Id,
       normalizedPrefix,
       IsSignedUrlProcessing,
     );

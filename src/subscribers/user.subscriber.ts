@@ -22,9 +22,9 @@ export class UserSubscriber implements EntitySubscriberInterface<UserEntity> {
     try {
       const user = event.entity;
 
-      const isPasswordChanged = Object.keys(event.entity).includes('password');
+      const isPasswordChanged = Object.keys(event.entity).includes('Password');
       if (isPasswordChanged) {
-        event.entity.password = await argon2.hash(user.password);
+        event.entity.Password = await argon2.hash(user.Password);
       }
     } catch (error) {
       throw new Error(error);
@@ -35,7 +35,7 @@ export class UserSubscriber implements EntitySubscriberInterface<UserEntity> {
     try {
       const user = event.entity;
 
-      event.entity.password = await argon2.hash(user.password);
+      event.entity.Password = await argon2.hash(user.Password);
     } catch (error) {
       throw new Error(error);
     }

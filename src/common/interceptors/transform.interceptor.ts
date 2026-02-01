@@ -19,24 +19,24 @@ export class TransformInterceptor implements NestInterceptor {
     const request = context.switchToHttp().getRequest();
 
     const status: BaseStatusModel = {
-      messages: ['OK'],
-      code: 200,
-      timestamp: dayjs().utc().format(),
-      path: request.url,
+      Messages: ['OK'],
+      Code: 200,
+      Timestamp: dayjs().utc().format(),
+      Path: request.url,
     };
 
     const result = next.handle().pipe(
       map((data) => ({
-        result:
+        Result:
           data instanceof Array
             ? {
-                options: plainToInstance(
+                Options: plainToInstance(
                   PaginationResponseModel,
                   {
-                    search: request.query.search,
-                    skip: request.query.skip,
-                    take: request.query.take,
-                    count: request.totalRowCount,
+                    Search: request.query.search,
+                    Skip: request.query.skip,
+                    Take: request.query.take,
+                    Count: request.TotalRowCount,
                     // sort: {
                     //   field: null,
                     //   direction: null,
@@ -47,10 +47,10 @@ export class TransformInterceptor implements NestInterceptor {
                     exposeDefaultValues: true,
                   },
                 ),
-                items: data,
+                Items: data,
               }
             : data,
-        status: status,
+        Status: status,
       })),
     );
 

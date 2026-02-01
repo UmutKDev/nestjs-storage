@@ -18,7 +18,7 @@ export class SubscriptionUserController {
     @User() user: UserContext,
   ): Promise<UserSubscriptionResponseModel | null> {
     return await this.subscriptionService.GetCurrentForUser({
-      userId: user.id,
+      userId: user.Id,
     });
   }
 
@@ -28,18 +28,16 @@ export class SubscriptionUserController {
     @Body() model: SubscribeRequestModel,
   ): Promise<boolean> {
     return await this.subscriptionService.SubscribeSelf({
-      userId: user.id,
-      subscriptionId: model.subscriptionId,
-      isTrial: model.isTrial,
+      userId: user.Id,
+      subscriptionId: model.SubscriptionId,
+      isTrial: model.IsTrial,
     });
   }
 
   @Delete('My/Unsubscribe')
-  async Unsubscribe(
-    @User() user: UserContext,
-  ): Promise<boolean> {
+  async Unsubscribe(@User() user: UserContext): Promise<boolean> {
     return await this.subscriptionService.UnsubscribeByUser({
-      userId: user.id,
+      userId: user.Id,
     });
   }
 }

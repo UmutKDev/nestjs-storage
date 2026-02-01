@@ -1,6 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import {
-  S3Client,
   CopyObjectCommand,
   DeleteObjectCommand,
   HeadObjectCommand,

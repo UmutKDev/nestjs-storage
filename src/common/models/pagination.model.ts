@@ -14,20 +14,20 @@ export class PaginationRequestModel {
   @IsOptional()
   @IsString()
   @MinLength(2)
-  search: string;
+  Search: string;
 
   @ApiProperty({ required: false, maximum: 100 })
   @IsOptional()
   @IsNumber()
   @Min(0)
-  skip: number = 0;
+  Skip: number = 0;
 
   @ApiProperty({ required: false, maximum: 100 })
   @IsOptional()
   @IsNumber()
   @Min(0)
   @Max(100)
-  take: number = 0;
+  Take: number = 0;
 
   // @ApiProperty({ required: false })
   // @IsOptional()
@@ -43,22 +43,22 @@ export class PaginationRequestModel {
 export class PaginationResponseModel {
   @Expose()
   @ApiProperty()
-  search: string = null;
+  Search: string = null;
 
   @Expose()
   @ApiProperty()
   @Transform(({ value }) => Number(value))
   @IsNumber()
-  skip: number = 0;
+  Skip: number = 0;
 
   @Expose()
   @Transform(({ value }) => Number(value))
   @ApiProperty()
-  take: number = 0;
+  Take: number = 0;
 
   @Expose()
   @ApiProperty()
-  count: number = 0;
+  Count: number = 0;
 
   // sort?: object
 }

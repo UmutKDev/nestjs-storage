@@ -19,13 +19,12 @@ export declare global {
       SWAGGER_USER: string;
       SWAGGER_PASSWORD: string;
 
-      // JWT Configuration
-      JWT_SECRET: string;
-      JWT_EXPIRES_IN: string;
-      JWT_REFRESH_SECRET: string;
-      JWT_REFRESH_EXPIRES_IN: string;
-      JWT_TWO_FACTOR_SECRET?: string;
-      JWT_TWO_FACTOR_EXPIRES_IN?: string;
+      // WebAuthn/Passkey Configuration
+      WEBAUTHN_RP_ID?: string;
+      WEBAUTHN_RP_NAME?: string;
+
+      // Session Configuration
+      SESSION_TTL_SECONDS?: string;
 
       // Sentry
       SENTRY_DSN?: string;
@@ -96,16 +95,17 @@ export declare global {
   }
 
   interface UserContext {
-    id: string;
-    fullName: string;
-    email: string;
-    role: Role;
-    status: Status;
+    Id: string;
+    FullName: string;
+    Email: string;
+    Role: Role;
+    Status: Status;
+    Image?: string;
   }
 
   interface Request {
     user: UserContext;
-    totalRowCount: number;
+    TotalRowCount: number;
   }
 
   namespace Codes {

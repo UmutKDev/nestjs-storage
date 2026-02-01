@@ -34,7 +34,7 @@ export class SubscriptionService {
 
   async Find({ id }: { id: string }): Promise<SubscriptionFindResponseModel> {
     const entity = await this.subscriptionRepository.findOneOrFail({
-      where: { id },
+      where: { Id: id },
     });
     return plainToInstance(SubscriptionFindResponseModel, entity);
   }
@@ -44,7 +44,18 @@ export class SubscriptionService {
   }: {
     model: SubscriptionPostBodyRequestModel;
   }): Promise<boolean> {
-    const newEntity = this.subscriptionRepository.create(model);
+    const newEntity = this.subscriptionRepository.create({
+      Name: model.Name,
+      Slug: model.Slug,
+      Description: model.Description,
+      Price: model.Price,
+      Currency: model.Currency,
+      BillingCycle: model.BillingCycle,
+      StorageLimitBytes: model.StorageLimitBytes,
+      MaxObjectCount: model.MaxObjectCount,
+      Features: model.Features,
+      Status: model.Status,
+    });
     await this.subscriptionRepository.save(newEntity);
     return true;
   }
@@ -56,14 +67,27 @@ export class SubscriptionService {
     id: string;
     model: SubscriptionPutBodyRequestModel;
   }): Promise<boolean> {
-    await this.subscriptionRepository.findOneOrFail({ where: { id } });
-    await this.subscriptionRepository.update({ id }, model);
+    await this.subscriptionRepository.findOneOrFail({ where: { Id: id } });
+    await this.subscriptionRepository.update(
+      { Id: id },
+      {
+        Name: model.Name,
+        Description: model.Description,
+        Price: model.Price,
+        Currency: model.Currency,
+        BillingCycle: model.BillingCycle,
+        StorageLimitBytes: model.StorageLimitBytes,
+        MaxObjectCount: model.MaxObjectCount,
+        Features: model.Features,
+        Status: model.Status,
+      },
+    );
     return true;
   }
 
   async Delete({ id }: { id: string }): Promise<boolean> {
-    await this.subscriptionRepository.findOneOrFail({ where: { id } });
-    await this.subscriptionRepository.softDelete({ id });
+    await this.subscriptionRepository.findOneOrFail({ where: { Id: id } });
+    await this.subscriptionRepository.softDelete({ Id: id });
     return true;
   }
 
@@ -76,36 +100,36 @@ export class SubscriptionService {
     subscriptionId: string;
     isTrial?: boolean;
   }): Promise<boolean> {
-    await this.userRepository.findOneOrFail({ where: { id: userId } });
+    await this.userRepository.findOneOrFail({ where: { Id: userId } });
 
     const subscription = await this.subscriptionRepository.findOneOrFail({
-      where: { id: subscriptionId },
+      where: { Id: subscriptionId },
     });
 
     // Mevcut aktif abonelik varsa sonlandır
     const existingSubscription = await this.userSubscriptionRepository.findOne({
-      where: { user: { id: userId } },
+      where: { User: { Id: userId } },
     });
 
     if (existingSubscription) {
-      existingSubscription.endAt = new Date();
-      existingSubscription.status = SubscriptionStatus.CANCELLED;
+      existingSubscription.EndAt = new Date();
+      existingSubscription.Status = SubscriptionStatus.CANCELLED;
       await this.userSubscriptionRepository.save(existingSubscription);
       // Eski aboneliği sil
       await this.userSubscriptionRepository.remove(existingSubscription);
     }
 
     const entity = this.userSubscriptionRepository.create({
-      user: {
-        id: userId,
+      User: {
+        Id: userId,
       },
-      subscription: {
-        id: subscriptionId,
+      Subscription: {
+        Id: subscriptionId,
       },
-      status: isTrial ? SubscriptionStatus.TRIALING : SubscriptionStatus.ACTIVE,
-      startAt: new Date(),
-      currency: subscription.currency,
-      billingCycle: subscription.billingCycle,
+      Status: isTrial ? SubscriptionStatus.TRIALING : SubscriptionStatus.ACTIVE,
+      StartAt: new Date(),
+      Currency: subscription.Currency,
+      BillingCycle: subscription.BillingCycle,
     });
 
     await this.userSubscriptionRepository.save(entity);
@@ -123,36 +147,36 @@ export class SubscriptionService {
     isTrial?: boolean;
   }): Promise<boolean> {
     // ensure user exists
-    await this.userRepository.findOneOrFail({ where: { id: userId } });
+    await this.userRepository.findOneOrFail({ where: { Id: userId } });
 
     const subscription = await this.subscriptionRepository.findOneOrFail({
-      where: { id: subscriptionId },
+      where: { Id: subscriptionId },
     });
 
     // Mevcut aktif abonelik varsa sonlandır
     const existingSubscription = await this.userSubscriptionRepository.findOne({
-      where: { user: { id: userId } },
+      where: { User: { Id: userId } },
     });
 
     if (existingSubscription) {
-      existingSubscription.endAt = new Date();
-      existingSubscription.status = SubscriptionStatus.CANCELLED;
+      existingSubscription.EndAt = new Date();
+      existingSubscription.Status = SubscriptionStatus.CANCELLED;
       await this.userSubscriptionRepository.save(existingSubscription);
       // Eski aboneliği sil
       await this.userSubscriptionRepository.remove(existingSubscription);
     }
 
     const entity = this.userSubscriptionRepository.create({
-      user: {
-        id: userId,
+      User: {
+        Id: userId,
       },
-      subscription: {
-        id: subscriptionId,
+      Subscription: {
+        Id: subscriptionId,
       },
-      status: isTrial ? SubscriptionStatus.TRIALING : SubscriptionStatus.ACTIVE,
-      startAt: new Date(),
-      currency: subscription.currency,
-      billingCycle: subscription.billingCycle,
+      Status: isTrial ? SubscriptionStatus.TRIALING : SubscriptionStatus.ACTIVE,
+      StartAt: new Date(),
+      Currency: subscription.Currency,
+      BillingCycle: subscription.BillingCycle,
     });
 
     await this.userSubscriptionRepository.save(entity);
@@ -167,9 +191,9 @@ export class SubscriptionService {
   }): Promise<UserSubscriptionResponseModel | null> {
     const entity = await this.userSubscriptionRepository.findOne({
       where: {
-        user: { id: userId },
+        User: { Id: userId },
       },
-      relations: ['subscription'],
+      relations: ['Subscription'],
     });
 
     if (!entity) return null;
@@ -179,10 +203,10 @@ export class SubscriptionService {
 
   async Unsubscribe({ id }: { id: string }): Promise<boolean> {
     const entity = await this.userSubscriptionRepository.findOneOrFail({
-      where: { id },
+      where: { Id: id },
     });
-    entity.endAt = new Date();
-    entity.status = SubscriptionStatus.CANCELLED;
+    entity.EndAt = new Date();
+    entity.Status = SubscriptionStatus.CANCELLED;
     await this.userSubscriptionRepository.save(entity);
     // Aboneliği tamamen sil
     await this.userSubscriptionRepository.remove(entity);
@@ -191,13 +215,13 @@ export class SubscriptionService {
 
   async UnsubscribeByUser({ userId }: { userId: string }): Promise<boolean> {
     const entity = await this.userSubscriptionRepository.findOne({
-      where: { user: { id: userId } },
+      where: { User: { Id: userId } },
     });
 
     if (!entity) throw new ForbiddenException('No active subscription found');
 
-    entity.endAt = new Date();
-    entity.status = SubscriptionStatus.CANCELLED;
+    entity.EndAt = new Date();
+    entity.Status = SubscriptionStatus.CANCELLED;
     await this.userSubscriptionRepository.save(entity);
     // Aboneliği tamamen sil
     await this.userSubscriptionRepository.remove(entity);

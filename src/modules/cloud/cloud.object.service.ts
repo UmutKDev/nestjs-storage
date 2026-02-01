@@ -39,7 +39,7 @@ export class CloudObjectService {
       const command = await this.CloudS3Service.Send(
         new HeadObjectCommand({
           Bucket: this.CloudS3Service.GetBuckets().Storage,
-          Key: KeyBuilder([User.id, Key]),
+          Key: KeyBuilder([User.Id, Key]),
         }),
       );
 
@@ -49,7 +49,7 @@ export class CloudObjectService {
         MimeType: command.ContentType,
         Path: {
           Host: this.CloudS3Service.GetPublicHostname(),
-          Key: Key.replace('' + User.id + '/', ''),
+          Key: Key.replace('' + User.Id + '/', ''),
           Url: Key,
         },
         Metadata: this.CloudMetadataService.DecodeMetadataFromS3(
@@ -77,13 +77,13 @@ export class CloudObjectService {
       await this.CloudS3Service.Send(
         new HeadObjectCommand({
           Bucket: this.CloudS3Service.GetBuckets().Storage,
-          Key: KeyBuilder([User.id, Key]),
+          Key: KeyBuilder([User.Id, Key]),
         }),
       );
 
       const command = new GetObjectCommand({
         Bucket: this.CloudS3Service.GetBuckets().Storage,
-        Key: KeyBuilder([User.id, Key]),
+        Key: KeyBuilder([User.Id, Key]),
       });
 
       const url = await getSignedUrl(this.CloudS3Service.GetClient(), command, {
@@ -107,7 +107,7 @@ export class CloudObjectService {
       const command = await this.CloudS3Service.Send(
         new GetObjectCommand({
           Bucket: this.CloudS3Service.GetBuckets().Storage,
-          Key: KeyBuilder([User.id, Key]),
+          Key: KeyBuilder([User.Id, Key]),
         }),
       );
       return command.Body.transformToWebStream();
@@ -127,7 +127,7 @@ export class CloudObjectService {
       const command = await this.CloudS3Service.Send(
         new GetObjectCommand({
           Bucket: this.CloudS3Service.GetBuckets().Storage,
-          Key: KeyBuilder([User.id, Key]),
+          Key: KeyBuilder([User.Id, Key]),
         }),
       );
 
@@ -147,10 +147,10 @@ export class CloudObjectService {
   ): Promise<boolean> {
     try {
       for await (const sourceKey of SourceKeys) {
-        const sourceFullKey = KeyBuilder([User.id, sourceKey]);
+        const sourceFullKey = KeyBuilder([User.Id, sourceKey]);
 
         const targetFullKey = KeyBuilder([
-          User.id,
+          User.Id,
           DestinationKey,
           sourceKey.split('/').pop() || '',
         ]);
@@ -192,7 +192,7 @@ export class CloudObjectService {
         await this.CloudS3Service.Send(
           new DeleteObjectCommand({
             Bucket: this.CloudS3Service.GetBuckets().Storage,
-            Key: KeyBuilder([User.id, item.Key]),
+            Key: KeyBuilder([User.Id, item.Key]),
           }),
         );
       }
@@ -212,7 +212,7 @@ export class CloudObjectService {
     try {
       const bucket = this.CloudS3Service.GetBuckets().Storage;
 
-      const sourceKey = KeyBuilder([User.id, Key]);
+      const sourceKey = KeyBuilder([User.Id, Key]);
 
       let targetRelative = Key;
       let targetKey = sourceKey;
@@ -221,7 +221,7 @@ export class CloudObjectService {
         const parts = Key.split('/');
         parts[parts.length - 1] = Name;
         targetRelative = parts.join('/');
-        targetKey = KeyBuilder([User.id, targetRelative]);
+        targetKey = KeyBuilder([User.Id, targetRelative]);
       }
 
       const sanitizedProvidedMetadata =

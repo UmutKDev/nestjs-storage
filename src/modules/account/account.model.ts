@@ -10,11 +10,11 @@ export class AccountResponseModel extends AccountViewModel {}
 export class AccountProfileResponseModel extends AccountResponseModel {}
 
 export class AccountBodyRequestModel extends PickType(UserBodyRequestModel, [
-  'fullName',
-  'phoneNumber',
+  'FullName',
+  'PhoneNumber',
 ] as const) {
   @IsOptional()
-  fullName: string;
+  FullName: string;
 }
 
 export class AccountPostBodyRequestModel extends AccountBodyRequestModel {}
@@ -24,22 +24,22 @@ export class AccountPutBodyRequestModel extends AccountBodyRequestModel {}
 export class AccountChangePasswordRequestModel {
   @ApiProperty()
   @IsNotEmpty({ message: Codes.Error.Password.CANNOT_BE_EMPTY })
-  current_password: string;
+  CurrentPassword: string;
 
   @ApiProperty()
   @IsNotEmpty({ message: Codes.Error.Password.CANNOT_BE_EMPTY })
   @IsStrongPassword(undefined, {
     message: Codes.Error.Password.NOT_STRONG,
   })
-  new_password: string;
+  NewPassword: string;
 
   @ApiProperty()
-  @Match('new_password', { message: Codes.Error.Password.NOT_MATCH })
+  @Match('NewPassword', { message: Codes.Error.Password.NOT_MATCH })
   @IsNotEmpty({ message: Codes.Error.Password.CANNOT_BE_EMPTY })
   @IsStrongPassword(undefined, {
     message: Codes.Error.Password.NOT_STRONG,
   })
-  new_password_confirmation: string;
+  NewPasswordConfirmation: string;
 }
 
 export class AccountUploadImageRequestModel {
@@ -47,5 +47,5 @@ export class AccountUploadImageRequestModel {
     type: 'string',
     format: 'binary',
   })
-  image: Express.Multer.File;
+  Image: Express.Multer.File;
 }

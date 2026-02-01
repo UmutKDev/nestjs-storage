@@ -12,30 +12,30 @@ import {
 @Entity({ name: 'DefinitionGroup' })
 export class DefinitionGroupEntity {
   @PrimaryGeneratedColumn('uuid')
-  id: string;
+  Id: string;
 
   @Column({ unique: true, type: 'enum', enum: DefinitionGroups })
-  code: string;
+  Code: string;
 
   @Column({ nullable: true })
-  description: string;
+  Description: string;
 
   @Column({ type: 'boolean', default: false })
-  isCommon: boolean;
+  IsCommon: boolean;
 
-  get date(): BaseDateModel {
+  get Date(): BaseDateModel {
     return {
-      created: this.createdAt,
-      updated: this.updatedAt,
+      Created: this.CreatedAt,
+      Updated: this.UpdatedAt,
     };
   }
 
   @CreateDateColumn()
-  createdAt?: Date;
+  CreatedAt?: Date;
 
   @UpdateDateColumn()
-  updatedAt?: Date;
+  UpdatedAt?: Date;
 
   @DeleteDateColumn()
-  deletedAt?: Date;
+  DeletedAt?: Date;
 }
