@@ -1,5 +1,5 @@
 import { Controller, Get, Param, Query } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { ApiCookieAuth, ApiTags } from '@nestjs/swagger';
 import { DefinitionService } from './definition.service';
 import {
   DefinitionGroupResponseModel,
@@ -10,7 +10,7 @@ import { ApiSuccessArrayResponse } from '@common/decorators/response.decorator';
 
 @Controller('Definition')
 @ApiTags('Definition')
-@ApiBearerAuth()
+@ApiCookieAuth()
 export class DefinitionController {
   constructor(private readonly definitionService: DefinitionService) {}
 

@@ -15,6 +15,7 @@ import { json, urlencoded } from 'express';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { useContainer } from 'class-validator';
 import basicAuth from 'express-basic-auth';
+import cookieParser from 'cookie-parser';
 
 import dayjs from 'dayjs';
 import timezone from 'dayjs/plugin/timezone';
@@ -42,6 +43,7 @@ async function bootstrap() {
 
   app.use(json({ limit: '50mb' }));
   app.use(urlencoded({ extended: true, limit: '50mb' }));
+  app.use(cookieParser());
 
   app.useGlobalPipes(
     new ValidationPipe({
@@ -100,14 +102,16 @@ const SwaggerConfig = new DocumentBuilder()
 
   .setDescription('Base API Service Test Environment & Documentation')
   .setVersion('1.0')
-  .addBearerAuth()
+
   .addTag('Home')
   .addTag('Health')
   .addTag('Authentication')
   .addTag('Account')
+  .addTag('Account / Security')
   .addTag('User')
   .addTag('Definition')
   .addTag('Cloud')
+  .addCookieAuth('session_id')
   .build();
 
 bootstrap();

@@ -16,7 +16,7 @@ import {
   MaxFileSizeValidator,
 } from '@nestjs/common';
 import {
-  ApiBearerAuth,
+  ApiCookieAuth,
   ApiBody,
   ApiConsumes,
   ApiTags,
@@ -99,7 +99,7 @@ const CLOUD_DOWNLOAD_THROTTLE = {
 
 @Controller('Cloud')
 @ApiTags('Cloud')
-@ApiBearerAuth()
+@ApiCookieAuth()
 export class CloudController {
   constructor(private readonly cloudService: CloudService) {}
 

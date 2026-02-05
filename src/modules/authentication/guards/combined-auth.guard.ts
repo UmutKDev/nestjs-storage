@@ -10,7 +10,7 @@ import { SessionService } from '../session/session.service';
 import { ApiKeyService } from '../api-key/api-key.service';
 import { IS_PUBLIC_KEY } from '@common/decorators/public.decorator';
 import { API_KEY_HEADER, API_SECRET_HEADER, SCOPES_KEY } from './api-key.guard';
-import { SESSION_HEADER } from './session.guard';
+import { SESSION_HEADER, SESSION_COOKIE_NAME } from './session.guard';
 import {
   ApiKeyScope,
   AuthenticationType,
@@ -132,21 +132,24 @@ export class CombinedAuthGuard implements CanActivate {
   }
 
   private extractSessionId(request: Request): string | null {
+    // Check cookie first (preferred for browser clients)
+    const cookieSession = (
+      request as Request & { cookies?: Record<string, string> }
+    ).cookies?.[SESSION_COOKIE_NAME];
+    if (cookieSession) {
+      return cookieSession;
+    }
+
+    // Check header (for API clients)
     const headerSession = request.headers[SESSION_HEADER] as string;
     if (headerSession) {
       return headerSession;
     }
 
+    // Check Authorization header (Bearer token format)
     const authHeader = request.headers.authorization;
     if (authHeader?.startsWith('Bearer ')) {
       return authHeader.substring(7);
-    }
-
-    const cookieSession = (
-      request as Request & { cookies?: Record<string, string> }
-    ).cookies?.session_id;
-    if (cookieSession) {
-      return cookieSession;
     }
 
     return null;

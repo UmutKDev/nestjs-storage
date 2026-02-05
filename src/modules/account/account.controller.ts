@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Put } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { ApiCookieAuth, ApiTags } from '@nestjs/swagger';
 import { AccountService } from './account.service';
 import { ApiSuccessResponse } from '@common/decorators/response.decorator';
 import {
@@ -8,16 +8,12 @@ import {
   AccountPutBodyRequestModel,
 } from './account.model';
 import { User } from '@common/decorators/user.decorator';
-import { AuthenticationService } from '../authentication/authentication.service';
 
 @Controller('Account')
 @ApiTags('Account')
-@ApiBearerAuth()
+@ApiCookieAuth()
 export class AccountController {
-  constructor(
-    private readonly accountService: AccountService,
-    private readonly authenticationService: AuthenticationService,
-  ) {}
+  constructor(private readonly accountService: AccountService) {}
 
   @Get('Profile')
   @ApiSuccessResponse(AccountProfileResponseModel)

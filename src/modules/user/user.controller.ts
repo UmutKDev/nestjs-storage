@@ -8,7 +8,7 @@ import {
   Put,
   Delete,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { ApiCookieAuth, ApiTags } from '@nestjs/swagger';
 import { UserService } from './user.service';
 import {
   UserFindResponseModel,
@@ -28,7 +28,7 @@ import { User } from '@common/decorators/user.decorator';
 
 @Controller('User')
 @ApiTags('User')
-@ApiBearerAuth()
+@ApiCookieAuth()
 @Roles(Role.ADMIN)
 export class UserController {
   constructor(private readonly userService: UserService) {}

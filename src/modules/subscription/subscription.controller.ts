@@ -7,7 +7,7 @@ import {
   Put,
   Delete,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { ApiCookieAuth, ApiTags } from '@nestjs/swagger';
 import { SubscriptionService } from './subscription.service';
 import {
   SubscriptionFindResponseModel,
@@ -26,7 +26,7 @@ import { Role } from '@common/enums';
 
 @Controller('Subscription')
 @ApiTags('Subscription')
-@ApiBearerAuth()
+@ApiCookieAuth()
 @Roles(Role.ADMIN)
 export class SubscriptionController {
   constructor(private readonly subscriptionService: SubscriptionService) {}

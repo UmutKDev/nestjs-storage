@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Post, Delete } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { ApiCookieAuth, ApiTags } from '@nestjs/swagger';
 import { SubscriptionService } from './subscription.service';
 import {
   SubscribeRequestModel,
@@ -9,7 +9,7 @@ import { User } from '@common/decorators/user.decorator';
 
 @Controller('Subscription')
 @ApiTags('Subscription')
-@ApiBearerAuth()
+@ApiCookieAuth()
 export class SubscriptionUserController {
   constructor(private readonly subscriptionService: SubscriptionService) {}
 

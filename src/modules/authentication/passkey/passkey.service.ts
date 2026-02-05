@@ -18,10 +18,16 @@ import type {
   AuthenticatorTransportFuture,
 } from '@simplewebauthn/types';
 import {
-  PasskeyRegistrationBeginResponseModel,
+  PasskeyLoginBeginRequestModel,
+  PasskeyLoginFinishRequestModel,
   PasskeyLoginBeginResponseModel,
-  PasskeyViewModel,
 } from '../authentication.model';
+import {
+  PasskeyRegistrationBeginRequestModel,
+  PasskeyRegistrationFinishRequestModel,
+  PasskeyRegistrationBeginResponseModel,
+  PasskeyViewModel,
+} from '../../account/security/security.model';
 import { plainToInstance } from 'class-transformer';
 
 @Injectable()
@@ -47,18 +53,15 @@ export class PasskeyService {
     return `${this.CHALLENGE_PREFIX}:${type}:${userId}`;
   }
 
-  async beginRegistration(
-    userId: string,
-    deviceName: string,
-  ): Promise<PasskeyRegistrationBeginResponseModel> {
-    const user = await this.userRepository.findOne({ where: { Id: userId } });
-    if (!user) {
-      throw new HttpException('User not found', 404);
-    }
-
+  async beginRegistration({
+    User,
+    DeviceName,
+  }: {
+    User: UserContext;
+  } & PasskeyRegistrationBeginRequestModel): Promise<PasskeyRegistrationBeginResponseModel> {
     // Get existing passkeys for this user
     const existingPasskeys = await this.passkeyRepository.find({
-      where: { User: { Id: user.Id } },
+      where: { User: { Id: User.Id } },
     });
 
     const excludeCredentials = existingPasskeys.map((passkey) => ({
@@ -71,8 +74,8 @@ export class PasskeyService {
     const options = await generateRegistrationOptions({
       rpName: this.RP_NAME,
       rpID: this.RP_ID,
-      userName: user.Email,
-      userDisplayName: user.FullName || user.Email,
+      userName: User.Email,
+      userDisplayName: User.FullName || User.Email,
       attestationType: 'none',
       excludeCredentials,
       authenticatorSelection: {
@@ -84,8 +87,8 @@ export class PasskeyService {
 
     // Store challenge in Redis
     await this.redisService.set(
-      this.getChallengeKey(userId, 'registration'),
-      { challenge: options.challenge, deviceName },
+      this.getChallengeKey(User.Id, 'registration'),
+      { challenge: options.challenge, deviceName: DeviceName },
       this.CHALLENGE_TTL,
     );
 
@@ -95,16 +98,18 @@ export class PasskeyService {
     });
   }
 
-  async finishRegistration(
-    userId: string,
-    deviceName: string,
-    credential: RegistrationResponseJSON,
-  ): Promise<PasskeyViewModel> {
+  async finishRegistration({
+    User,
+    DeviceName,
+    Credential,
+  }: {
+    User: UserContext;
+  } & PasskeyRegistrationFinishRequestModel): Promise<PasskeyViewModel> {
     // Get stored challenge
     const stored = await this.redisService.get<{
       challenge: string;
       deviceName: string;
-    }>(this.getChallengeKey(userId, 'registration'));
+    }>(this.getChallengeKey(User.Id, 'registration'));
 
     if (!stored) {
       throw new HttpException('Registration challenge expired', 400);
@@ -113,7 +118,7 @@ export class PasskeyService {
     let verification: VerifiedRegistrationResponse;
     try {
       verification = await verifyRegistrationResponse({
-        response: credential,
+        response: Credential as unknown as RegistrationResponseJSON,
         expectedChallenge: stored.challenge,
         expectedOrigin: this.ORIGIN,
         expectedRPID: this.RP_ID,
@@ -131,21 +136,25 @@ export class PasskeyService {
 
     // Save passkey
     const passkey = new PasskeyEntity({
-      User: { Id: userId } as UserEntity,
+      User: { Id: User.Id } as UserEntity,
       CredentialId: Buffer.from(regCredential.id).toString('base64url'),
       PublicKey: Buffer.from(regCredential.publicKey).toString('base64'),
       Counter: Number(regCredential.counter),
-      DeviceName: deviceName || stored.deviceName,
+      DeviceName: DeviceName || stored.deviceName,
       DeviceType: credentialDeviceType,
-      Transports: credential.response.transports
-        ? JSON.stringify(credential.response.transports)
+      Transports: (Credential as unknown as RegistrationResponseJSON).response
+        .transports
+        ? JSON.stringify(
+            (Credential as unknown as RegistrationResponseJSON).response
+              .transports,
+          )
         : null,
     });
 
     const saved = await this.passkeyRepository.save(passkey);
 
     // Clear challenge
-    await this.redisService.del(this.getChallengeKey(userId, 'registration'));
+    await this.redisService.del(this.getChallengeKey(User.Id, 'registration'));
 
     return plainToInstance(PasskeyViewModel, {
       Id: saved.Id,
@@ -156,8 +165,10 @@ export class PasskeyService {
     });
   }
 
-  async beginLogin(email: string): Promise<PasskeyLoginBeginResponseModel> {
-    const user = await this.userRepository.findOne({ where: { Email: email } });
+  async beginLogin({
+    Email,
+  }: PasskeyLoginBeginRequestModel): Promise<PasskeyLoginBeginResponseModel> {
+    const user = await this.userRepository.findOne({ where: { Email } });
     if (!user) {
       throw new HttpException('User not found', 404);
     }
@@ -196,11 +207,11 @@ export class PasskeyService {
     });
   }
 
-  async finishLogin(
-    email: string,
-    credential: AuthenticationResponseJSON,
-  ): Promise<UserEntity> {
-    const user = await this.userRepository.findOne({ where: { Email: email } });
+  async finishLogin({
+    Email,
+    Credential,
+  }: PasskeyLoginFinishRequestModel): Promise<UserEntity> {
+    const user = await this.userRepository.findOne({ where: { Email } });
     if (!user) {
       throw new HttpException('User not found', 404);
     }
@@ -219,7 +230,7 @@ export class PasskeyService {
     const passkey = await this.passkeyRepository.findOne({
       where: {
         User: { Id: user.Id },
-        CredentialId: credential.id,
+        CredentialId: (Credential as unknown as AuthenticationResponseJSON).id,
       },
     });
 
@@ -230,7 +241,7 @@ export class PasskeyService {
     let verification: VerifiedAuthenticationResponse;
     try {
       verification = await verifyAuthenticationResponse({
-        response: credential,
+        response: Credential as unknown as AuthenticationResponseJSON,
         expectedChallenge: stored.challenge,
         expectedOrigin: this.ORIGIN,
         expectedRPID: this.RP_ID,
@@ -266,9 +277,9 @@ export class PasskeyService {
     return user;
   }
 
-  async getUserPasskeys(userId: string): Promise<PasskeyViewModel[]> {
+  async getUserPasskeys(User: UserContext): Promise<PasskeyViewModel[]> {
     const passkeys = await this.passkeyRepository.find({
-      where: { User: { Id: userId } },
+      where: { User: { Id: User.Id } },
       order: { CreatedAt: 'DESC' },
     });
 
@@ -283,10 +294,10 @@ export class PasskeyService {
     );
   }
 
-  async deletePasskey(userId: string, passkeyId: string): Promise<boolean> {
+  async deletePasskey(User: UserContext, passkeyId: string): Promise<boolean> {
     const result = await this.passkeyRepository.delete({
       Id: passkeyId,
-      User: { Id: userId },
+      User: { Id: User.Id },
     });
 
     return result.affected > 0;

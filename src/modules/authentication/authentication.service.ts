@@ -2,11 +2,13 @@ import { HttpException, Injectable } from '@nestjs/common';
 import * as argon2 from 'argon2';
 import {
   LoginRequestModel,
+  LoginCheckRequestModel,
+  LoginCheckResponseModel,
   RegisterRequestModel,
   ResetPasswordRequestModel,
-  AuthResponseModel,
-  SessionViewModel,
+  AuthenticationResponseModel,
 } from './authentication.model';
+import { SessionViewModel } from '../account/security/security.model';
 import { MailService } from '../mail/mail.service';
 import { passwordGenerator } from '@common/helpers/cast.helper';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -30,10 +32,80 @@ export class AuthenticationService {
     private readonly mailService: MailService,
   ) {}
 
+  /**
+   * Step 1: Check email and return authentication requirements
+   * Returns what authentication methods are available for this user
+   */
+  async LoginCheck({
+    Email,
+  }: LoginCheckRequestModel): Promise<LoginCheckResponseModel> {
+    const user = await this.userRepository.findOne({
+      where: { Email: Email },
+    });
+
+    if (!user) {
+      // Return generic response to prevent email enumeration
+      return plainToInstance(LoginCheckResponseModel, {
+        Exists: false,
+        HasPasskey: false,
+        HasTwoFactor: false,
+        TwoFactorMethod: null,
+        AvailableMethods: [],
+        PasskeyOptions: null,
+      });
+    }
+
+    if (user.Status === Status.SUSPENDED) {
+      throw new HttpException(Codes.Error.User.SUSPENDED, 403);
+    }
+
+    const hasPasskey = await this.passkeyService.hasPasskey(user.Id);
+    const hasTwoFactor = await this.twoFactorService.isTwoFactorEnabled(
+      user.Id,
+    );
+
+    // Create a minimal UserContext for getStatus
+    const userContext: UserContext = {
+      Id: user.Id,
+      Email: user.Email,
+      FullName: user.FullName,
+      Role: user.Role as Role,
+      Status: user.Status as Status,
+      Image: user.Image,
+    };
+
+    const twoFactorStatus = hasTwoFactor
+      ? await this.twoFactorService.getStatus(userContext, hasPasskey)
+      : null;
+
+    const availableMethods: ('password' | 'passkey')[] = ['password'];
+    let passkeyOptions = null;
+
+    if (hasPasskey) {
+      availableMethods.push('passkey');
+      // Pre-generate passkey options for convenience
+      try {
+        const passkeyBegin = await this.passkeyService.beginLogin({ Email });
+        passkeyOptions = passkeyBegin.Options;
+      } catch {
+        // If passkey options fail, just don't include them
+      }
+    }
+
+    return plainToInstance(LoginCheckResponseModel, {
+      Exists: true,
+      HasPasskey: hasPasskey,
+      HasTwoFactor: hasTwoFactor,
+      TwoFactorMethod: twoFactorStatus?.Method || null,
+      AvailableMethods: availableMethods,
+      PasskeyOptions: passkeyOptions,
+    });
+  }
+
   async Login(
     { Email, Password }: LoginRequestModel,
     request?: Request,
-  ): Promise<AuthResponseModel> {
+  ): Promise<AuthenticationResponseModel> {
     const user = await this.userRepository
       .createQueryBuilder('user')
       .select([
@@ -98,7 +170,7 @@ export class AuthenticationService {
       requires2FA,
     );
 
-    return plainToInstance(AuthResponseModel, {
+    return plainToInstance(AuthenticationResponseModel, {
       SessionId: SessionId,
       ExpiresAt: Session.ExpiresAt,
       RequiresTwoFactor: requires2FA,
@@ -108,7 +180,7 @@ export class AuthenticationService {
   async Register(
     { Email, Password }: RegisterRequestModel,
     request?: Request,
-  ): Promise<AuthResponseModel> {
+  ): Promise<AuthenticationResponseModel> {
     const queryRunner =
       this.userRepository.manager.connection.createQueryRunner();
 
@@ -136,7 +208,7 @@ export class AuthenticationService {
         false,
       );
 
-      return plainToInstance(AuthResponseModel, {
+      return plainToInstance(AuthenticationResponseModel, {
         SessionId: SessionId,
         ExpiresAt: Session.ExpiresAt,
         RequiresTwoFactor: false,
@@ -157,23 +229,23 @@ export class AuthenticationService {
     return true;
   }
 
-  async LogoutAll(userId: string): Promise<number> {
-    return this.sessionService.revokeAllUserSessions(userId);
+  async LogoutAll(User: UserContext): Promise<number> {
+    return this.sessionService.revokeAllUserSessions(User.Id);
   }
 
   async LogoutOthers(
-    userId: string,
+    User: UserContext,
     currentSessionId: string,
   ): Promise<number> {
-    return this.sessionService.revokeOtherSessions(userId, currentSessionId);
+    return this.sessionService.revokeOtherSessions(User.Id, currentSessionId);
   }
 
   async GetSessions(
-    userId: string,
+    User: UserContext,
     currentSessionId?: string,
   ): Promise<SessionViewModel[]> {
     const sessions = await this.sessionService.getUserSessions(
-      userId,
+      User.Id,
       currentSessionId,
     );
 
@@ -182,10 +254,10 @@ export class AuthenticationService {
     );
   }
 
-  async RevokeSession(userId: string, sessionId: string): Promise<boolean> {
+  async RevokeSession(User: UserContext, sessionId: string): Promise<boolean> {
     const session = await this.sessionService.getSession(sessionId);
 
-    if (!session || session.UserId !== userId) {
+    if (!session || session.UserId !== User.Id) {
       throw new HttpException('Session not found', 404);
     }
 
@@ -255,7 +327,10 @@ export class AuthenticationService {
     return user;
   }
 
-  async Verify2FA(sessionId: string, code: string): Promise<AuthResponseModel> {
+  async Verify2FA(
+    sessionId: string,
+    code: string,
+  ): Promise<AuthenticationResponseModel> {
     const session = await this.sessionService.getSession(sessionId);
 
     if (!session) {
@@ -277,7 +352,7 @@ export class AuthenticationService {
 
     await this.sessionService.completeTwoFactorVerification(sessionId);
 
-    return plainToInstance(AuthResponseModel, {
+    return plainToInstance(AuthenticationResponseModel, {
       SessionId: sessionId,
       ExpiresAt: session.ExpiresAt,
       RequiresTwoFactor: false,

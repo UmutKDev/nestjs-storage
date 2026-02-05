@@ -11,6 +11,7 @@ import { IS_PUBLIC_KEY } from '@common/decorators/public.decorator';
 import { SessionData } from '../session/session.interface';
 
 export const SESSION_HEADER = 'x-session-id';
+export const SESSION_COOKIE_NAME = 'session_id';
 
 @Injectable()
 export class SessionGuard implements CanActivate {
@@ -60,7 +61,15 @@ export class SessionGuard implements CanActivate {
   }
 
   private extractSessionId(request: Request): string | null {
-    // Check header first
+    // Check cookie first (preferred for browser clients)
+    const cookieSession = (
+      request as Request & { cookies?: Record<string, string> }
+    ).cookies?.[SESSION_COOKIE_NAME];
+    if (cookieSession) {
+      return cookieSession;
+    }
+
+    // Check header (for API clients)
     const headerSession = request.headers[SESSION_HEADER] as string;
     if (headerSession) {
       return headerSession;
@@ -70,14 +79,6 @@ export class SessionGuard implements CanActivate {
     const authHeader = request.headers.authorization;
     if (authHeader?.startsWith('Bearer ')) {
       return authHeader.substring(7);
-    }
-
-    // Check cookie
-    const cookieSession = (
-      request as Request & { cookies?: Record<string, string> }
-    ).cookies?.session_id;
-    if (cookieSession) {
-      return cookieSession;
     }
 
     return null;

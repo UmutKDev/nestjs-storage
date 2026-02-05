@@ -14,7 +14,7 @@ import {
   ApiKeyViewModel,
   ApiKeyUpdateRequestModel,
   ApiKeyRotateResponseModel,
-} from '../authentication.model';
+} from '../../account/security/security.model';
 import { plainToInstance } from 'class-transformer';
 import { RedisService } from '@modules/redis/redis.service';
 import { UserEntity } from '@entities/user.entity';
@@ -41,25 +41,32 @@ export class ApiKeyService {
     return prefix + randomBytes(24).toString('hex');
   }
 
-  async createApiKey(
-    userId: string,
-    data: ApiKeyCreateRequestModel,
-  ): Promise<ApiKeyCreatedResponseModel> {
-    const publicKey = this.generatePublicKey(data.Environment);
-    const secretKey = this.generateSecretKey(data.Environment);
+  async createApiKey({
+    User,
+    Name,
+    Scopes,
+    Environment,
+    IpWhitelist,
+    RateLimitPerMinute,
+    ExpiresAt,
+  }: {
+    User: UserContext;
+  } & ApiKeyCreateRequestModel): Promise<ApiKeyCreatedResponseModel> {
+    const publicKey = this.generatePublicKey(Environment);
+    const secretKey = this.generateSecretKey(Environment);
     const secretKeyHash = await argon2.hash(secretKey);
 
     const apiKey = new ApiKeyEntity({
-      User: { Id: userId } as UserEntity,
-      Name: data.Name,
+      User: { Id: User.Id } as UserEntity,
+      Name: Name,
       PublicKey: publicKey,
       SecretKeyHash: secretKeyHash,
       SecretKeyPrefix: secretKey.substring(0, 15),
-      Scopes: data.Scopes,
-      Environment: data.Environment,
-      IpWhitelist: data.IpWhitelist || null,
-      RateLimitPerMinute: data.RateLimitPerMinute || 100,
-      ExpiresAt: data.ExpiresAt ? new Date(data.ExpiresAt) : null,
+      Scopes: Scopes,
+      Environment: Environment,
+      IpWhitelist: IpWhitelist || null,
+      RateLimitPerMinute: RateLimitPerMinute || 100,
+      ExpiresAt: ExpiresAt ? new Date(ExpiresAt) : null,
     });
 
     const saved = await this.apiKeyRepository.save(apiKey);
@@ -210,9 +217,9 @@ export class ApiKeyService {
     await this.redisService.set(key, (current || 0) + 1, 60);
   }
 
-  async getUserApiKeys(userId: string): Promise<ApiKeyViewModel[]> {
+  async getUserApiKeys(User: UserContext): Promise<ApiKeyViewModel[]> {
     const apiKeys = await this.apiKeyRepository.find({
-      where: { User: { Id: userId } },
+      where: { User: { Id: User.Id } },
       order: { CreatedAt: 'DESC' },
     });
 
@@ -234,13 +241,19 @@ export class ApiKeyService {
     );
   }
 
-  async updateApiKey(
-    userId: string,
-    apiKeyId: string,
-    data: ApiKeyUpdateRequestModel,
-  ): Promise<ApiKeyViewModel> {
+  async updateApiKey({
+    User,
+    ApiKeyId,
+    Name,
+    Scopes,
+    IpWhitelist,
+    RateLimitPerMinute,
+  }: {
+    User: UserContext;
+    ApiKeyId: string;
+  } & ApiKeyUpdateRequestModel): Promise<ApiKeyViewModel> {
     const apiKey = await this.apiKeyRepository.findOne({
-      where: { Id: apiKeyId, User: { Id: userId } },
+      where: { Id: ApiKeyId, User: { Id: User.Id } },
     });
 
     if (!apiKey) {
@@ -251,11 +264,10 @@ export class ApiKeyService {
       throw new HttpException('Cannot update revoked API key', 400);
     }
 
-    if (data.Name) apiKey.Name = data.Name;
-    if (data.Scopes) apiKey.Scopes = data.Scopes;
-    if (data.IpWhitelist !== undefined) apiKey.IpWhitelist = data.IpWhitelist;
-    if (data.RateLimitPerMinute)
-      apiKey.RateLimitPerMinute = data.RateLimitPerMinute;
+    if (Name) apiKey.Name = Name;
+    if (Scopes) apiKey.Scopes = Scopes;
+    if (IpWhitelist !== undefined) apiKey.IpWhitelist = IpWhitelist;
+    if (RateLimitPerMinute) apiKey.RateLimitPerMinute = RateLimitPerMinute;
 
     await this.apiKeyRepository.save(apiKey);
 
@@ -275,9 +287,9 @@ export class ApiKeyService {
     });
   }
 
-  async revokeApiKey(userId: string, apiKeyId: string): Promise<boolean> {
+  async revokeApiKey(User: UserContext, apiKeyId: string): Promise<boolean> {
     const result = await this.apiKeyRepository.update(
-      { Id: apiKeyId, User: { Id: userId } },
+      { Id: apiKeyId, User: { Id: User.Id } },
       { IsRevoked: true },
     );
 
@@ -285,11 +297,11 @@ export class ApiKeyService {
   }
 
   async rotateApiKey(
-    userId: string,
+    User: UserContext,
     apiKeyId: string,
   ): Promise<ApiKeyRotateResponseModel> {
     const apiKey = await this.apiKeyRepository.findOne({
-      where: { Id: apiKeyId, User: { Id: userId } },
+      where: { Id: apiKeyId, User: { Id: User.Id } },
     });
 
     if (!apiKey) {

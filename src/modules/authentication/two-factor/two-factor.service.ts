@@ -6,11 +6,12 @@ import { TwoFactorMethod } from '@common/enums/authentication.enum';
 import { authenticator } from 'otplib';
 import * as argon2 from 'argon2';
 import { randomBytes } from 'crypto';
+import { TwoFactorVerifyRequestModel } from '../authentication.model';
 import {
   TwoFactorSetupResponseModel,
   TwoFactorBackupCodesResponseModel,
   TwoFactorStatusResponseModel,
-} from '../authentication.model';
+} from '../../account/security/security.model';
 import { plainToInstance } from 'class-transformer';
 
 @Injectable()
@@ -43,26 +44,26 @@ export class TwoFactorService {
     return Promise.all(codes.map((code) => argon2.hash(code)));
   }
 
-  async setupTotp(
-    userId: string,
-    email: string,
-  ): Promise<TwoFactorSetupResponseModel> {
+  async setupTotp(User: UserContext): Promise<TwoFactorSetupResponseModel> {
     // Check if already has 2FA enabled
     const existing = await this.twoFactorRepository.findOne({
-      where: { UserId: userId, IsEnabled: true },
+      where: { UserId: User.Id, IsEnabled: true },
     });
 
     if (existing) {
-      throw new HttpException('Two-factor authentication is already enabled', 400);
+      throw new HttpException(
+        'Two-factor authentication is already enabled',
+        400,
+      );
     }
 
     // Generate secret
     const secret = authenticator.generateSecret();
-    const otpAuthUrl = authenticator.keyuri(email, this.ISSUER, secret);
+    const otpAuthUrl = authenticator.keyuri(User.Email, this.ISSUER, secret);
 
     // Create or update 2FA record (not enabled yet)
     let twoFactor = await this.twoFactorRepository.findOne({
-      where: { UserId: userId },
+      where: { UserId: User.Id },
     });
 
     if (twoFactor) {
@@ -71,7 +72,7 @@ export class TwoFactorService {
       twoFactor.IsVerified = false;
     } else {
       twoFactor = new TwoFactorEntity({
-        UserId: userId,
+        UserId: User.Id,
         Method: TwoFactorMethod.TOTP,
         Secret: secret,
         IsEnabled: false,
@@ -84,17 +85,19 @@ export class TwoFactorService {
     return plainToInstance(TwoFactorSetupResponseModel, {
       Secret: secret,
       Issuer: this.ISSUER,
-      AccountName: email,
+      AccountName: User.Email,
       OtpAuthUrl: otpAuthUrl,
     });
   }
 
-  async verifyAndEnableTotp(
-    userId: string,
-    code: string,
-  ): Promise<TwoFactorBackupCodesResponseModel> {
+  async verifyAndEnableTotp({
+    User,
+    Code,
+  }: {
+    User: UserContext;
+  } & TwoFactorVerifyRequestModel): Promise<TwoFactorBackupCodesResponseModel> {
     const twoFactor = await this.twoFactorRepository.findOne({
-      where: { UserId: userId, Method: TwoFactorMethod.TOTP },
+      where: { UserId: User.Id, Method: TwoFactorMethod.TOTP },
     });
 
     if (!twoFactor || !twoFactor.Secret) {
@@ -103,7 +106,7 @@ export class TwoFactorService {
 
     // Verify the code
     const isValid = authenticator.verify({
-      token: code,
+      token: Code,
       secret: twoFactor.Secret,
     });
 
@@ -158,7 +161,10 @@ export class TwoFactorService {
       const hashedCode = twoFactor.BackupCodes[i];
       if (hashedCode) {
         try {
-          const isValid = await argon2.verify(hashedCode, code.replace('-', '').toUpperCase());
+          const isValid = await argon2.verify(
+            hashedCode,
+            code.replace('-', '').toUpperCase(),
+          );
           if (isValid) {
             // Remove used backup code
             const newCodes = [...twoFactor.BackupCodes];
@@ -181,27 +187,32 @@ export class TwoFactorService {
     return false;
   }
 
-  async disableTotp(userId: string, code: string): Promise<boolean> {
-    const isValid = await this.verifyCode(userId, code);
+  async disableTotp({
+    User,
+    Code,
+  }: { User: UserContext } & TwoFactorVerifyRequestModel): Promise<boolean> {
+    const isValid = await this.verifyCode(User.Id, Code);
     if (!isValid) {
       throw new HttpException('Invalid verification code', 400);
     }
 
-    await this.twoFactorRepository.delete({ UserId: userId });
+    await this.twoFactorRepository.delete({ UserId: User.Id });
     return true;
   }
 
-  async regenerateBackupCodes(
-    userId: string,
-    code: string,
-  ): Promise<TwoFactorBackupCodesResponseModel> {
-    const isValid = await this.verifyCode(userId, code);
+  async regenerateBackupCodes({
+    User,
+    Code,
+  }: {
+    User: UserContext;
+  } & TwoFactorVerifyRequestModel): Promise<TwoFactorBackupCodesResponseModel> {
+    const isValid = await this.verifyCode(User.Id, Code);
     if (!isValid) {
       throw new HttpException('Invalid verification code', 400);
     }
 
     const twoFactor = await this.twoFactorRepository.findOne({
-      where: { UserId: userId, IsEnabled: true },
+      where: { UserId: User.Id, IsEnabled: true },
     });
 
     if (!twoFactor) {
@@ -219,12 +230,16 @@ export class TwoFactorService {
     });
   }
 
-  async getStatus(userId: string, hasPasskey: boolean): Promise<TwoFactorStatusResponseModel> {
+  async getStatus(
+    User: UserContext,
+    hasPasskey: boolean,
+  ): Promise<TwoFactorStatusResponseModel> {
     const twoFactor = await this.twoFactorRepository.findOne({
-      where: { UserId: userId },
+      where: { UserId: User.Id },
     });
 
-    const backupCodesRemaining = twoFactor?.BackupCodes?.filter(Boolean).length || 0;
+    const backupCodesRemaining =
+      twoFactor?.BackupCodes?.filter(Boolean).length || 0;
 
     return plainToInstance(TwoFactorStatusResponseModel, {
       IsEnabled: twoFactor?.IsEnabled || false,
