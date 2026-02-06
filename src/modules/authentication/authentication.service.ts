@@ -140,23 +140,18 @@ export class AuthenticationService {
       throw new HttpException(Codes.Error.User.SUSPENDED, 403);
     }
 
-    const loginDate = user.Role !== Role.ADMIN ? null : new Date();
-
-    if (loginDate) {
-      await this.userRepository.update(
-        { Id: user.Id },
-        { LastLoginAt: loginDate },
-      );
-      user.LastLoginAt = loginDate;
-    }
-
     if (user.Status === Status.PENDING) {
-      await this.userRepository.update(
-        { Id: user.Id },
-        { Status: Status.ACTIVE },
-      );
       user.Status = Status.ACTIVE;
     }
+
+    const now = new Date();
+
+    await this.userRepository.update(
+      { Id: user.Id },
+      { LastLoginAt: now, Status: user.Status },
+    );
+
+    user.LastLoginAt = now;
 
     const requires2FA = await this.twoFactorService.isTwoFactorEnabled(user.Id);
 
