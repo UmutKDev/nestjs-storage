@@ -50,9 +50,11 @@ services:
       - NODE_ENV=${NODE_ENV}
       - PORT=${PORT}
       - APP_NAME=${APP_NAME}
-      - APP_URL=${APP_URL}
+      - API_APP_URL=${API_APP_URL}
+      - CLIENT_APP_URL=${CLIENT_APP_URL}
       - TZ=${TZ}
 
+      - REDIS_ENABLED=${REDIS_ENABLED}
       - REDIS_HOST=${REDIS_HOST:-redis}
       - REDIS_PORT=${REDIS_PORT:-6379}
       - REDIS_PASSWORD=${REDIS_PASSWORD:-}

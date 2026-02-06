@@ -9,7 +9,10 @@ import {
   Req,
 } from '@nestjs/common';
 import { ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { ApiSuccessResponse } from '@common/decorators/response.decorator';
+import {
+  ApiSuccessArrayResponse,
+  ApiSuccessResponse,
+} from '@common/decorators/response.decorator';
 import {
   SessionViewModel,
   PasskeyRegistrationBeginRequestModel,
@@ -135,7 +138,7 @@ export class SecurityController {
   }
 
   @Get('Passkey')
-  @ApiSuccessResponse(PasskeyViewModel)
+  @ApiSuccessArrayResponse(PasskeyViewModel)
   @ApiOperation({ summary: 'Get registered passkeys' })
   async GetPasskeys(@User() User: UserContext): Promise<PasskeyViewModel[]> {
     return this.passkeyService.getUserPasskeys(User);

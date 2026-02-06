@@ -34,7 +34,7 @@ import { plainToInstance } from 'class-transformer';
 export class PasskeyService {
   private readonly RP_NAME = process.env.APP_NAME || 'Storage';
   private readonly RP_ID = process.env.WEBAUTHN_RP_ID || 'localhost';
-  private readonly ORIGIN = process.env.APP_URL || 'http://localhost:3000';
+  private readonly ORIGIN = process.env.CLIENT_APP_URL;
   private readonly CHALLENGE_PREFIX = 'passkey:challenge';
   private readonly CHALLENGE_TTL = 300; // 5 minutes
 

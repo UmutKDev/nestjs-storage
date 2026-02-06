@@ -90,7 +90,8 @@ export declare global {
       NODE_ENV: string;
       PORT: string;
       APP_NAME?: string;
-      APP_URL: string;
+      CLIENT_APP_URL: string;
+      API_APP_URL: string;
     }
   }
 
