@@ -71,16 +71,19 @@ export class PasskeyService {
         : undefined,
     }));
 
+    const userIdBuffer = new TextEncoder().encode(User.Id);
+
     const options = await generateRegistrationOptions({
       rpName: this.RP_NAME,
       rpID: this.RP_ID,
+      userID: userIdBuffer,
       userName: User.Email,
       userDisplayName: User.FullName || User.Email,
       attestationType: 'none',
       excludeCredentials,
       authenticatorSelection: {
-        residentKey: 'preferred',
-        userVerification: 'preferred',
+        residentKey: 'required',
+        userVerification: 'required',
         authenticatorAttachment: 'platform',
       },
     });
@@ -137,7 +140,7 @@ export class PasskeyService {
     // Save passkey
     const passkey = new PasskeyEntity({
       User: { Id: User.Id } as UserEntity,
-      CredentialId: Buffer.from(regCredential.id).toString('base64url'),
+      CredentialId: regCredential.id,
       PublicKey: Buffer.from(regCredential.publicKey).toString('base64'),
       Counter: Number(regCredential.counter),
       DeviceName: DeviceName || stored.deviceName,
@@ -181,17 +184,9 @@ export class PasskeyService {
       throw new HttpException('No passkeys registered', 400);
     }
 
-    const allowCredentials = passkeys.map((passkey) => ({
-      id: passkey.CredentialId,
-      transports: passkey.Transports
-        ? (JSON.parse(passkey.Transports) as AuthenticatorTransportFuture[])
-        : undefined,
-    }));
-
     const options = await generateAuthenticationOptions({
       rpID: this.RP_ID,
-      allowCredentials,
-      userVerification: 'preferred',
+      userVerification: 'required',
     });
 
     // Store challenge
