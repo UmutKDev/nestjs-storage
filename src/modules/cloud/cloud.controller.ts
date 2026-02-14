@@ -526,9 +526,16 @@ export class CloudController {
     // set headers
     res.setHeader('Content-Type', obj.MimeType || 'application/octet-stream');
     if (obj.Size) res.setHeader('Content-Length', String(obj.Size));
-    const filename =
+    const rawFilename =
       obj.Name || (model.Key ? model.Key.split('/').pop() : 'file');
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    const sanitizedFilename = rawFilename
+      .replace(/["\\\r\n]/g, '_')
+      .replace(/[^\x20-\x7E]/g, '_');
+    const encodedFilename = encodeURIComponent(rawFilename);
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${sanitizedFilename}"; filename*=UTF-8''${encodedFilename}`,
+    );
 
     // get node stream and throttle for this user (static per subscription)
     const rawStream = await this.cloudService.GetObjectReadable(model, user);

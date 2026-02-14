@@ -83,7 +83,12 @@ export class AccountService {
 
       return true;
     } catch (error) {
-      throw new HttpException(error, 400);
+      throw new HttpException(
+        error instanceof HttpException
+          ? error.message
+          : 'Failed to update profile',
+        error instanceof HttpException ? error.getStatus() : 400,
+      );
     }
   }
 
@@ -118,9 +123,11 @@ export class AccountService {
       throw new HttpException(Codes.Error.Password.WRONG, 400);
     }
 
+    const hashedPassword = await argon2.hash(model.NewPassword);
+
     await this.userRepository.update(
       { Id: user.Id },
-      { Password: model.NewPassword },
+      { Password: hashedPassword },
     );
 
     return true;

@@ -1,5 +1,6 @@
 import { AllMimeTypesExtensions, MimeTypeGroups } from '@common/enums';
 import { camelCase, startCase } from 'lodash';
+import { randomBytes, randomInt, randomUUID } from 'crypto';
 
 export const slugify = (value: string): string =>
   value
@@ -36,18 +37,14 @@ export const passwordGenerator = (length: number): string => {
   const password = Array.from({ length })
     .fill(charset)
     .map((e: string) => {
-      return e[Math.floor(Math.random() * e.length)];
+      return e[randomInt(e.length)];
     });
 
   return password.join('');
 };
 
 export const uuidGenerator = (): string => {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    const v = c === 'x' ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
+  return randomUUID();
 };
 
 export const SizeFormatter = ({

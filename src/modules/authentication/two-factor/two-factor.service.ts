@@ -163,7 +163,7 @@ export class TwoFactorService {
         try {
           const isValid = await argon2.verify(
             hashedCode,
-            code.replace('-', '').toUpperCase(),
+            code.replaceAll('-', '').toUpperCase(),
           );
           if (isValid) {
             // Remove used backup code

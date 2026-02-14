@@ -121,6 +121,7 @@ export class UserService {
       Image: model.Image,
       Role: model.Role,
       Status: Status.ACTIVE,
+      Password: password,
     });
 
     await this.userRepository.save(newUser);

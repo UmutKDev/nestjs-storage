@@ -13,10 +13,6 @@ export class LoginCheckRequestModel extends PickType(UserViewModel, [
 
 export class LoginCheckResponseModel {
   @Expose()
-  @ApiProperty({ description: 'Whether the user exists' })
-  Exists: boolean;
-
-  @Expose()
   @ApiProperty({ description: 'Whether the user has passkey(s) registered' })
   HasPasskey: boolean;
 

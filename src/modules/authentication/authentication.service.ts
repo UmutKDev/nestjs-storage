@@ -20,6 +20,10 @@ import { plainToInstance } from 'class-transformer';
 import { SessionService } from './session/session.service';
 import { TwoFactorService } from './two-factor/two-factor.service';
 import { PasskeyService } from './passkey/passkey.service';
+import { RedisService } from '../redis/redis.service';
+
+const TWO_FACTOR_MAX_ATTEMPTS = 5;
+const TWO_FACTOR_LOCKOUT_SECONDS = 900; // 15 minutes
 
 @Injectable()
 export class AuthenticationService {
@@ -30,6 +34,7 @@ export class AuthenticationService {
     private readonly twoFactorService: TwoFactorService,
     private readonly passkeyService: PasskeyService,
     private readonly mailService: MailService,
+    private readonly redisService: RedisService,
   ) {}
 
   /**
@@ -44,13 +49,12 @@ export class AuthenticationService {
     });
 
     if (!user) {
-      // Return generic response to prevent email enumeration
+      // Return same structure as existing user to prevent email enumeration
       return plainToInstance(LoginCheckResponseModel, {
-        Exists: false,
         HasPasskey: false,
         HasTwoFactor: false,
         TwoFactorMethod: null,
-        AvailableMethods: [],
+        AvailableMethods: ['password'],
         PasskeyOptions: null,
       });
     }
@@ -93,7 +97,6 @@ export class AuthenticationService {
     }
 
     return plainToInstance(LoginCheckResponseModel, {
-      Exists: true,
       HasPasskey: hasPasskey,
       HasTwoFactor: hasTwoFactor,
       TwoFactorMethod: twoFactorStatus?.Method || null,
@@ -276,10 +279,11 @@ export class AuthenticationService {
       });
 
     const generatedPassword = passwordGenerator(12);
+    const hashedPassword = await argon2.hash(generatedPassword);
 
     await this.userRepository.update(
       { Id: user.Id },
-      { Password: generatedPassword },
+      { Password: hashedPassword },
     );
 
     await this.sessionService.revokeAllUserSessions(user.Id);
@@ -336,15 +340,33 @@ export class AuthenticationService {
       throw new HttpException('Two-factor verification not required', 400);
     }
 
+    // Brute force protection
+    const attemptKey = `2fa:attempts:${sessionId}`;
+    const attempts = (await this.redisService.get<number>(attemptKey)) || 0;
+
+    if (attempts >= TWO_FACTOR_MAX_ATTEMPTS) {
+      await this.sessionService.revokeSession(sessionId);
+      throw new HttpException(
+        'Too many failed attempts. Session revoked. Please login again.',
+        429,
+      );
+    }
+
     const isValid = await this.twoFactorService.verifyCode(
       session.UserId,
       code,
     );
 
     if (!isValid) {
+      await this.redisService.set(
+        attemptKey,
+        attempts + 1,
+        TWO_FACTOR_LOCKOUT_SECONDS,
+      );
       throw new HttpException('Invalid verification code', 400);
     }
 
+    await this.redisService.del(attemptKey);
     await this.sessionService.completeTwoFactorVerification(sessionId);
 
     return plainToInstance(AuthenticationResponseModel, {

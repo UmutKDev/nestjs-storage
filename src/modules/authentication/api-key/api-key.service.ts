@@ -7,7 +7,7 @@ import {
   ApiKeyScope,
 } from '@common/enums/authentication.enum';
 import * as argon2 from 'argon2';
-import { randomBytes, createHmac } from 'crypto';
+import { randomBytes, createHmac, timingSafeEqual } from 'crypto';
 import {
   ApiKeyCreateRequestModel,
   ApiKeyCreatedResponseModel,
@@ -192,19 +192,35 @@ export class ApiKeyService {
     return createHmac('sha256', secret).update(data).digest('hex');
   }
 
-  /* eslint-disable @typescript-eslint/no-unused-vars */
   private async verifySignature(
-    _apiKeyId: string,
-    _signature: string,
-    _payload: string,
-    _timestamp: string,
+    apiKeyId: string,
+    signature: string,
+    payload: string,
+    timestamp: string,
   ): Promise<boolean> {
-    // In a production system, you'd store an HMAC key separately
-    // For simplicity, we'll validate using a cached or stored key
-    // This is a simplified implementation
-    return true; // Simplified - real implementation needs HMAC key storage
+    const apiKey = await this.apiKeyRepository.findOne({
+      where: { Id: apiKeyId },
+    });
+
+    if (!apiKey) {
+      return false;
+    }
+
+    const expectedSignature = this.generateSignature(
+      apiKey.SecretKeyHash,
+      payload,
+      timestamp,
+    );
+
+    const sigBuffer = Buffer.from(signature, 'hex');
+    const expectedBuffer = Buffer.from(expectedSignature, 'hex');
+
+    if (sigBuffer.length !== expectedBuffer.length) {
+      return false;
+    }
+
+    return timingSafeEqual(sigBuffer, expectedBuffer);
   }
-  /* eslint-enable @typescript-eslint/no-unused-vars */
 
   private async checkRateLimit(apiKey: ApiKeyEntity): Promise<void> {
     const key = `${this.RATE_LIMIT_PREFIX}:${apiKey.Id}`;
