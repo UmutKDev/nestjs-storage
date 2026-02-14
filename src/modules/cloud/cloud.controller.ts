@@ -54,6 +54,7 @@ import {
   CloudUserStorageUsageResponseModel,
   CloudScanStatusResponseModel,
   CloudPreSignedUrlRequestModel,
+  CloudSearchRequestModel,
   // New Directories API
   DirectoryCreateRequestModel,
   DirectoryRenameRequestModel,
@@ -174,6 +175,28 @@ export class CloudController {
     @Headers(FOLDER_SESSION_HEADER) sessionToken?: string,
   ): Promise<CloudObjectModel[]> {
     return this.cloudService.ListObjects(model, user, sessionToken);
+  }
+
+  @ApiOperation({
+    summary: 'Search files by name',
+    description:
+      "Recursively searches the user's files by partial filename match (case-insensitive). " +
+      'Optionally restrict to a specific path or filter by extension. ' +
+      'Encrypted folder contents are excluded unless a valid session token is provided via X-Folder-Session header.',
+  })
+  @Get('Search')
+  @ApiHeader({
+    name: FOLDER_SESSION_HEADER,
+    required: false,
+    description: 'Session token for encrypted folder access',
+  })
+  @ApiSuccessArrayResponse(CloudObjectModel)
+  async Search(
+    @Query() model: CloudSearchRequestModel,
+    @User() user: UserContext,
+    @Headers(FOLDER_SESSION_HEADER) sessionToken?: string,
+  ): Promise<CloudObjectModel[]> {
+    return this.cloudService.Search(model, user, sessionToken);
   }
 
   @ApiOperation({

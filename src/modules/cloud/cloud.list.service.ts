@@ -50,6 +50,10 @@ export class CloudListService {
     process.env.S3_PROTOCOL_SIGNED_URL_PROCESSING === 'true';
   private readonly IsDirectory = (key: string) =>
     key.includes(this.EmptyFolderPlaceholder);
+  private readonly MaxSearchScanObjects = Math.max(
+    1,
+    parseInt(process.env.CLOUD_SEARCH_SCAN_MAX ?? '10000', 10),
+  );
 
   constructor(
     private readonly CloudS3Service: CloudS3Service,
@@ -371,6 +375,122 @@ export class CloudListService {
     }
 
     return { Directories: directories, TotalCount: totalCount };
+  }
+
+  async SearchObjects(
+    {
+      Query,
+      Path,
+      Extension,
+      IsMetadataProcessing,
+      Skip,
+      Take,
+    }: {
+      Query: string;
+      Path?: string;
+      Extension?: string;
+      IsMetadataProcessing: boolean;
+      Skip?: number;
+      Take?: number;
+    },
+    User: UserContext,
+    EncryptedFolders?: Set<string>,
+    SessionToken?: string,
+    ValidateDirectorySession?: (
+      userId: string,
+      folderPath: string,
+      sessionToken: string,
+    ) => Promise<unknown>,
+  ): Promise<{ Objects: CloudObjectModel[]; TotalCount: number }> {
+    const cleanedPath = Path ? Path.replace(/^\/+|\/+$/g, '') : '';
+
+    let prefix = KeyBuilder([User.Id, cleanedPath]);
+    if (!prefix.endsWith('/')) {
+      prefix = prefix + '/';
+    }
+
+    const skipValue = typeof Skip === 'number' && Skip > 0 ? Skip : 0;
+    const takeValue =
+      typeof Take === 'number' && Take > 0 ? Take : 50;
+    const lowerQuery = Query.toLowerCase();
+    const lowerExtension = Extension?.toLowerCase();
+
+    const matched: _Object[] = [];
+    let totalMatched = 0;
+    let continuationToken: string | undefined;
+    let scannedObjects = 0;
+
+    const sessionCache = new Map<string, boolean>();
+
+    do {
+      const command = await this.CloudS3Service.Send(
+        new ListObjectsV2Command({
+          Bucket: this.CloudS3Service.GetBuckets().Storage,
+          Prefix: prefix,
+          MaxKeys: this.MaxListObjects,
+          ContinuationToken: continuationToken,
+        }),
+      );
+
+      for (const obj of command.Contents ?? []) {
+        scannedObjects++;
+        if (!obj.Key) continue;
+        if (this.IsDirectory(obj.Key)) continue;
+        if (obj.Key.includes('.secure/')) continue;
+
+        const relativePath = obj.Key.replace(User.Id + '/', '');
+
+        if (this.IsInsideEncryptedFolder(relativePath, EncryptedFolders)) {
+          const encFolder = this.FindEncryptingFolder(
+            relativePath,
+            EncryptedFolders,
+          );
+          if (encFolder) {
+            if (!sessionCache.has(encFolder)) {
+              const session =
+                SessionToken && ValidateDirectorySession
+                  ? await ValidateDirectorySession(
+                      User.Id,
+                      encFolder,
+                      SessionToken,
+                    )
+                  : null;
+              sessionCache.set(encFolder, !!session);
+            }
+            if (!sessionCache.get(encFolder)) continue;
+          }
+        }
+
+        const fileName = obj.Key.split('/').pop() || '';
+        if (!fileName.toLowerCase().includes(lowerQuery)) continue;
+
+        if (lowerExtension) {
+          const ext = fileName.includes('.')
+            ? fileName.split('.').pop()?.toLowerCase()
+            : '';
+          if (ext !== lowerExtension) continue;
+        }
+
+        totalMatched++;
+
+        if (totalMatched > skipValue && matched.length < takeValue) {
+          matched.push(obj);
+        }
+      }
+
+      continuationToken = command.IsTruncated
+        ? command.NextContinuationToken
+        : undefined;
+    } while (continuationToken && scannedObjects < this.MaxSearchScanObjects);
+
+    const objects = await this.ProcessObjects(
+      matched,
+      IsMetadataProcessing,
+      User,
+      this.IsSignedUrlProcessing,
+    );
+
+    return { Objects: objects, TotalCount: totalMatched };
   }
 
   async ProcessBreadcrumb(
@@ -845,5 +965,37 @@ export class CloudListService {
     }
 
     return CloudS3Service.GetUrl(content.Key!);
+  }
+
+  private IsInsideEncryptedFolder(
+    relativePath: string,
+    encryptedFolders?: Set<string>,
+  ): boolean {
+    if (!encryptedFolders || encryptedFolders.size === 0) return false;
+    for (const folder of encryptedFolders) {
+      if (
+        relativePath === folder ||
+        relativePath.startsWith(folder + '/')
+      ) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private FindEncryptingFolder(
+    relativePath: string,
+    encryptedFolders?: Set<string>,
+  ): string | null {
+    if (!encryptedFolders) return null;
+    for (const folder of encryptedFolders) {
+      if (
+        relativePath === folder ||
+        relativePath.startsWith(folder + '/')
+      ) {
+        return folder;
+      }
+    }
+    return null;
   }
 }

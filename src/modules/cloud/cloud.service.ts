@@ -32,6 +32,7 @@ import {
   CloudUserStorageUsageResponseModel,
   CloudScanStatusResponseModel,
   CloudPreSignedUrlRequestModel,
+  CloudSearchRequestModel,
   // New Directories API models
   DirectoryCreateRequestModel,
   DirectoryRenameRequestModel,
@@ -232,6 +233,58 @@ export class CloudService {
     const result = await this.CloudListService.ListObjects(
       { Path, Delimiter, IsMetadataProcessing, Search, Skip, Take },
       User,
+    );
+
+    if (request) {
+      request.TotalRowCount = result.TotalCount;
+    }
+
+    return result.Objects;
+  }
+
+  //#endregion
+
+  //#region Search
+
+  async Search(
+    {
+      Query,
+      Path,
+      Extension,
+      IsMetadataProcessing,
+      Skip,
+      Take,
+    }: CloudSearchRequestModel,
+    User: UserContext,
+    sessionToken?: string,
+  ): Promise<CloudObjectModel[]> {
+    const store = asyncLocalStorage.getStore();
+    const request: Request = store?.get('request');
+
+    if (Path) {
+      const cleanedPath = Path.replace(/^\/+|\/+$/g, '');
+      const accessCheck = await this.CheckEncryptedFolderAccess(
+        cleanedPath,
+        User.Id,
+        sessionToken,
+      );
+
+      if (accessCheck.isEncrypted && !accessCheck.hasAccess) {
+        throw new HttpException(
+          `Access denied. Folder "${accessCheck.encryptingFolder}" is encrypted. Unlock it first via POST /Cloud/Directories/Unlock`,
+          HttpStatus.FORBIDDEN,
+        );
+      }
+    }
+
+    const encryptedFolders = await this.GetEncryptedFolderSet(User);
+
+    const result = await this.CloudListService.SearchObjects(
+      { Query, Path, Extension, IsMetadataProcessing, Skip, Take },
+      User,
+      encryptedFolders,
+      sessionToken,
+      this.ValidateDirectorySession.bind(this),
     );
 
     if (request) {

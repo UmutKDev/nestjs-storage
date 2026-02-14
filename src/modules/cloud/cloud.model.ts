@@ -804,3 +804,44 @@ export class DirectoryResponseModel {
   @ApiProperty({ required: false })
   UpdatedAt?: string;
 }
+
+// ============================================================================
+// SEARCH API
+// ============================================================================
+
+export class CloudSearchRequestModel extends PaginationRequestModel {
+  @ApiProperty({
+    description:
+      'Search query - partial filename match (case-insensitive, min 2 chars)',
+  })
+  @IsString()
+  @IsNotEmpty()
+  @MinLength(2)
+  Query: string;
+
+  @ApiProperty({
+    required: false,
+    description: 'Restrict search to a specific directory path',
+  })
+  @IsString()
+  @IsOptional()
+  Path?: string;
+
+  @ApiProperty({
+    required: false,
+    description:
+      'Filter by file extension (e.g. "pdf", "jpg"). Without leading dot.',
+  })
+  @IsString()
+  @IsOptional()
+  @Transform(({ value }) => value?.replace(/^\./, ''))
+  Extension?: string;
+
+  @ApiProperty({ required: false, default: false })
+  @IsBoolean()
+  @Transform(({ obj }) => {
+    return obj.IsMetadataProcessing === 'true' ? true : false;
+  })
+  @IsOptional()
+  IsMetadataProcessing: boolean = false;
+}
