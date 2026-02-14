@@ -410,8 +410,7 @@ export class CloudListService {
     }
 
     const skipValue = typeof Skip === 'number' && Skip > 0 ? Skip : 0;
-    const takeValue =
-      typeof Take === 'number' && Take > 0 ? Take : 50;
+    const takeValue = typeof Take === 'number' && Take > 0 ? Take : 50;
     const lowerQuery = Query.toLowerCase();
     const lowerExtension = Extension?.toLowerCase();
 
@@ -973,10 +972,7 @@ export class CloudListService {
   ): boolean {
     if (!encryptedFolders || encryptedFolders.size === 0) return false;
     for (const folder of encryptedFolders) {
-      if (
-        relativePath === folder ||
-        relativePath.startsWith(folder + '/')
-      ) {
+      if (relativePath === folder || relativePath.startsWith(folder + '/')) {
         return true;
       }
     }
@@ -989,10 +985,7 @@ export class CloudListService {
   ): string | null {
     if (!encryptedFolders) return null;
     for (const folder of encryptedFolders) {
-      if (
-        relativePath === folder ||
-        relativePath.startsWith(folder + '/')
-      ) {
+      if (relativePath === folder || relativePath.startsWith(folder + '/')) {
         return folder;
       }
     }

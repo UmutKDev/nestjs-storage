@@ -442,7 +442,9 @@ describe('CloudListService', () => {
       it('should include encrypted folder contents with valid session token', async () => {
         mockS3SinglePage(createTestObjects());
 
-        const mockValidateSession = jest.fn().mockResolvedValue({ valid: true });
+        const mockValidateSession = jest
+          .fn()
+          .mockResolvedValue({ valid: true });
 
         const result = await service.SearchObjects(
           { Query: 'secret', IsMetadataProcessing: false },
@@ -501,7 +503,9 @@ describe('CloudListService', () => {
         ];
         mockS3SinglePage(objects);
 
-        const mockValidateSession = jest.fn().mockResolvedValue({ valid: true });
+        const mockValidateSession = jest
+          .fn()
+          .mockResolvedValue({ valid: true });
 
         await service.SearchObjects(
           { Query: 'file', IsMetadataProcessing: false },
