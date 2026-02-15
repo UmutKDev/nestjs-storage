@@ -33,6 +33,7 @@ import {
   CloudScanStatusResponseModel,
   CloudPreSignedUrlRequestModel,
   CloudSearchRequestModel,
+  CloudSearchResponseModel,
   // New Directories API models
   DirectoryCreateRequestModel,
   DirectoryRenameRequestModel,
@@ -257,7 +258,7 @@ export class CloudService {
     }: CloudSearchRequestModel,
     User: UserContext,
     sessionToken?: string,
-  ): Promise<CloudObjectModel[]> {
+  ): Promise<CloudSearchResponseModel> {
     const store = asyncLocalStorage.getStore();
     const request: Request = store?.get('request');
 
@@ -288,10 +289,15 @@ export class CloudService {
     );
 
     if (request) {
-      request.TotalRowCount = result.TotalCount;
+      request.TotalRowCount = result.TotalCount + result.TotalDirectoryCount;
     }
 
-    return result.Objects;
+    return {
+      Objects: result.Objects,
+      Directories: result.Directories,
+      TotalObjectCount: result.TotalCount,
+      TotalDirectoryCount: result.TotalDirectoryCount,
+    };
   }
 
   //#endregion

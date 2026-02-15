@@ -401,7 +401,7 @@ export class CloudListService {
       folderPath: string,
       sessionToken: string,
     ) => Promise<unknown>,
-  ): Promise<{ Objects: CloudObjectModel[]; TotalCount: number }> {
+  ): Promise<{ Objects: CloudObjectModel[]; TotalCount: number; Directories: CloudDirectoryModel[]; TotalDirectoryCount: number }> {
     const cleanedPath = Path ? Path.replace(/^\/+|\/+$/g, '') : '';
 
     let prefix = KeyBuilder([User.Id, cleanedPath]);
@@ -420,6 +420,7 @@ export class CloudListService {
     let scannedObjects = 0;
 
     const sessionCache = new Map<string, boolean>();
+    const matchedDirs = new Map<string, string>(); // dirPath -> dirName
 
     do {
       const command = await this.CloudS3Service.Send(
@@ -434,11 +435,11 @@ export class CloudListService {
       for (const obj of command.Contents ?? []) {
         scannedObjects++;
         if (!obj.Key) continue;
-        if (this.IsDirectory(obj.Key)) continue;
         if (obj.Key.includes('.secure/')) continue;
 
         const relativePath = obj.Key.replace(User.Id + '/', '');
 
+        // Check encrypted folder access
         if (this.IsInsideEncryptedFolder(relativePath, EncryptedFolders)) {
           const encFolder = this.FindEncryptingFolder(
             relativePath,
@@ -460,6 +461,39 @@ export class CloudListService {
           }
         }
 
+        // Extract directories from .emptyFolderPlaceholder files
+        if (this.IsDirectory(obj.Key)) {
+          const folderPath = relativePath.replace(
+            '/' + this.EmptyFolderPlaceholder,
+            '',
+          );
+          const folderName = folderPath.split('/').pop() || '';
+          if (
+            folderName.toLowerCase().includes(lowerQuery) &&
+            !matchedDirs.has(folderPath)
+          ) {
+            matchedDirs.set(folderPath, folderName);
+          }
+          continue;
+        }
+
+        // Extract directory names from object path segments
+        const pathParts = relativePath.split('/');
+        if (pathParts.length > 1) {
+          let dirPath = '';
+          for (let i = 0; i < pathParts.length - 1; i++) {
+            dirPath = dirPath ? dirPath + '/' + pathParts[i] : pathParts[i];
+            const dirName = pathParts[i];
+            if (
+              !matchedDirs.has(dirPath) &&
+              dirName.toLowerCase().includes(lowerQuery)
+            ) {
+              matchedDirs.set(dirPath, dirName);
+            }
+          }
+        }
+
+        // Match file name
         const fileName = obj.Key.split('/').pop() || '';
         if (!fileName.toLowerCase().includes(lowerQuery)) continue;
 
@@ -489,7 +523,21 @@ export class CloudListService {
       this.IsSignedUrlProcessing,
     );
 
-    return { Objects: objects, TotalCount: totalMatched };
+    const directories: CloudDirectoryModel[] = Array.from(
+      matchedDirs.entries(),
+    ).map(([dirPrefix, name]) => ({
+      Name: name,
+      Prefix: dirPrefix.endsWith('/') ? dirPrefix : dirPrefix + '/',
+      IsEncrypted: EncryptedFolders?.has(dirPrefix) ?? false,
+      IsLocked: false,
+    }));
+
+    return {
+      Objects: objects,
+      TotalCount: totalMatched,
+      Directories: directories,
+      TotalDirectoryCount: directories.length,
+    };
   }
 
   async ProcessBreadcrumb(

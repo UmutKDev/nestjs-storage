@@ -160,12 +160,16 @@ describe('CloudListService', () => {
           testUser,
         );
 
-        // Should match: photo.jpg, Photo_Backup.JPG (case-insensitive)
+        // Should match files: photo.jpg, Photo_Backup.JPG (case-insensitive)
         expect(result.Objects).toHaveLength(2);
         expect(result.TotalCount).toBe(2);
         const names = result.Objects.map((o) => o.Name);
         expect(names).toContain('photo.jpg');
         expect(names).toContain('Photo_Backup.JPG');
+        // Should match directory: my-photos
+        expect(result.Directories.length).toBeGreaterThanOrEqual(1);
+        const dirNames = result.Directories.map((d) => d.Name);
+        expect(dirNames).toContain('my-photos');
       });
 
       it('should perform case-insensitive matching', async () => {
@@ -192,6 +196,8 @@ describe('CloudListService', () => {
 
         expect(result.Objects).toHaveLength(0);
         expect(result.TotalCount).toBe(0);
+        expect(result.Directories).toHaveLength(0);
+        expect(result.TotalDirectoryCount).toBe(0);
       });
 
       it('should match partial filenames', async () => {
@@ -659,6 +665,187 @@ describe('CloudListService', () => {
         expect(result.Objects).toHaveLength(1);
         expect(result.Objects[0].Name).toBe('README');
         expect(result.Objects[0].Extension).toBe('');
+      });
+    });
+
+    describe('Directory search', () => {
+      it('should return matching directories extracted from object paths', async () => {
+        mockS3SinglePage(createTestObjects());
+
+        const result = await service.SearchObjects(
+          { Query: 'folder', IsMetadataProcessing: false },
+          testUser,
+        );
+
+        // "folder" directory appears in: user-1/folder/report.pdf, user-1/folder/.emptyFolderPlaceholder
+        const dirNames = result.Directories.map((d) => d.Name);
+        expect(dirNames).toContain('folder');
+        expect(result.TotalDirectoryCount).toBeGreaterThanOrEqual(1);
+      });
+
+      it('should perform case-insensitive directory name matching', async () => {
+        mockS3SinglePage([
+          {
+            Key: 'user-1/MyPhotos/image.jpg',
+            Size: 1024,
+            ETag: 'e1',
+            LastModified: new Date(),
+          },
+        ]);
+
+        const result = await service.SearchObjects(
+          { Query: 'myphotos', IsMetadataProcessing: false },
+          testUser,
+        );
+
+        expect(result.Directories).toHaveLength(1);
+        expect(result.Directories[0].Name).toBe('MyPhotos');
+      });
+
+      it('should not return duplicate directories', async () => {
+        mockS3SinglePage([
+          {
+            Key: 'user-1/docs/file1.txt',
+            Size: 100,
+            ETag: 'e1',
+            LastModified: new Date(),
+          },
+          {
+            Key: 'user-1/docs/file2.txt',
+            Size: 200,
+            ETag: 'e2',
+            LastModified: new Date(),
+          },
+          {
+            Key: 'user-1/docs/file3.txt',
+            Size: 300,
+            ETag: 'e3',
+            LastModified: new Date(),
+          },
+        ]);
+
+        const result = await service.SearchObjects(
+          { Query: 'docs', IsMetadataProcessing: false },
+          testUser,
+        );
+
+        // "docs" should appear only once even though multiple files are inside
+        const docsEntries = result.Directories.filter(
+          (d) => d.Name === 'docs',
+        );
+        expect(docsEntries).toHaveLength(1);
+      });
+
+      it('should detect directories from .emptyFolderPlaceholder files', async () => {
+        mockS3SinglePage([
+          {
+            Key: 'user-1/empty-folder/.emptyFolderPlaceholder',
+            Size: 0,
+            ETag: 'e1',
+            LastModified: new Date(),
+          },
+        ]);
+
+        const result = await service.SearchObjects(
+          { Query: 'empty', IsMetadataProcessing: false },
+          testUser,
+        );
+
+        // Directory should be found from placeholder, not as a file
+        expect(result.Objects).toHaveLength(0);
+        expect(result.Directories).toHaveLength(1);
+        expect(result.Directories[0].Name).toBe('empty-folder');
+        expect(result.Directories[0].Prefix).toBe('empty-folder/');
+      });
+
+      it('should mark encrypted directories correctly', async () => {
+        const encryptedFolders = new Set(['encrypted-dir']);
+        mockS3SinglePage([
+          {
+            Key: 'user-1/encrypted-dir/file.txt',
+            Size: 100,
+            ETag: 'e1',
+            LastModified: new Date(),
+          },
+        ]);
+
+        const mockValidateSession = jest
+          .fn()
+          .mockResolvedValue({ valid: true });
+
+        const result = await service.SearchObjects(
+          { Query: 'encrypted', IsMetadataProcessing: false },
+          testUser,
+          encryptedFolders,
+          'valid-token',
+          mockValidateSession,
+        );
+
+        const encDir = result.Directories.find(
+          (d) => d.Name === 'encrypted-dir',
+        );
+        expect(encDir).toBeDefined();
+        expect(encDir.IsEncrypted).toBe(true);
+      });
+
+      it('should exclude .secure directories from results', async () => {
+        mockS3SinglePage([
+          {
+            Key: 'user-1/.secure/manifest.json',
+            Size: 256,
+            ETag: 'e1',
+            LastModified: new Date(),
+          },
+        ]);
+
+        const result = await service.SearchObjects(
+          { Query: 'secure', IsMetadataProcessing: false },
+          testUser,
+        );
+
+        expect(result.Directories).toHaveLength(0);
+        expect(result.Objects).toHaveLength(0);
+      });
+
+      it('should not include directories when only file name matches', async () => {
+        mockS3SinglePage([
+          {
+            Key: 'user-1/reports/budget.xlsx',
+            Size: 1024,
+            ETag: 'e1',
+            LastModified: new Date(),
+          },
+        ]);
+
+        const result = await service.SearchObjects(
+          { Query: 'budget', IsMetadataProcessing: false },
+          testUser,
+        );
+
+        // "budget" matches file name but not directory name "reports"
+        expect(result.Objects).toHaveLength(1);
+        expect(result.Directories).toHaveLength(0);
+      });
+
+      it('should extract nested directory paths', async () => {
+        mockS3SinglePage([
+          {
+            Key: 'user-1/projects/webapp/src/index.ts',
+            Size: 512,
+            ETag: 'e1',
+            LastModified: new Date(),
+          },
+        ]);
+
+        const result = await service.SearchObjects(
+          { Query: 'webapp', IsMetadataProcessing: false },
+          testUser,
+        );
+
+        // "webapp" matches the nested directory name
+        expect(result.Directories).toHaveLength(1);
+        expect(result.Directories[0].Name).toBe('webapp');
+        expect(result.Directories[0].Prefix).toBe('projects/webapp/');
       });
     });
   });

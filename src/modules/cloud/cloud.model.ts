@@ -845,3 +845,23 @@ export class CloudSearchRequestModel extends PaginationRequestModel {
   @IsOptional()
   IsMetadataProcessing: boolean = false;
 }
+
+export class CloudSearchResponseModel {
+  @Expose()
+  @ApiProperty({ type: CloudDirectoryModel, isArray: true })
+  @Type(() => CloudDirectoryModel)
+  Directories: CloudDirectoryModel[];
+
+  @Expose()
+  @ApiProperty({ type: CloudObjectModel, isArray: true })
+  @Type(() => CloudObjectModel)
+  Objects: CloudObjectModel[];
+
+  @Expose()
+  @ApiProperty()
+  TotalObjectCount: number;
+
+  @Expose()
+  @ApiProperty()
+  TotalDirectoryCount: number;
+}

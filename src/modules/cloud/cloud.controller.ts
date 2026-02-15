@@ -55,6 +55,7 @@ import {
   CloudScanStatusResponseModel,
   CloudPreSignedUrlRequestModel,
   CloudSearchRequestModel,
+  CloudSearchResponseModel,
   // New Directories API
   DirectoryCreateRequestModel,
   DirectoryRenameRequestModel,
@@ -190,12 +191,12 @@ export class CloudController {
     required: false,
     description: 'Session token for encrypted folder access',
   })
-  @ApiSuccessArrayResponse(CloudObjectModel)
+  @ApiSuccessResponse(CloudSearchResponseModel)
   async Search(
     @Query() model: CloudSearchRequestModel,
     @User() user: UserContext,
     @Headers(FOLDER_SESSION_HEADER) sessionToken?: string,
-  ): Promise<CloudObjectModel[]> {
+  ): Promise<CloudSearchResponseModel> {
     return this.cloudService.Search(model, user, sessionToken);
   }
 
