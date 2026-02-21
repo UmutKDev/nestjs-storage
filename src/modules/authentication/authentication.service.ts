@@ -342,7 +342,7 @@ export class AuthenticationService {
 
     // Brute force protection
     const attemptKey = `2fa:attempts:${sessionId}`;
-    const attempts = (await this.redisService.get<number>(attemptKey)) || 0;
+    const attempts = (await this.redisService.Get<number>(attemptKey)) || 0;
 
     if (attempts >= TWO_FACTOR_MAX_ATTEMPTS) {
       await this.sessionService.revokeSession(sessionId);
@@ -358,7 +358,7 @@ export class AuthenticationService {
     );
 
     if (!isValid) {
-      await this.redisService.set(
+      await this.redisService.Set(
         attemptKey,
         attempts + 1,
         TWO_FACTOR_LOCKOUT_SECONDS,
@@ -366,7 +366,7 @@ export class AuthenticationService {
       throw new HttpException('Invalid verification code', 400);
     }
 
-    await this.redisService.del(attemptKey);
+    await this.redisService.Delete(attemptKey);
     await this.sessionService.completeTwoFactorVerification(sessionId);
 
     return plainToInstance(AuthenticationResponseModel, {

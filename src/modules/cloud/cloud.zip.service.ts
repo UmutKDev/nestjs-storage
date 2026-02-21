@@ -30,6 +30,7 @@ import {
   NormalizeZipEntryPath,
 } from './cloud.utils';
 import { RedisService } from '@modules/redis/redis.service';
+import { CloudKeys } from '@modules/redis/redis.keys';
 import { CloudUsageService } from './cloud.usage.service';
 import { CloudListService } from './cloud.list.service';
 
@@ -58,7 +59,6 @@ export class CloudZipService implements OnModuleInit, OnModuleDestroy {
   private readonly IsRedisEnabled =
     (process.env.REDIS_ENABLED ?? 'true').toLowerCase() !== 'false';
   private readonly ZipExtractQueueName = 'cloud-zip-extract';
-  private readonly ZipExtractCancelKeyPrefix = 'cloud:zip-extract:cancel:';
   private readonly ZipExtractCancelTtlSeconds = 6 * 60 * 60; // 6 hours
   private readonly ZipExtractJobConcurrency = Math.max(
     1,
@@ -249,8 +249,8 @@ export class CloudZipService implements OnModuleInit, OnModuleDestroy {
       });
     }
 
-    await this.RedisService.set(
-      this.GetZipExtractCancelKey(JobId),
+    await this.RedisService.Set(
+      CloudKeys.ZipExtractCancel(JobId),
       true,
       this.ZipExtractCancelTtlSeconds,
     );
@@ -285,14 +285,10 @@ export class CloudZipService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private GetZipExtractCancelKey(jobId: string): string {
-    return `${this.ZipExtractCancelKeyPrefix}${jobId}`;
-  }
-
   private async ProcessZipExtractJob(
     job: Job<ZipExtractJobData, ZipExtractJobResult>,
   ): Promise<ZipExtractJobResult> {
-    const cancelKey = this.GetZipExtractCancelKey(job.id?.toString() ?? '');
+    const cancelKey = CloudKeys.ZipExtractCancel(job.id?.toString() ?? '');
     const key = job.data.key;
 
     if (!IsZipKey(key)) {
@@ -307,7 +303,7 @@ export class CloudZipService implements OnModuleInit, OnModuleDestroy {
           await job.updateProgress(progress);
         },
         shouldCancel: async () => {
-          const cancelled = await this.RedisService.get<boolean>(cancelKey);
+          const cancelled = await this.RedisService.Get<boolean>(cancelKey);
           return cancelled === true;
         },
       });
@@ -316,11 +312,12 @@ export class CloudZipService implements OnModuleInit, OnModuleDestroy {
         user.Id,
         extractedPrefix,
       );
+      await this.CloudListService.InvalidateListCache(user.Id);
 
       return { extractedPath: extractedPrefix };
     } finally {
       if (cancelKey) {
-        await this.RedisService.del(cancelKey);
+        await this.RedisService.Delete(cancelKey);
       }
     }
   }

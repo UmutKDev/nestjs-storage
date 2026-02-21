@@ -1,6 +1,4 @@
-import {
-  GetObjectCommand,
-} from '@aws-sdk/client-s3';
+import { GetObjectCommand } from '@aws-sdk/client-s3';
 import {
   Injectable,
   Logger,
@@ -13,6 +11,7 @@ import IORedis, { RedisOptions } from 'ioredis';
 import * as net from 'net';
 import { CloudS3Service } from './cloud.s3.service';
 import { RedisService } from '@modules/redis/redis.service';
+import { CloudKeys } from '@modules/redis/redis.keys';
 import { KeyBuilder } from '@common/helpers/cast.helper';
 
 type ScanJobData = {
@@ -117,12 +116,9 @@ export class CloudScanService implements OnModuleInit, OnModuleDestroy {
     await this.Queue.add('scan', { userId, key });
   }
 
-  async GetScanStatus(
-    userId: string,
-    key: string,
-  ): Promise<ScanResult | null> {
-    const statusKey = this.BuildStatusKey(userId, key);
-    const raw = await this.RedisService.get<string>(statusKey);
+  async GetScanStatus(userId: string, key: string): Promise<ScanResult | null> {
+    const statusKey = CloudKeys.ScanStatus(userId, key);
+    const raw = await this.RedisService.Get<string>(statusKey);
     if (!raw) {
       return null;
     }
@@ -184,23 +180,16 @@ export class CloudScanService implements OnModuleInit, OnModuleDestroy {
     };
   }
 
-  private BuildStatusKey(userId: string, key: string): string {
-    const encodedKey = encodeURIComponent(key || '');
-    return `cloud:scan:${userId}:${encodedKey}`;
-  }
-
   private async SetStatus(
     userId: string,
     key: string,
     result: ScanResult,
   ): Promise<void> {
-    const statusKey = this.BuildStatusKey(userId, key);
-    await this.RedisService.set(statusKey, JSON.stringify(result));
+    const statusKey = CloudKeys.ScanStatus(userId, key);
+    await this.RedisService.Set(statusKey, JSON.stringify(result));
   }
 
-  private async ScanStreamWithClamAV(
-    stream: Readable,
-  ): Promise<ScanResult> {
+  private async ScanStreamWithClamAV(stream: Readable): Promise<ScanResult> {
     const host = process.env.CLOUD_AV_HOST;
     const port = parseInt(process.env.CLOUD_AV_PORT ?? '', 10);
     if (!host || Number.isNaN(port)) {
@@ -251,9 +240,7 @@ export class CloudScanService implements OnModuleInit, OnModuleDestroy {
         try {
           socket.write('zINSTREAM\0');
           for await (const chunk of stream) {
-            const buffer = Buffer.isBuffer(chunk)
-              ? chunk
-              : Buffer.from(chunk);
+            const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
             const size = Buffer.alloc(4);
             size.writeUInt32BE(buffer.length, 0);
             if (!socket.write(size)) {

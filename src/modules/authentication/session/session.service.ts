@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { RedisService } from '@modules/redis/redis.service';
+import { SessionKeys } from '@modules/redis/redis.keys';
 import { SessionData, DeviceInfo, SessionListItem } from './session.interface';
 import { randomBytes } from 'crypto';
 import { UserEntity } from '@entities/user.entity';
@@ -7,25 +8,12 @@ import { Role, Status } from '@common/enums';
 
 @Injectable()
 export class SessionService {
-  private readonly SESSION_PREFIX = 'session';
   private readonly SESSION_TTL = 60 * 60 * 24 * 7; // 7 days in seconds
 
   constructor(private readonly redisService: RedisService) {}
 
   private generateSessionId(): string {
     return randomBytes(32).toString('hex');
-  }
-
-  private getSessionKey(sessionId: string): string {
-    return `${this.SESSION_PREFIX}:${sessionId}`;
-  }
-
-  private getUserSessionsPattern(userId: string): string {
-    return `${this.SESSION_PREFIX}:user:${userId}:*`;
-  }
-
-  private getUserSessionKey(userId: string, sessionId: string): string {
-    return `${this.SESSION_PREFIX}:user:${userId}:${sessionId}`;
   }
 
   parseUserAgent(userAgent: string): DeviceInfo {
@@ -92,15 +80,15 @@ export class SessionService {
     };
 
     // Store session by session ID
-    await this.redisService.set(
-      this.getSessionKey(sessionId),
+    await this.redisService.Set(
+      SessionKeys.Session(sessionId),
       session,
       this.SESSION_TTL,
     );
 
     // Store reference for user's sessions
-    await this.redisService.set(
-      this.getUserSessionKey(user.Id, sessionId),
+    await this.redisService.Set(
+      SessionKeys.UserSession(user.Id, sessionId),
       sessionId,
       this.SESSION_TTL,
     );
@@ -109,8 +97,8 @@ export class SessionService {
   }
 
   async getSession(sessionId: string): Promise<SessionData | null> {
-    const session = await this.redisService.get<SessionData>(
-      this.getSessionKey(sessionId),
+    const session = await this.redisService.Get<SessionData>(
+      SessionKeys.Session(sessionId),
     );
 
     if (!session) return null;
@@ -130,8 +118,8 @@ export class SessionService {
 
     session.LastActivityAt = new Date();
 
-    await this.redisService.set(
-      this.getSessionKey(sessionId),
+    await this.redisService.Set(
+      SessionKeys.Session(sessionId),
       session,
       this.SESSION_TTL,
     );
@@ -144,8 +132,8 @@ export class SessionService {
     session.IsTwoFactorVerified = true;
     session.TwoFactorPending = false;
 
-    await this.redisService.set(
-      this.getSessionKey(sessionId),
+    await this.redisService.Set(
+      SessionKeys.Session(sessionId),
       session,
       this.SESSION_TTL,
     );
@@ -156,23 +144,23 @@ export class SessionService {
   async revokeSession(sessionId: string): Promise<void> {
     const session = await this.getSession(sessionId);
     if (session) {
-      await this.redisService.del(
-        this.getUserSessionKey(session.UserId, sessionId),
+      await this.redisService.Delete(
+        SessionKeys.UserSession(session.UserId, sessionId),
       );
     }
-    await this.redisService.del(this.getSessionKey(sessionId));
+    await this.redisService.Delete(SessionKeys.Session(sessionId));
   }
 
   async revokeAllUserSessions(userId: string): Promise<number> {
-    const pattern = this.getUserSessionsPattern(userId);
-    const keys = await this.redisService.keys(pattern);
+    const pattern = SessionKeys.UserSessionsPattern(userId);
+    const keys = await this.redisService.FindKeys(pattern);
 
     let count = 0;
     for (const key of keys) {
-      const sessionId = await this.redisService.get<string>(key);
+      const sessionId = await this.redisService.Get<string>(key);
       if (sessionId) {
-        await this.redisService.del(this.getSessionKey(sessionId));
-        await this.redisService.del(key);
+        await this.redisService.Delete(SessionKeys.Session(sessionId));
+        await this.redisService.Delete(key);
         count++;
       }
     }
@@ -184,15 +172,15 @@ export class SessionService {
     userId: string,
     currentSessionId: string,
   ): Promise<number> {
-    const pattern = this.getUserSessionsPattern(userId);
-    const keys = await this.redisService.keys(pattern);
+    const pattern = SessionKeys.UserSessionsPattern(userId);
+    const keys = await this.redisService.FindKeys(pattern);
 
     let count = 0;
     for (const key of keys) {
-      const sessionId = await this.redisService.get<string>(key);
+      const sessionId = await this.redisService.Get<string>(key);
       if (sessionId && sessionId !== currentSessionId) {
-        await this.redisService.del(this.getSessionKey(sessionId));
-        await this.redisService.del(key);
+        await this.redisService.Delete(SessionKeys.Session(sessionId));
+        await this.redisService.Delete(key);
         count++;
       }
     }
@@ -204,13 +192,13 @@ export class SessionService {
     userId: string,
     currentSessionId?: string,
   ): Promise<SessionListItem[]> {
-    const pattern = this.getUserSessionsPattern(userId);
-    const keys = await this.redisService.keys(pattern);
+    const pattern = SessionKeys.UserSessionsPattern(userId);
+    const keys = await this.redisService.FindKeys(pattern);
 
     const sessions: SessionListItem[] = [];
 
     for (const key of keys) {
-      const sessionId = await this.redisService.get<string>(key);
+      const sessionId = await this.redisService.Get<string>(key);
       if (sessionId) {
         const session = await this.getSession(sessionId);
         if (session) {
@@ -248,8 +236,8 @@ export class SessionService {
     session.Image = user.Image;
     session.LastActivityAt = new Date();
 
-    await this.redisService.set(
-      this.getSessionKey(sessionId),
+    await this.redisService.Set(
+      SessionKeys.Session(sessionId),
       session,
       this.SESSION_TTL,
     );

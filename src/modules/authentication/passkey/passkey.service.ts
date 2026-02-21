@@ -89,7 +89,7 @@ export class PasskeyService {
     });
 
     // Store challenge in Redis
-    await this.redisService.set(
+    await this.redisService.Set(
       this.getChallengeKey(User.Id, 'registration'),
       { challenge: options.challenge, deviceName: DeviceName },
       this.CHALLENGE_TTL,
@@ -109,7 +109,7 @@ export class PasskeyService {
     User: UserContext;
   } & PasskeyRegistrationFinishRequestModel): Promise<PasskeyViewModel> {
     // Get stored challenge
-    const stored = await this.redisService.get<{
+    const stored = await this.redisService.Get<{
       challenge: string;
       deviceName: string;
     }>(this.getChallengeKey(User.Id, 'registration'));
@@ -157,7 +157,9 @@ export class PasskeyService {
     const saved = await this.passkeyRepository.save(passkey);
 
     // Clear challenge
-    await this.redisService.del(this.getChallengeKey(User.Id, 'registration'));
+    await this.redisService.Delete(
+      this.getChallengeKey(User.Id, 'registration'),
+    );
 
     return plainToInstance(PasskeyViewModel, {
       Id: saved.Id,
@@ -190,7 +192,7 @@ export class PasskeyService {
     });
 
     // Store challenge
-    await this.redisService.set(
+    await this.redisService.Set(
       this.getChallengeKey(user.Id, 'login'),
       { challenge: options.challenge, userId: user.Id },
       this.CHALLENGE_TTL,
@@ -212,7 +214,7 @@ export class PasskeyService {
     }
 
     // Get stored challenge
-    const stored = await this.redisService.get<{
+    const stored = await this.redisService.Get<{
       challenge: string;
       userId: string;
     }>(this.getChallengeKey(user.Id, 'login'));
@@ -267,7 +269,7 @@ export class PasskeyService {
     );
 
     // Clear challenge
-    await this.redisService.del(this.getChallengeKey(user.Id, 'login'));
+    await this.redisService.Delete(this.getChallengeKey(user.Id, 'login'));
 
     return user;
   }

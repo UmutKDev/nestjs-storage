@@ -1,11 +1,21 @@
 import { CacheModule } from '@nestjs/cache-manager';
 import { Module, Global, Logger } from '@nestjs/common';
-import { redisStore } from 'cache-manager-redis-yet';
+import KeyvRedis from '@keyv/redis';
 import { RedisService } from './redis.service';
 
 const IS_DEVELOPMENT = process.env.NODE_ENV === 'development';
 const REDIS_ENABLED =
   (process.env.REDIS_ENABLED ?? 'true').toLowerCase() !== 'false';
+
+const buildRedisUrl = (): string => {
+  const database = process.env.NODE_ENV === 'production' ? 0 : 1; // Use separate DB for development
+  const host = process.env.REDIS_HOSTNAME ?? 'localhost';
+  const port = process.env.REDIS_PORT ?? '6379';
+  const password = process.env.REDIS_PASSWORD;
+  return password
+    ? `redis://:${encodeURIComponent(password)}@${host}:${port}/${database}`
+    : `redis://${host}:${port}/${database}`;
+};
 
 @Global()
 @Module({
@@ -20,20 +30,14 @@ const REDIS_ENABLED =
               'Using Redis store - sessions will persist across restarts',
             );
             return {
-              store: await redisStore({
-                socket: {
-                  host: process.env.REDIS_HOSTNAME,
-                  port: parseInt(process.env.REDIS_PORT, 10),
-                },
-                password: process.env.REDIS_PASSWORD,
-                ttl: parseInt(process.env.REDIS_TTL, 10) * 1000, // default 5 minutes in ms
-              }),
+              stores: [new KeyvRedis(buildRedisUrl())],
+              ttl: parseInt(process.env.REDIS_TTL, 10) * 1000, // default TTL in ms
             };
           },
         })
       : CacheModule.register({
           isGlobal: true,
-          ttl: parseInt(process.env.REDIS_TTL, 10), // seconds for in-memory cache
+          ttl: parseInt(process.env.REDIS_TTL, 10) * 1000, // default TTL in ms
         }),
   ],
   providers: [RedisService],

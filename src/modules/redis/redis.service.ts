@@ -1,127 +1,178 @@
 import { Injectable, Inject } from '@nestjs/common';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import type { Cache } from 'cache-manager';
+import { CloudKeys } from './redis.keys';
 
 @Injectable()
 export class RedisService {
+  /** Resolved once from the first Keyv store; empty string when no namespace */
+  private StorePrefix: string | undefined;
+
   constructor(@Inject(CACHE_MANAGER) private readonly cacheManager: Cache) {}
 
   /**
-   * Get a value from cache
-   * @param key Cache key
-   * @returns Cached value or undefined
+   * Derive the key prefix from the Keyv store at runtime.
+   * The NestJS cache-manager provider may or may not set a namespace on the
+   * underlying Keyv instance — we read whatever was actually configured.
    */
-  async get<T>(key: string): Promise<T | undefined> {
+  private ResolveStorePrefix(): string {
+    if (this.StorePrefix !== undefined) return this.StorePrefix;
+
+    const stores = this.cacheManager.stores;
+    const ns = (stores?.[0] as unknown as { _namespace?: string })?._namespace;
+    this.StorePrefix = ns ? `${ns}:` : '';
+    return this.StorePrefix;
+  }
+
+  /**
+   * Get a value from cache.
+   */
+  async Get<T>(key: string): Promise<T | undefined> {
     return this.cacheManager.get<T>(key);
   }
 
   /**
-   * Set a value in cache
-   * @param key Cache key
-   * @param value Value to cache
-   * @param ttl Time to live in seconds (optional)
+   * Set a value in cache.
+   * @param ttl Time to live in **seconds** (optional)
    */
-  async set<T>(key: string, value: T, ttl?: number): Promise<void> {
+  async Set<T>(key: string, value: T, ttl?: number): Promise<void> {
     await this.cacheManager.set(key, value, ttl ? ttl * 1000 : undefined);
   }
 
   /**
-   * Delete a value from cache
-   * @param key Cache key
+   * Delete a single key from cache.
    */
-  async del(key: string): Promise<void> {
+  async Delete(key: string): Promise<void> {
     await this.cacheManager.del(key);
   }
 
   /**
-   * Get all keys matching a pattern
-   * @param pattern Pattern to match (e.g., 'encrypted-folder:session:*')
-   * @returns Array of matching keys
+   * Access the underlying Redis client from the first Keyv store.
+   * Returns null when running with the in-memory Map fallback.
    */
-  async keys(pattern: string): Promise<string[]> {
-    const cacheManagerAny = this.cacheManager as unknown as {
-      stores?: Array<{
-        keys?: (pattern: string) => Promise<string[]>;
-        client?: { keys: (pattern: string) => Promise<string[]> };
-      }>;
-      store?: {
-        keys?: (pattern: string) => Promise<string[]>;
-        client?: { keys: (pattern: string) => Promise<string[]> };
-      };
-    };
+  private GetNativeClient(): {
+    keys: (pattern: string) => Promise<string[]>;
+    del: (keys: string | string[]) => Promise<number>;
+  } | null {
+    const stores = this.cacheManager.stores;
+    if (!stores?.length) return null;
 
-    let keys: string[] = [];
+    const keyvRedis = (
+      stores[0] as unknown as { store?: Record<string, unknown> }
+    )?.store as
+      | {
+          client?: {
+            keys: (p: string) => Promise<string[]>;
+            del: (k: string | string[]) => Promise<number>;
+          };
+        }
+      | undefined;
 
-    // Try stores array first (cache-manager v5+)
-    if (cacheManagerAny.stores && cacheManagerAny.stores.length > 0) {
-      const store = cacheManagerAny.stores[0];
-      if (typeof store.keys === 'function') {
-        keys = await store.keys(pattern);
-      } else if (store.client && typeof store.client.keys === 'function') {
-        keys = await store.client.keys(pattern);
-      }
-    }
-    // Fallback to single store
-    else if (cacheManagerAny.store) {
-      const store = cacheManagerAny.store;
-      if (typeof store.keys === 'function') {
-        keys = await store.keys(pattern);
-      } else if (store.client && typeof store.client.keys === 'function') {
-        keys = await store.client.keys(pattern);
-      }
+    if (keyvRedis?.client && typeof keyvRedis.client.keys === 'function') {
+      return keyvRedis.client;
     }
 
-    return keys;
+    return null;
   }
 
   /**
-   * Delete all keys matching a pattern (user-based invalidation)
-   * @param pattern Pattern to match (e.g., 'cloud:user:123:*')
+   * Return all keys matching a glob pattern.
+   * @returns Keys without store namespace prefix
    */
-  async delByPattern(pattern: string): Promise<void> {
-    const keys = await this.keys(pattern);
+  async FindKeys(pattern: string): Promise<string[]> {
+    const client = this.GetNativeClient();
+    const prefix = this.ResolveStorePrefix();
+    if (client) {
+      const raw = await client.keys(`${prefix}${pattern}`);
+      return raw.map((k) =>
+        prefix && k.startsWith(prefix) ? k.slice(prefix.length) : k,
+      );
+    }
 
-    // Delete all matching keys
+    return this.FindKeysFromMemoryStore(pattern);
+  }
+
+  /**
+   * Pattern-match keys from the in-memory Map store (development fallback).
+   */
+  private FindKeysFromMemoryStore(pattern: string): string[] {
+    const stores = this.cacheManager.stores;
+    if (!stores?.length) return [];
+
+    const innerStore = (stores[0] as unknown as { _store?: unknown })._store;
+    if (!(innerStore instanceof Map)) return [];
+
+    const prefix = this.ResolveStorePrefix();
+
+    // Convert glob-like pattern to regex
+    const escaped = pattern
+      .replace(/[.+^${}()|[\]\\]/g, '\\$&')
+      .replace(/\*/g, '.*')
+      .replace(/\?/g, '.');
+    const regex = new RegExp(
+      `^${prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}${escaped}$`,
+    );
+
+    const result: string[] = [];
+    for (const key of innerStore.keys()) {
+      if (typeof key === 'string' && regex.test(key)) {
+        result.push(
+          prefix && key.startsWith(prefix) ? key.slice(prefix.length) : key,
+        );
+      }
+    }
+    return result;
+  }
+
+  /**
+   * Delete all keys matching a glob pattern.
+   */
+  async DeleteByPattern(pattern: string): Promise<void> {
+    const client = this.GetNativeClient();
+    if (client) {
+      const prefix = this.ResolveStorePrefix();
+      const keys = await client.keys(`${prefix}${pattern}`);
+      if (keys.length > 0) {
+        await client.del(keys);
+      }
+      return;
+    }
+
+    const keys = await this.FindKeys(pattern);
     for (const key of keys) {
       await this.cacheManager.del(key);
     }
   }
 
   /**
-   * Clear all cache - uses del pattern to clear all keys
+   * Clear the entire cache store.
    */
-  async clearAll(): Promise<void> {
-    await this.delByPattern('*');
+  async Clear(): Promise<void> {
+    await this.DeleteByPattern('*');
   }
 
   /**
-   * Generate a user-scoped cache key for cloud operations
-   * @param userId User ID
-   * @param operation Operation name
-   * @param params Additional parameters
+   * Generate a user-scoped cache key for cloud operations.
    */
-  generateCloudCacheKey(
+  GenerateCloudCacheKey(
     userId: string,
     operation: string,
     params?: Record<string, unknown>,
   ): string {
-    const baseKey = `cloud:user:${userId}:${operation}`;
-    if (params) {
-      const paramString = Object.entries(params)
-        .filter(([, v]) => v !== undefined && v !== null)
-        .sort(([a], [b]) => a.localeCompare(b))
-        .map(([k, v]) => `${k}=${String(v)}`)
-        .join(':');
-      return paramString ? `${baseKey}:${paramString}` : baseKey;
-    }
-    return baseKey;
+    return CloudKeys.UserCache(userId, operation, params);
   }
 
   /**
-   * Invalidate all cloud cache for a specific user
-   * @param userId User ID
+   * Invalidate all cloud cache for a specific user.
    */
-  async invalidateUserCloudCache(userId: string): Promise<void> {
-    await this.delByPattern(`cloud:user:${userId}:*`);
+  async InvalidateUserCloudCache(userId: string): Promise<void> {
+    await this.DeleteByPattern(CloudKeys.UserCachePattern(userId));
+  }
+
+  /**
+   * Return the raw Keyv stores for diagnostics.
+   */
+  GetStores(): unknown[] {
+    return this.cacheManager.stores;
   }
 }

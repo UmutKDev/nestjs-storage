@@ -17,12 +17,11 @@ import {
 } from '../../account/security/security.model';
 import { plainToInstance } from 'class-transformer';
 import { RedisService } from '@modules/redis/redis.service';
+import { ApiKeyKeys } from '@modules/redis/redis.keys';
 import { UserEntity } from '@entities/user.entity';
 
 @Injectable()
 export class ApiKeyService {
-  private readonly RATE_LIMIT_PREFIX = 'api-key:rate-limit';
-
   constructor(
     @InjectRepository(ApiKeyEntity)
     private readonly apiKeyRepository: Repository<ApiKeyEntity>,
@@ -223,14 +222,14 @@ export class ApiKeyService {
   }
 
   private async checkRateLimit(apiKey: ApiKeyEntity): Promise<void> {
-    const key = `${this.RATE_LIMIT_PREFIX}:${apiKey.Id}`;
-    const current = await this.redisService.get<number>(key);
+    const key = ApiKeyKeys.RateLimit(apiKey.Id);
+    const current = await this.redisService.Get<number>(key);
 
     if (current && current >= apiKey.RateLimitPerMinute) {
       throw new HttpException('Rate limit exceeded', 429);
     }
 
-    await this.redisService.set(key, (current || 0) + 1, 60);
+    await this.redisService.Set(key, (current || 0) + 1, 60);
   }
 
   async getUserApiKeys(User: UserContext): Promise<ApiKeyViewModel[]> {

@@ -26,6 +26,7 @@ import { CloudS3Service } from './cloud.s3.service';
 import { CloudMetadataService } from './cloud.metadata.service';
 import { NormalizeDirectoryPath } from './cloud.utils';
 import { RedisService } from '@modules/redis/redis.service';
+import { CloudKeys } from '@modules/redis/redis.keys';
 
 @Injectable()
 export class CloudListService {
@@ -46,6 +47,10 @@ export class CloudListService {
     parseInt(process.env.CLOUD_LIST_THUMBNAIL_CACHE_TTL_SECONDS ?? '86400', 10),
   );
   private readonly EmptyFolderPlaceholder = '.emptyFolderPlaceholder';
+  private readonly ListCacheTTLSeconds = Math.max(
+    1,
+    parseInt(process.env.CLOUD_LIST_CACHE_TTL_SECONDS ?? '60', 10),
+  );
   private readonly IsSignedUrlProcessing =
     process.env.S3_PROTOCOL_SIGNED_URL_PROCESSING === 'true';
   private readonly IsDirectory = (key: string) =>
@@ -73,6 +78,19 @@ export class CloudListService {
     ) => Promise<unknown>,
   ): Promise<CloudListResponseModel> {
     const cleanedPath = Path ? Path.replace(/^\/+|\/+$/g, '') : '';
+
+    const cacheKey = CloudKeys.List(
+      User.Id,
+      cleanedPath,
+      !!Delimiter,
+      !!IsMetadataProcessing,
+      !!SessionToken,
+    );
+    const cached =
+      await this.RedisService.Get<CloudListResponseModel>(cacheKey);
+    if (cached !== undefined) {
+      return cached;
+    }
 
     let prefix = KeyBuilder([User.Id, cleanedPath]);
     if (!prefix.endsWith('/')) {
@@ -106,11 +124,14 @@ export class CloudListService {
       ),
     ]);
 
-    return plainToInstance(CloudListResponseModel, {
+    const result = plainToInstance(CloudListResponseModel, {
       Breadcrumb,
       Directories,
       Contents,
     });
+
+    await this.RedisService.Set(cacheKey, result, this.ListCacheTTLSeconds);
+    return result;
   }
 
   async ListObjects(
@@ -135,6 +156,23 @@ export class CloudListService {
     const takeValue =
       typeof Take === 'number' && Take > 0 ? Take : this.MaxListObjects;
 
+    const cacheKey = CloudKeys.ListObjects(
+      User.Id,
+      cleanedPath,
+      !!Delimiter,
+      !!IsMetadataProcessing,
+      skipValue,
+      takeValue,
+      Search,
+    );
+    const cached = await this.RedisService.Get<{
+      Objects: CloudObjectModel[];
+      TotalCount: number;
+    }>(cacheKey);
+    if (cached !== undefined) {
+      return cached;
+    }
+
     if (!skipValue && takeValue === this.MaxListObjects) {
       const command = await this.CloudS3Service.Send(
         new ListObjectsV2Command({
@@ -152,7 +190,9 @@ export class CloudListService {
         this.IsSignedUrlProcessing,
       );
 
-      return { Objects: objects, TotalCount: objects.length };
+      const result = { Objects: objects, TotalCount: objects.length };
+      await this.RedisService.Set(cacheKey, result, this.ListCacheTTLSeconds);
+      return result;
     }
 
     const aggregated: _Object[] = [];
@@ -231,7 +271,9 @@ export class CloudListService {
       continuationToken = countCommand.NextContinuationToken;
     }
 
-    return { Objects: objects, TotalCount: totalCount };
+    const result = { Objects: objects, TotalCount: totalCount };
+    await this.RedisService.Set(cacheKey, result, this.ListCacheTTLSeconds);
+    return result;
   }
 
   async ListDirectories(
@@ -255,6 +297,22 @@ export class CloudListService {
     ) => Promise<unknown>,
   ): Promise<{ Directories: CloudDirectoryModel[]; TotalCount: number }> {
     const cleanedPath = Path ? Path.replace(/^\/+|\/+$/g, '') : '';
+
+    const cacheKey = CloudKeys.ListDirectories(
+      User.Id,
+      cleanedPath,
+      typeof skip === 'number' && skip > 0 ? skip : 0,
+      typeof take === 'number' && take > 0 ? take : 0,
+      !!SessionToken,
+      search,
+    );
+    const cached = await this.RedisService.Get<{
+      Directories: CloudDirectoryModel[];
+      TotalCount: number;
+    }>(cacheKey);
+    if (cached !== undefined) {
+      return cached;
+    }
 
     let prefix = KeyBuilder([User.Id, cleanedPath]);
     if (!prefix.endsWith('/')) {
@@ -284,10 +342,12 @@ export class CloudListService {
         this.IsSignedUrlProcessing,
       );
 
-      return {
+      const result = {
         Directories: directories,
         TotalCount: command.CommonPrefixes?.length ?? 0,
       };
+      await this.RedisService.Set(cacheKey, result, this.ListCacheTTLSeconds);
+      return result;
     }
 
     const skipValue = typeof skip === 'number' && skip > 0 ? skip : 0;
@@ -374,7 +434,9 @@ export class CloudListService {
       continuationToken = countCommand.NextContinuationToken;
     }
 
-    return { Directories: directories, TotalCount: totalCount };
+    const result = { Directories: directories, TotalCount: totalCount };
+    await this.RedisService.Set(cacheKey, result, this.ListCacheTTLSeconds);
+    return result;
   }
 
   async SearchObjects(
@@ -401,7 +463,12 @@ export class CloudListService {
       folderPath: string,
       sessionToken: string,
     ) => Promise<unknown>,
-  ): Promise<{ Objects: CloudObjectModel[]; TotalCount: number; Directories: CloudDirectoryModel[]; TotalDirectoryCount: number }> {
+  ): Promise<{
+    Objects: CloudObjectModel[];
+    TotalCount: number;
+    Directories: CloudDirectoryModel[];
+    TotalDirectoryCount: number;
+  }> {
     const cleanedPath = Path ? Path.replace(/^\/+|\/+$/g, '') : '';
 
     let prefix = KeyBuilder([User.Id, cleanedPath]);
@@ -761,12 +828,12 @@ export class CloudListService {
     }
 
     const prefix = KeyBuilder([User.Id, normalizedPrefix]);
-    const cacheKey = this.BuildDirectoryThumbnailCacheKey(
+    const cacheKey = CloudKeys.DirectoryThumbnails(
       User.Id,
       normalizedPrefix,
       IsSignedUrlProcessing,
     );
-    const cached = await this.RedisService.get<CloudObjectModel[]>(cacheKey);
+    const cached = await this.RedisService.Get<CloudObjectModel[]>(cacheKey);
     if (cached !== undefined) {
       return cached;
     }
@@ -890,18 +957,9 @@ export class CloudListService {
           Math.max(1, this.PresignedUrlExpirySeconds - 60),
         )
       : this.DirectoryThumbnailCacheTTLSeconds;
-    await this.RedisService.set(cacheKey, thumbnails, ttlSeconds);
+    await this.RedisService.Set(cacheKey, thumbnails, ttlSeconds);
 
     return thumbnails;
-  }
-
-  private BuildDirectoryThumbnailCacheKey(
-    userId: string,
-    directoryPrefix: string,
-    isSigned: boolean,
-  ): string {
-    const mode = isSigned ? 'signed' : 'public';
-    return `cloud:dir-thumbnails:${mode}:${userId}:${directoryPrefix}`;
   }
 
   async InvalidateDirectoryThumbnailCache(
@@ -914,11 +972,11 @@ export class CloudListService {
     }
     const ancestors = this.GetDirectoryAncestors(normalized);
     for (const path of ancestors) {
-      await this.RedisService.del(
-        this.BuildDirectoryThumbnailCacheKey(userId, path, false),
+      await this.RedisService.Delete(
+        CloudKeys.DirectoryThumbnails(userId, path, false),
       );
-      await this.RedisService.del(
-        this.BuildDirectoryThumbnailCacheKey(userId, path, true),
+      await this.RedisService.Delete(
+        CloudKeys.DirectoryThumbnails(userId, path, true),
       );
     }
   }
@@ -932,6 +990,14 @@ export class CloudListService {
       return;
     }
     await this.InvalidateDirectoryThumbnailCache(userId, parent);
+  }
+
+  /**
+   * Invalidate all list/directory/object listing caches for a user.
+   * Call after any mutation (upload, delete, move, rename, directory changes).
+   */
+  async InvalidateListCache(userId: string): Promise<void> {
+    await this.RedisService.DeleteByPattern(CloudKeys.ListAllPattern(userId));
   }
 
   private GetDirectoryAncestors(path: string): string[] {

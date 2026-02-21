@@ -56,6 +56,7 @@ import { CloudScanService } from './cloud.scan.service';
 import { NormalizeDirectoryPath } from './cloud.utils';
 import { SizeFormatter } from '@common/helpers/cast.helper';
 import { RedisService } from '@modules/redis/redis.service';
+import { CloudKeys } from '@modules/redis/redis.keys';
 
 @Injectable()
 export class CloudService {
@@ -183,20 +184,6 @@ export class CloudService {
   }
 
   //#endregion
-
-  // /**
-  //  * Invalidate list objects cache for a user's path.
-  //  * Call this when objects are added, deleted, moved, or renamed.
-  //  */
-  // async InvalidateListObjectsCache(
-  //   userId: string,
-  //   path?: string,
-  // ): Promise<void> {
-  //   const pattern = path
-  //     ? `cloud:list-objects:${userId}:${path.replace(/^\/+|\/+$/g, '') || 'root'}:*`
-  //     : `cloud:list-objects:${userId}:*`;
-  //   await this.RedisService.delByPattern(pattern);
-  // }
 
   //#region Objects
 
@@ -402,6 +389,7 @@ export class CloudService {
       );
     }
     await this.SetIdempotentResult(User.Id, 'move', idempotencyKey, result);
+    await this.CloudListService.InvalidateListCache(User.Id);
     return result;
   }
 
@@ -475,9 +463,11 @@ export class CloudService {
         idempotencyKey,
         deleted,
       );
+      await this.CloudListService.InvalidateListCache(User.Id);
       return deleted;
     }
     await this.SetIdempotentResult(User.Id, 'delete', idempotencyKey, true);
+    await this.CloudListService.InvalidateListCache(User.Id);
     return true;
   }
 
@@ -494,6 +484,7 @@ export class CloudService {
       User,
     );
     await this.CloudListService.InvalidateDirectoryThumbnailCache(User.Id, Key);
+    await this.CloudListService.InvalidateListCache(User.Id);
     return result;
   }
 
@@ -516,6 +507,7 @@ export class CloudService {
         renamedPath,
       );
     }
+    await this.CloudListService.InvalidateListCache(User.Id);
     return result;
   }
 
@@ -661,6 +653,7 @@ export class CloudService {
       idempotencyKey,
       result,
     );
+    await this.CloudListService.InvalidateListCache(User.Id);
     return result;
   }
 
@@ -718,6 +711,7 @@ export class CloudService {
       User.Id,
       Key,
     );
+    await this.CloudListService.InvalidateListCache(User.Id);
     return result;
   }
 
@@ -749,6 +743,7 @@ export class CloudService {
       User.Id,
       Path,
     );
+    await this.CloudListService.InvalidateListCache(User.Id);
     return result;
   }
 
@@ -779,6 +774,7 @@ export class CloudService {
         renamedPath,
       );
     }
+    await this.CloudListService.InvalidateListCache(User.Id);
     return result;
   }
 
@@ -801,6 +797,7 @@ export class CloudService {
       User.Id,
       Path,
     );
+    await this.CloudListService.InvalidateListCache(User.Id);
     return result;
   }
 
@@ -822,6 +819,7 @@ export class CloudService {
       User.Id,
       Path,
     );
+    await this.CloudListService.InvalidateListCache(User.Id);
     return result;
   }
 
@@ -840,6 +838,7 @@ export class CloudService {
       User.Id,
       Path,
     );
+    await this.CloudListService.InvalidateListCache(User.Id);
     return result;
   }
 
@@ -862,6 +861,7 @@ export class CloudService {
       User.Id,
       Path,
     );
+    await this.CloudListService.InvalidateListCache(User.Id);
     return result;
   }
 
@@ -884,6 +884,7 @@ export class CloudService {
       User.Id,
       Path,
     );
+    await this.CloudListService.InvalidateListCache(User.Id);
     return result;
   }
 
@@ -990,7 +991,7 @@ export class CloudService {
     if (!idempotencyKey) {
       return null;
     }
-    return `cloud:idempotency:${userId}:${action}:${idempotencyKey}`;
+    return CloudKeys.Idempotency(userId, action, idempotencyKey);
   }
 
   private async GetIdempotentResult<T>(
@@ -1002,7 +1003,7 @@ export class CloudService {
     if (!key) {
       return undefined;
     }
-    return this.RedisService.get<T>(key);
+    return this.RedisService.Get<T>(key);
   }
 
   private async SetIdempotentResult<T>(
@@ -1019,6 +1020,6 @@ export class CloudService {
       1,
       parseInt(process.env.CLOUD_IDEMPOTENCY_TTL_SECONDS ?? '300', 10),
     );
-    await this.RedisService.set(key, value, ttlSeconds);
+    await this.RedisService.Set(key, value, ttlSeconds);
   }
 }

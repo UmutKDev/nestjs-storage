@@ -29,6 +29,7 @@ import {
 } from './cloud.model';
 import { CloudS3Service } from './cloud.s3.service';
 import { RedisService } from '@modules/redis/redis.service';
+import { CloudKeys } from '@modules/redis/redis.keys';
 import { ENCRYPTED_FOLDER_SESSION_TTL } from './cloud.constants';
 import { KeyBuilder } from '@common/helpers/cast.helper';
 import { EnsureTrailingSlash, NormalizeDirectoryPath } from './cloud.utils';
@@ -529,16 +530,22 @@ export class CloudDirectoryService {
       expiresAt,
     };
 
-    const cacheKey = this.BuildSessionKey(User.Id, encryptedFolderPath);
-    await this.RedisService.set(
+    const cacheKey = CloudKeys.EncryptedFolderSession(
+      User.Id,
+      encryptedFolderPath,
+    );
+    await this.RedisService.Set(
       cacheKey,
       session,
       ENCRYPTED_FOLDER_SESSION_TTL,
     );
 
     if (normalizedPath !== encryptedFolderPath) {
-      const childCacheKey = this.BuildSessionKey(User.Id, normalizedPath);
-      await this.RedisService.set(
+      const childCacheKey = CloudKeys.EncryptedFolderSession(
+        User.Id,
+        normalizedPath,
+      );
+      await this.RedisService.Set(
         childCacheKey,
         session,
         ENCRYPTED_FOLDER_SESSION_TTL,
@@ -566,8 +573,8 @@ export class CloudDirectoryService {
       );
     }
 
-    await this.RedisService.delByPattern(
-      `encrypted-folder:session:${User.Id}:${normalizedPath}*`,
+    await this.RedisService.DeleteByPattern(
+      CloudKeys.EncryptedFolderSessionPattern(User.Id, normalizedPath),
     );
 
     return true;
@@ -697,16 +704,16 @@ export class CloudDirectoryService {
   ): Promise<EncryptedFolderSession | null> {
     const normalizedPath = NormalizeDirectoryPath(folderPath);
 
-    const cacheKey = this.BuildSessionKey(userId, normalizedPath);
+    const cacheKey = CloudKeys.EncryptedFolderSession(userId, normalizedPath);
     const session =
-      await this.RedisService.get<EncryptedFolderSession>(cacheKey);
+      await this.RedisService.Get<EncryptedFolderSession>(cacheKey);
 
     if (!session || session.token !== sessionToken) {
       return null;
     }
 
     if (session.expiresAt < Math.floor(Date.now() / 1000)) {
-      await this.RedisService.del(cacheKey);
+      await this.RedisService.Delete(cacheKey);
       return null;
     }
 
@@ -761,9 +768,9 @@ export class CloudDirectoryService {
     userId: string,
     folderPath: string,
   ): Promise<EncryptedFolderSession | null> {
-    const cacheKey = this.BuildSessionKey(userId, folderPath);
+    const cacheKey = CloudKeys.EncryptedFolderSession(userId, folderPath);
     const session =
-      await this.RedisService.get<EncryptedFolderSession>(cacheKey);
+      await this.RedisService.Get<EncryptedFolderSession>(cacheKey);
 
     if (!session || session.expiresAt < Math.floor(Date.now() / 1000)) {
       return null;
@@ -966,11 +973,6 @@ export class CloudDirectoryService {
       chunks.push(bufferChunk);
     }
     return Buffer.concat(chunks).toString('utf8');
-  }
-
-  private BuildSessionKey(userId: string, folderPath: string): string {
-    const normalizedPath = NormalizeDirectoryPath(folderPath);
-    return `encrypted-folder:session:${userId}:${normalizedPath}`;
   }
 
   private async GetEncryptedFolderManifestByUserId(

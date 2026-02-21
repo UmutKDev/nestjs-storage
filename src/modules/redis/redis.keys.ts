@@ -1,0 +1,120 @@
+// ─── Session Keys ────────────────────────────────────────────────────────────
+
+export namespace SessionKeys {
+  /** session:{sessionId} — stores SessionData */
+  export const Session = (sessionId: string) => `session:${sessionId}`;
+
+  /** session:user:{userId}:{sessionId} — maps user→session */
+  export const UserSession = (userId: string, sessionId: string) =>
+    `session:user:${userId}:${sessionId}`;
+
+  /** session:user:{userId}:* — pattern to find all sessions of a user */
+  export const UserSessionsPattern = (userId: string) =>
+    `session:user:${userId}:*`;
+}
+
+// ─── API-Key Keys ────────────────────────────────────────────────────────────
+
+export namespace ApiKeyKeys {
+  /** api-key:rate-limit:{apiKeyId} — per-minute request counter */
+  export const RateLimit = (apiKeyId: string) =>
+    `api-key:rate-limit:${apiKeyId}`;
+}
+
+// ─── Cloud Keys ──────────────────────────────────────────────────────────────
+
+export namespace CloudKeys {
+  /** cloud:list:{userId}:{path}:full:{delim|nodelim}:{meta|nometa}:{auth|noauth} — combined list response */
+  export const List = (
+    userId: string,
+    path: string,
+    delimiter: boolean,
+    metadata: boolean,
+    hasSession: boolean,
+  ) =>
+    `cloud:list:${userId}:${path || 'root'}:full:${delimiter ? 'delim' : 'nodelim'}:${metadata ? 'meta' : 'nometa'}:${hasSession ? 'auth' : 'noauth'}`;
+
+  /** cloud:list:{userId}:{path}:objects:{delim|nodelim}:{meta|nometa}:{skip}:{take}[:{search}] */
+  export const ListObjects = (
+    userId: string,
+    path: string,
+    delimiter: boolean,
+    metadata: boolean,
+    skip: number,
+    take: number,
+    search?: string,
+  ) =>
+    `cloud:list:${userId}:${path || 'root'}:objects:${delimiter ? 'delim' : 'nodelim'}:${metadata ? 'meta' : 'nometa'}:${skip}:${take}${search ? ':' + encodeURIComponent(search) : ''}`;
+
+  /** cloud:list:{userId}:{path}:dirs:{skip}:{take}:{auth|noauth}[:{search}] */
+  export const ListDirectories = (
+    userId: string,
+    path: string,
+    skip: number,
+    take: number,
+    hasSession: boolean,
+    search?: string,
+  ) =>
+    `cloud:list:${userId}:${path || 'root'}:dirs:${skip}:${take}:${hasSession ? 'auth' : 'noauth'}${search ? ':' + encodeURIComponent(search) : ''}`;
+
+  /** cloud:list:{userId}:* — invalidate all listing caches for a user */
+  export const ListAllPattern = (userId: string) => `cloud:list:${userId}:*`;
+
+  /** cloud:dir-thumbnails:{signed|public}:{userId}:{directoryPrefix} */
+  export const DirectoryThumbnails = (
+    userId: string,
+    directoryPrefix: string,
+    isSigned: boolean,
+  ) =>
+    `cloud:dir-thumbnails:${isSigned ? 'signed' : 'public'}:${userId}:${directoryPrefix}`;
+
+  /** cloud:scan:{userId}:{encodedKey} — AV scan status for a file */
+  export const ScanStatus = (userId: string, key: string) => {
+    const encodedKey = encodeURIComponent(key || '');
+    return `cloud:scan:${userId}:${encodedKey}`;
+  };
+
+  /** cloud:zip-extract:cancel:{jobId} — signal to cancel a running zip extraction */
+  export const ZipExtractCancel = (jobId: string) =>
+    `cloud:zip-extract:cancel:${jobId}`;
+
+  /** cloud:idempotency:{userId}:{action}:{idempotencyKey} — dedup cache for mutations */
+  export const Idempotency = (
+    userId: string,
+    action: string,
+    idempotencyKey: string,
+  ) => `cloud:idempotency:${userId}:${action}:${idempotencyKey}`;
+
+  /** cloud:user:{userId}:{operation}[:params] — generic per-user cloud cache */
+  export const UserCache = (
+    userId: string,
+    operation: string,
+    params?: Record<string, unknown>,
+  ) => {
+    const baseKey = `cloud:user:${userId}:${operation}`;
+    if (params) {
+      const paramString = Object.entries(params)
+        .filter(([, v]) => v !== undefined && v !== null)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([k, v]) => `${k}=${String(v)}`)
+        .join(':');
+      return paramString ? `${baseKey}:${paramString}` : baseKey;
+    }
+    return baseKey;
+  };
+
+  /** cloud:user:{userId}:* — pattern to invalidate all cloud caches for a user */
+  export const UserCachePattern = (userId: string) => `cloud:user:${userId}:*`;
+
+  /** cloud:encrypted-folder:session:{userId}:{normalizedPath} — unlock session */
+  export const EncryptedFolderSession = (
+    userId: string,
+    normalizedPath: string,
+  ) => `cloud:encrypted-folder:session:${userId}:${normalizedPath}`;
+
+  /** Glob pattern that matches the encrypted-folder session key + any child paths */
+  export const EncryptedFolderSessionPattern = (
+    userId: string,
+    normalizedPath: string,
+  ) => `${EncryptedFolderSession(userId, normalizedPath)}*`;
+}

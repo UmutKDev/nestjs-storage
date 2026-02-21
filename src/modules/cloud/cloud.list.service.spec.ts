@@ -33,10 +33,10 @@ describe('CloudListService', () => {
   };
 
   const mockRedisService = {
-    get: jest.fn().mockResolvedValue(undefined),
-    set: jest.fn().mockResolvedValue(undefined),
-    del: jest.fn().mockResolvedValue(undefined),
-    delByPattern: jest.fn().mockResolvedValue(undefined),
+    Get: jest.fn().mockResolvedValue(undefined),
+    Set: jest.fn().mockResolvedValue(undefined),
+    Delete: jest.fn().mockResolvedValue(undefined),
+    DeleteByPattern: jest.fn().mockResolvedValue(undefined),
   };
 
   const testUser: UserContext = {
@@ -730,9 +730,7 @@ describe('CloudListService', () => {
         );
 
         // "docs" should appear only once even though multiple files are inside
-        const docsEntries = result.Directories.filter(
-          (d) => d.Name === 'docs',
-        );
+        const docsEntries = result.Directories.filter((d) => d.Name === 'docs');
         expect(docsEntries).toHaveLength(1);
       });
 

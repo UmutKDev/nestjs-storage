@@ -132,7 +132,7 @@ export class CloudUsageService {
   }
 
   private async GetUsage(userId: string): Promise<number | null> {
-    const raw = await this.RedisService.get<string>(this.BuildUsageKey(userId));
+    const raw = await this.RedisService.Get<string>(this.BuildUsageKey(userId));
     if (raw === undefined || raw === null) {
       return null;
     }
@@ -141,7 +141,7 @@ export class CloudUsageService {
   }
 
   private async SetUsage(userId: string, value: number): Promise<void> {
-    await this.RedisService.set(this.BuildUsageKey(userId), String(value));
+    await this.RedisService.Set(this.BuildUsageKey(userId), String(value));
   }
 
   private async ComputeUsageFromS3(userId: string): Promise<number> {
