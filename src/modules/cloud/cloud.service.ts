@@ -57,6 +57,7 @@ import { NormalizeDirectoryPath } from './cloud.utils';
 import { SizeFormatter } from '@common/helpers/cast.helper';
 import { RedisService } from '@modules/redis/redis.service';
 import { CloudKeys } from '@modules/redis/redis.keys';
+import { CLOUD_IDEMPOTENCY_TTL } from '@modules/redis/redis.ttl';
 
 @Injectable()
 export class CloudService {
@@ -1016,10 +1017,6 @@ export class CloudService {
     if (!key) {
       return;
     }
-    const ttlSeconds = Math.max(
-      1,
-      parseInt(process.env.CLOUD_IDEMPOTENCY_TTL_SECONDS ?? '300', 10),
-    );
-    await this.RedisService.Set(key, value, ttlSeconds);
+    await this.RedisService.Set(key, value, CLOUD_IDEMPOTENCY_TTL);
   }
 }

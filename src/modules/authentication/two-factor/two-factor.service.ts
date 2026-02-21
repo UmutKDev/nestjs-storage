@@ -15,14 +15,12 @@ import {
 import { plainToInstance } from 'class-transformer';
 import { RedisService } from '@modules/redis/redis.service';
 import { AuthKeys } from '@modules/redis/redis.keys';
+import { TWO_FACTOR_ENABLED_CACHE_TTL } from '@modules/redis/redis.ttl';
 
 @Injectable()
 export class TwoFactorService {
   private readonly ISSUER = process.env.APP_NAME || 'Storage';
   private readonly BACKUP_CODE_COUNT = 10;
-
-  /** Cache TTL for isTwoFactorEnabled check (seconds) */
-  private readonly TwoFactorCacheTtl = 300; // 5 minutes
 
   constructor(
     @InjectRepository(TwoFactorEntity)
@@ -269,7 +267,7 @@ export class TwoFactorService {
       where: { UserId: userId, IsEnabled: true },
     });
     const result = !!twoFactor;
-    await this.RedisService.Set(cacheKey, result, this.TwoFactorCacheTtl);
+    await this.RedisService.Set(cacheKey, result, TWO_FACTOR_ENABLED_CACHE_TTL);
     return result;
   }
 }

@@ -12,11 +12,10 @@ import { plainToInstance } from 'class-transformer';
 import { asyncLocalStorage } from '../../common/context/context.service';
 import { RedisService } from '@modules/redis/redis.service';
 import { DefinitionKeys } from '@modules/redis/redis.keys';
+import { DEFINITION_CACHE_TTL } from '@modules/redis/redis.ttl';
 
 @Injectable()
 export class DefinitionService {
-  /** Cache TTL for definition queries (seconds) */
-  private readonly DefinitionCacheTtl = 3600; // 1 hour
 
   constructor(
     @InjectRepository(DefinitionEntity)
@@ -64,7 +63,7 @@ export class DefinitionService {
     await this.RedisService.Set(
       cacheKey,
       { items, count },
-      this.DefinitionCacheTtl,
+      DEFINITION_CACHE_TTL,
     );
     return items;
   }
@@ -117,7 +116,7 @@ export class DefinitionService {
     await this.RedisService.Set(
       cacheKey,
       { items, count },
-      this.DefinitionCacheTtl,
+      DEFINITION_CACHE_TTL,
     );
     return items;
   }

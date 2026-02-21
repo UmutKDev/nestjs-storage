@@ -5,6 +5,10 @@ import { PasskeyEntity } from '@entities/passkey.entity';
 import { UserEntity } from '@entities/user.entity';
 import { RedisService } from '@modules/redis/redis.service';
 import {
+  PASSKEY_CHALLENGE_TTL,
+  HAS_PASSKEY_CACHE_TTL,
+} from '@modules/redis/redis.ttl';
+import {
   generateRegistrationOptions,
   verifyRegistrationResponse,
   generateAuthenticationOptions,
@@ -37,10 +41,6 @@ export class PasskeyService {
   private readonly RP_ID = process.env.WEBAUTHN_RP_ID || 'localhost';
   private readonly ORIGIN = process.env.CLIENT_APP_URL;
   private readonly CHALLENGE_PREFIX = 'passkey:challenge';
-  private readonly CHALLENGE_TTL = 300; // 5 minutes
-
-  /** Cache TTL for hasPasskey check (seconds) */
-  private readonly HasPasskeyCacheTtl = 300; // 5 minutes
 
   constructor(
     @InjectRepository(PasskeyEntity)
@@ -96,7 +96,7 @@ export class PasskeyService {
     await this.redisService.Set(
       this.getChallengeKey(User.Id, 'registration'),
       { challenge: options.challenge, deviceName: DeviceName },
-      this.CHALLENGE_TTL,
+      PASSKEY_CHALLENGE_TTL,
     );
 
     return plainToInstance(PasskeyRegistrationBeginResponseModel, {
@@ -202,7 +202,7 @@ export class PasskeyService {
     await this.redisService.Set(
       this.getChallengeKey(user.Id, 'login'),
       { challenge: options.challenge, userId: user.Id },
-      this.CHALLENGE_TTL,
+      PASSKEY_CHALLENGE_TTL,
     );
 
     return plainToInstance(PasskeyLoginBeginResponseModel, {
@@ -319,7 +319,7 @@ export class PasskeyService {
       where: { User: { Id: userId } },
     });
     const result = count > 0;
-    await this.redisService.Set(cacheKey, result, this.HasPasskeyCacheTtl);
+    await this.redisService.Set(cacheKey, result, HAS_PASSKEY_CACHE_TTL);
     return result;
   }
 }

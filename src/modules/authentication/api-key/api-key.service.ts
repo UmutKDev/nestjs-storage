@@ -18,12 +18,11 @@ import {
 import { plainToInstance } from 'class-transformer';
 import { RedisService } from '@modules/redis/redis.service';
 import { ApiKeyKeys } from '@modules/redis/redis.keys';
+import { API_KEY_ENTITY_CACHE_TTL, API_KEY_RATE_LIMIT_TTL } from '@modules/redis/redis.ttl';
 import { UserEntity } from '@entities/user.entity';
 
 @Injectable()
 export class ApiKeyService {
-  /** Cache TTL for API key entity lookups (seconds) */
-  private readonly ApiKeyCacheTtl = 300; // 5 minutes
 
   constructor(
     @InjectRepository(ApiKeyEntity)
@@ -228,7 +227,7 @@ export class ApiKeyService {
       throw new HttpException('Rate limit exceeded', 429);
     }
 
-    await this.redisService.Set(key, (current || 0) + 1, 60);
+    await this.redisService.Set(key, (current || 0) + 1, API_KEY_RATE_LIMIT_TTL);
   }
 
   async getUserApiKeys(User: UserContext): Promise<ApiKeyViewModel[]> {
@@ -378,7 +377,7 @@ export class ApiKeyService {
     });
 
     if (apiKey) {
-      await this.redisService.Set(cacheKey, apiKey, this.ApiKeyCacheTtl);
+      await this.redisService.Set(cacheKey, apiKey, API_KEY_ENTITY_CACHE_TTL);
     }
 
     return apiKey;

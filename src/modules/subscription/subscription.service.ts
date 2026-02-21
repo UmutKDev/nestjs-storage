@@ -15,14 +15,13 @@ import { plainToInstance } from 'class-transformer';
 import { SubscriptionStatus } from '@common/enums/subscription.enum';
 import { RedisService } from '@modules/redis/redis.service';
 import { SubscriptionKeys } from '@modules/redis/redis.keys';
+import {
+  SUBSCRIPTION_LIST_CACHE_TTL,
+  USER_SUBSCRIPTION_CACHE_TTL,
+} from '@modules/redis/redis.ttl';
 
 @Injectable()
 export class SubscriptionService {
-  /** Cache TTL for subscription list (seconds) */
-  private readonly ListCacheTtl = 1800; // 30 minutes
-
-  /** Cache TTL for user subscription (seconds) */
-  private readonly UserSubscriptionCacheTtl = 600; // 10 minutes
 
   constructor(
     @InjectRepository(SubscriptionEntity)
@@ -47,7 +46,7 @@ export class SubscriptionService {
     await this.RedisService.Set(
       SubscriptionKeys.List,
       mapped,
-      this.ListCacheTtl,
+      SUBSCRIPTION_LIST_CACHE_TTL,
     );
     return mapped;
   }
@@ -237,7 +236,7 @@ export class SubscriptionService {
     await this.RedisService.Set(
       cacheKey,
       result,
-      this.UserSubscriptionCacheTtl,
+      USER_SUBSCRIPTION_CACHE_TTL,
     );
     return result;
   }

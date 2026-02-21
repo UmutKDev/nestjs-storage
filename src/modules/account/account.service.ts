@@ -11,11 +11,10 @@ import { UserEntity } from '@entities//user.entity';
 import { plainToInstance } from 'class-transformer';
 import { RedisService } from '@modules/redis/redis.service';
 import { AccountKeys } from '@modules/redis/redis.keys';
+import { ACCOUNT_PROFILE_CACHE_TTL } from '@modules/redis/redis.ttl';
 
 @Injectable()
 export class AccountService {
-  /** Cache TTL for profile (seconds) */
-  private readonly ProfileCacheTtl = 300; // 5 minutes
 
   constructor(
     @InjectRepository(UserEntity)
@@ -62,7 +61,7 @@ export class AccountService {
     };
 
     const result = plainToInstance(AccountProfileResponseModel, userQuery);
-    await this.RedisService.Set(cacheKey, result, this.ProfileCacheTtl);
+    await this.RedisService.Set(cacheKey, result, ACCOUNT_PROFILE_CACHE_TTL);
     return result;
   }
 

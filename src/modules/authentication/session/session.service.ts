@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { RedisService } from '@modules/redis/redis.service';
 import { SessionKeys } from '@modules/redis/redis.keys';
+import { SESSION_TTL, SESSION_ACTIVITY_THROTTLE } from '@modules/redis/redis.ttl';
 import { SessionData, DeviceInfo, SessionListItem } from './session.interface';
 import { randomBytes } from 'crypto';
 import { UserEntity } from '@entities/user.entity';
@@ -8,9 +9,6 @@ import { Role, Status } from '@common/enums';
 
 @Injectable()
 export class SessionService {
-  private readonly SESSION_TTL = 60 * 60 * 24 * 7; // 7 days in seconds
-  private readonly ACTIVITY_THROTTLE_SECONDS = 60; // Skip writes if last activity < 60s ago
-
   constructor(private readonly redisService: RedisService) {}
 
   private generateSessionId(): string {
@@ -61,7 +59,7 @@ export class SessionService {
   ): Promise<{ SessionId: string; Session: SessionData }> {
     const sessionId = this.generateSessionId();
     const now = new Date();
-    const expiresAt = new Date(now.getTime() + this.SESSION_TTL * 1000);
+    const expiresAt = new Date(now.getTime() + SESSION_TTL * 1000);
 
     const session: SessionData = {
       Id: sessionId,
@@ -84,14 +82,14 @@ export class SessionService {
     await this.redisService.Set(
       SessionKeys.Session(sessionId),
       session,
-      this.SESSION_TTL,
+      SESSION_TTL,
     );
 
     // Store reference for user's sessions
     await this.redisService.Set(
       SessionKeys.UserSession(user.Id, sessionId),
       sessionId,
-      this.SESSION_TTL,
+      SESSION_TTL,
     );
 
     return { SessionId: sessionId, Session: session };
@@ -120,7 +118,7 @@ export class SessionService {
     // Throttle: skip write if last activity is within the threshold
     const lastActivity = new Date(session.LastActivityAt).getTime();
     const now = Date.now();
-    if (now - lastActivity < this.ACTIVITY_THROTTLE_SECONDS * 1000) {
+    if (now - lastActivity < SESSION_ACTIVITY_THROTTLE * 1000) {
       return;
     }
 
@@ -129,7 +127,7 @@ export class SessionService {
     await this.redisService.Set(
       SessionKeys.Session(sessionId),
       session,
-      this.SESSION_TTL,
+      SESSION_TTL,
     );
   }
 
@@ -143,7 +141,7 @@ export class SessionService {
     await this.redisService.Set(
       SessionKeys.Session(sessionId),
       session,
-      this.SESSION_TTL,
+      SESSION_TTL,
     );
 
     return true;
@@ -247,7 +245,7 @@ export class SessionService {
     await this.redisService.Set(
       SessionKeys.Session(sessionId),
       session,
-      this.SESSION_TTL,
+      SESSION_TTL,
     );
 
     return session;

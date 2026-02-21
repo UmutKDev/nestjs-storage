@@ -21,9 +21,10 @@ import { SessionService } from './session/session.service';
 import { TwoFactorService } from './two-factor/two-factor.service';
 import { PasskeyService } from './passkey/passkey.service';
 import { RedisService } from '../redis/redis.service';
-
-const TWO_FACTOR_MAX_ATTEMPTS = 5;
-const TWO_FACTOR_LOCKOUT_SECONDS = 900; // 15 minutes
+import {
+  TWO_FACTOR_MAX_ATTEMPTS,
+  TWO_FACTOR_LOCKOUT_TTL,
+} from '@modules/redis/redis.ttl';
 
 @Injectable()
 export class AuthenticationService {
@@ -361,7 +362,7 @@ export class AuthenticationService {
       await this.redisService.Set(
         attemptKey,
         attempts + 1,
-        TWO_FACTOR_LOCKOUT_SECONDS,
+        TWO_FACTOR_LOCKOUT_TTL,
       );
       throw new HttpException('Invalid verification code', 400);
     }

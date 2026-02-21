@@ -27,6 +27,7 @@ import { CloudMetadataService } from './cloud.metadata.service';
 import { NormalizeDirectoryPath } from './cloud.utils';
 import { RedisService } from '@modules/redis/redis.service';
 import { CloudKeys } from '@modules/redis/redis.keys';
+import { CLOUD_LIST_CACHE_TTL, CLOUD_THUMBNAIL_CACHE_TTL } from '@modules/redis/redis.ttl';
 
 @Injectable()
 export class CloudListService {
@@ -42,15 +43,7 @@ export class CloudListService {
   private readonly PresignedUrlExpirySeconds = 3600;
   private readonly DirectoryThumbnailLimit = 4;
   private readonly DirectoryThumbnailMaxFolders = 4;
-  private readonly DirectoryThumbnailCacheTTLSeconds = Math.max(
-    1,
-    parseInt(process.env.CLOUD_LIST_THUMBNAIL_CACHE_TTL_SECONDS ?? '86400', 10),
-  );
   private readonly EmptyFolderPlaceholder = '.emptyFolderPlaceholder';
-  private readonly ListCacheTTLSeconds = Math.max(
-    1,
-    parseInt(process.env.CLOUD_LIST_CACHE_TTL_SECONDS ?? '3600', 10),
-  );
   private readonly IsSignedUrlProcessing =
     process.env.S3_PROTOCOL_SIGNED_URL_PROCESSING === 'true';
   private readonly IsDirectory = (key: string) =>
@@ -130,7 +123,7 @@ export class CloudListService {
       Contents,
     });
 
-    await this.RedisService.Set(cacheKey, result, this.ListCacheTTLSeconds);
+    await this.RedisService.Set(cacheKey, result, CLOUD_LIST_CACHE_TTL);
     return result;
   }
 
@@ -191,7 +184,7 @@ export class CloudListService {
       );
 
       const result = { Objects: objects, TotalCount: objects.length };
-      await this.RedisService.Set(cacheKey, result, this.ListCacheTTLSeconds);
+      await this.RedisService.Set(cacheKey, result, CLOUD_LIST_CACHE_TTL);
       return result;
     }
 
@@ -272,7 +265,7 @@ export class CloudListService {
     }
 
     const result = { Objects: objects, TotalCount: totalCount };
-    await this.RedisService.Set(cacheKey, result, this.ListCacheTTLSeconds);
+    await this.RedisService.Set(cacheKey, result, CLOUD_LIST_CACHE_TTL);
     return result;
   }
 
@@ -346,7 +339,7 @@ export class CloudListService {
         Directories: directories,
         TotalCount: command.CommonPrefixes?.length ?? 0,
       };
-      await this.RedisService.Set(cacheKey, result, this.ListCacheTTLSeconds);
+      await this.RedisService.Set(cacheKey, result, CLOUD_LIST_CACHE_TTL);
       return result;
     }
 
@@ -435,7 +428,7 @@ export class CloudListService {
     }
 
     const result = { Directories: directories, TotalCount: totalCount };
-    await this.RedisService.Set(cacheKey, result, this.ListCacheTTLSeconds);
+    await this.RedisService.Set(cacheKey, result, CLOUD_LIST_CACHE_TTL);
     return result;
   }
 
@@ -953,10 +946,10 @@ export class CloudListService {
 
     const ttlSeconds = IsSignedUrlProcessing
       ? Math.min(
-          this.DirectoryThumbnailCacheTTLSeconds,
+          CLOUD_THUMBNAIL_CACHE_TTL,
           Math.max(1, this.PresignedUrlExpirySeconds - 60),
         )
-      : this.DirectoryThumbnailCacheTTLSeconds;
+      : CLOUD_THUMBNAIL_CACHE_TTL;
     await this.RedisService.Set(cacheKey, thumbnails, ttlSeconds);
 
     return thumbnails;

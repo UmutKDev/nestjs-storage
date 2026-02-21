@@ -30,7 +30,7 @@ import {
 import { CloudS3Service } from './cloud.s3.service';
 import { RedisService } from '@modules/redis/redis.service';
 import { CloudKeys } from '@modules/redis/redis.keys';
-import { ENCRYPTED_FOLDER_SESSION_TTL } from './cloud.constants';
+import { ENCRYPTED_FOLDER_SESSION_TTL, ENCRYPTED_MANIFEST_CACHE_TTL } from '@modules/redis/redis.ttl';
 import { KeyBuilder } from '@common/helpers/cast.helper';
 import { EnsureTrailingSlash, NormalizeDirectoryPath } from './cloud.utils';
 import { CloudUsageService } from './cloud.usage.service';
@@ -836,9 +836,6 @@ export class CloudDirectoryService {
     return set;
   }
 
-  /** TTL for cached encrypted folder manifest (seconds) */
-  private readonly EncryptedManifestCacheTtl = 600; // 10 minutes
-
   private async GetEncryptedFolderManifest(
     User: UserContext,
   ): Promise<EncryptedFolderManifest> {
@@ -866,7 +863,7 @@ export class CloudDirectoryService {
         await this.RedisService.Set(
           cacheKey,
           empty,
-          this.EncryptedManifestCacheTtl,
+          ENCRYPTED_MANIFEST_CACHE_TTL,
         );
         return empty;
       }
@@ -877,7 +874,7 @@ export class CloudDirectoryService {
         await this.RedisService.Set(
           cacheKey,
           empty,
-          this.EncryptedManifestCacheTtl,
+          ENCRYPTED_MANIFEST_CACHE_TTL,
         );
         return empty;
       }
@@ -894,7 +891,7 @@ export class CloudDirectoryService {
         await this.RedisService.Set(
           cacheKey,
           empty,
-          this.EncryptedManifestCacheTtl,
+          ENCRYPTED_MANIFEST_CACHE_TTL,
         );
         return empty;
       }
@@ -921,7 +918,7 @@ export class CloudDirectoryService {
       await this.RedisService.Set(
         cacheKey,
         manifest,
-        this.EncryptedManifestCacheTtl,
+        ENCRYPTED_MANIFEST_CACHE_TTL,
       );
       return manifest;
     } catch (error) {
@@ -930,7 +927,7 @@ export class CloudDirectoryService {
         await this.RedisService.Set(
           cacheKey,
           empty,
-          this.EncryptedManifestCacheTtl,
+          ENCRYPTED_MANIFEST_CACHE_TTL,
         );
         return empty;
       }
