@@ -863,14 +863,22 @@ export class CloudDirectoryService {
       const body = command.Body as Readable;
       if (!body) {
         const empty: EncryptedFolderManifest = { folders: {} };
-        await this.RedisService.Set(cacheKey, empty, this.EncryptedManifestCacheTtl);
+        await this.RedisService.Set(
+          cacheKey,
+          empty,
+          this.EncryptedManifestCacheTtl,
+        );
         return empty;
       }
 
       const json = await this.ReadStreamToString(body);
       if (!json) {
         const empty: EncryptedFolderManifest = { folders: {} };
-        await this.RedisService.Set(cacheKey, empty, this.EncryptedManifestCacheTtl);
+        await this.RedisService.Set(
+          cacheKey,
+          empty,
+          this.EncryptedManifestCacheTtl,
+        );
         return empty;
       }
 
@@ -883,7 +891,11 @@ export class CloudDirectoryService {
           parseError,
         );
         const empty: EncryptedFolderManifest = { folders: {} };
-        await this.RedisService.Set(cacheKey, empty, this.EncryptedManifestCacheTtl);
+        await this.RedisService.Set(
+          cacheKey,
+          empty,
+          this.EncryptedManifestCacheTtl,
+        );
         return empty;
       }
       const normalized: Record<string, EncryptedFolderRecord> = {};
@@ -906,12 +918,20 @@ export class CloudDirectoryService {
         }
       }
       const manifest: EncryptedFolderManifest = { folders: normalized };
-      await this.RedisService.Set(cacheKey, manifest, this.EncryptedManifestCacheTtl);
+      await this.RedisService.Set(
+        cacheKey,
+        manifest,
+        this.EncryptedManifestCacheTtl,
+      );
       return manifest;
     } catch (error) {
       if (this.CloudS3Service.IsNotFoundError(error)) {
         const empty: EncryptedFolderManifest = { folders: {} };
-        await this.RedisService.Set(cacheKey, empty, this.EncryptedManifestCacheTtl);
+        await this.RedisService.Set(
+          cacheKey,
+          empty,
+          this.EncryptedManifestCacheTtl,
+        );
         return empty;
       }
       this.Logger.error('Failed to load encrypted folder manifest', error);

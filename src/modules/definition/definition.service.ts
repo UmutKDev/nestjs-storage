@@ -35,11 +35,7 @@ export class DefinitionService {
     const request: Request = store?.get('request');
 
     // Try Redis cache first
-    const cacheKey = DefinitionKeys.Group(
-      model.Skip,
-      model.Take,
-      model.Search,
-    );
+    const cacheKey = DefinitionKeys.Group(model.Skip, model.Take, model.Search);
     const cached = await this.RedisService.Get<{
       items: DefinitionGroupResponseModel[];
       count: number;

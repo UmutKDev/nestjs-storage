@@ -21,8 +21,7 @@ export namespace ApiKeyKeys {
     `api-key:rate-limit:${apiKeyId}`;
 
   /** api-key:entity:{publicKey} — cached API key entity */
-  export const Entity = (publicKey: string) =>
-    `api-key:entity:${publicKey}`;
+  export const Entity = (publicKey: string) => `api-key:entity:${publicKey}`;
 
   /** api-key:entity:* — pattern to invalidate all cached API key entities */
   export const EntityPattern = `api-key:entity:*`;
@@ -36,8 +35,7 @@ export namespace AuthKeys {
     `auth:2fa-enabled:${userId}`;
 
   /** auth:has-passkey:{userId} — cached boolean for hasPasskey */
-  export const HasPasskey = (userId: string) =>
-    `auth:has-passkey:${userId}`;
+  export const HasPasskey = (userId: string) => `auth:has-passkey:${userId}`;
 }
 
 // ─── Subscription Keys ──────────────────────────────────────────────────────
@@ -75,8 +73,7 @@ export namespace DefinitionKeys {
 
 export namespace AccountKeys {
   /** account:profile:{userId} — cached user profile */
-  export const Profile = (userId: string) =>
-    `account:profile:${userId}`;
+  export const Profile = (userId: string) => `account:profile:${userId}`;
 }
 
 // ─── Cloud Keys ──────────────────────────────────────────────────────────────
