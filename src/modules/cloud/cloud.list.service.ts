@@ -49,7 +49,7 @@ export class CloudListService {
   private readonly EmptyFolderPlaceholder = '.emptyFolderPlaceholder';
   private readonly ListCacheTTLSeconds = Math.max(
     1,
-    parseInt(process.env.CLOUD_LIST_CACHE_TTL_SECONDS ?? '60', 10),
+    parseInt(process.env.CLOUD_LIST_CACHE_TTL_SECONDS ?? '3600', 10),
   );
   private readonly IsSignedUrlProcessing =
     process.env.S3_PROTOCOL_SIGNED_URL_PROCESSING === 'true';
