@@ -29,6 +29,7 @@ import {
   PasskeyViewModel,
 } from '../../account/security/security.model';
 import { plainToInstance } from 'class-transformer';
+import { AuthKeys } from '@modules/redis/redis.keys';
 
 @Injectable()
 export class PasskeyService {
@@ -37,6 +38,9 @@ export class PasskeyService {
   private readonly ORIGIN = process.env.CLIENT_APP_URL;
   private readonly CHALLENGE_PREFIX = 'passkey:challenge';
   private readonly CHALLENGE_TTL = 300; // 5 minutes
+
+  /** Cache TTL for hasPasskey check (seconds) */
+  private readonly HasPasskeyCacheTtl = 300; // 5 minutes
 
   constructor(
     @InjectRepository(PasskeyEntity)
@@ -160,6 +164,9 @@ export class PasskeyService {
     await this.redisService.Delete(
       this.getChallengeKey(User.Id, 'registration'),
     );
+
+    // Invalidate hasPasskey cache
+    await this.redisService.Delete(AuthKeys.HasPasskey(User.Id));
 
     return plainToInstance(PasskeyViewModel, {
       Id: saved.Id,
@@ -297,13 +304,22 @@ export class PasskeyService {
       User: { Id: User.Id },
     });
 
+    // Invalidate hasPasskey cache
+    await this.redisService.Delete(AuthKeys.HasPasskey(User.Id));
+
     return result.affected > 0;
   }
 
   async hasPasskey(userId: string): Promise<boolean> {
+    const cacheKey = AuthKeys.HasPasskey(userId);
+    const cached = await this.redisService.Get<boolean>(cacheKey);
+    if (cached !== undefined && cached !== null) return cached;
+
     const count = await this.passkeyRepository.count({
       where: { User: { Id: userId } },
     });
-    return count > 0;
+    const result = count > 0;
+    await this.redisService.Set(cacheKey, result, this.HasPasskeyCacheTtl);
+    return result;
   }
 }

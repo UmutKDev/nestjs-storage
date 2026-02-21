@@ -22,6 +22,9 @@ import { UserEntity } from '@entities/user.entity';
 
 @Injectable()
 export class ApiKeyService {
+  /** Cache TTL for API key entity lookups (seconds) */
+  private readonly ApiKeyCacheTtl = 300; // 5 minutes
+
   constructor(
     @InjectRepository(ApiKeyEntity)
     private readonly apiKeyRepository: Repository<ApiKeyEntity>,
@@ -88,9 +91,7 @@ export class ApiKeyService {
     payload: string,
     ipAddress: string,
   ): Promise<{ ApiKey: ApiKeyEntity; UserId: string }> {
-    const apiKey = await this.apiKeyRepository.findOne({
-      where: { PublicKey: publicKey, IsRevoked: false },
-    });
+    const apiKey = await this.GetApiKeyByPublicKey(publicKey);
 
     if (!apiKey) {
       throw new HttpException('Invalid API key', 401);
@@ -144,9 +145,7 @@ export class ApiKeyService {
     secretKey: string,
     ipAddress: string,
   ): Promise<{ ApiKey: ApiKeyEntity; UserId: string }> {
-    const apiKey = await this.apiKeyRepository.findOne({
-      where: { PublicKey: publicKey, IsRevoked: false },
-    });
+    const apiKey = await this.GetApiKeyByPublicKey(publicKey);
 
     if (!apiKey) {
       throw new HttpException('Invalid API key', 401);
@@ -286,6 +285,9 @@ export class ApiKeyService {
 
     await this.apiKeyRepository.save(apiKey);
 
+    // Invalidate cached entity
+    await this.InvalidateApiKeyCache(apiKey.PublicKey);
+
     return plainToInstance(ApiKeyViewModel, {
       Id: apiKey.Id,
       Name: apiKey.Name,
@@ -303,10 +305,18 @@ export class ApiKeyService {
   }
 
   async revokeApiKey(User: UserContext, apiKeyId: string): Promise<boolean> {
+    const apiKey = await this.apiKeyRepository.findOne({
+      where: { Id: apiKeyId, User: { Id: User.Id } },
+    });
+
     const result = await this.apiKeyRepository.update(
       { Id: apiKeyId, User: { Id: User.Id } },
       { IsRevoked: true },
     );
+
+    if (apiKey) {
+      await this.InvalidateApiKeyCache(apiKey.PublicKey);
+    }
 
     return result.affected > 0;
   }
@@ -336,6 +346,9 @@ export class ApiKeyService {
 
     await this.apiKeyRepository.save(apiKey);
 
+    // Invalidate cached entity
+    await this.InvalidateApiKeyCache(apiKey.PublicKey);
+
     return plainToInstance(ApiKeyRotateResponseModel, {
       Id: apiKey.Id,
       PublicKey: apiKey.PublicKey,
@@ -348,5 +361,33 @@ export class ApiKeyService {
       apiKey.Scopes.includes(ApiKeyScope.ADMIN) ||
       apiKey.Scopes.includes(requiredScope)
     );
+  }
+
+  /**
+   * Look up an API key by PublicKey, using Redis cache to avoid DB round-trips.
+   */
+  private async GetApiKeyByPublicKey(
+    publicKey: string,
+  ): Promise<ApiKeyEntity | null> {
+    const cacheKey = ApiKeyKeys.Entity(publicKey);
+    const cached = await this.redisService.Get<ApiKeyEntity>(cacheKey);
+    if (cached) return cached;
+
+    const apiKey = await this.apiKeyRepository.findOne({
+      where: { PublicKey: publicKey, IsRevoked: false },
+    });
+
+    if (apiKey) {
+      await this.redisService.Set(cacheKey, apiKey, this.ApiKeyCacheTtl);
+    }
+
+    return apiKey;
+  }
+
+  /**
+   * Invalidate a cached API key entity.
+   */
+  private async InvalidateApiKeyCache(publicKey: string): Promise<void> {
+    await this.redisService.Delete(ApiKeyKeys.Entity(publicKey));
   }
 }

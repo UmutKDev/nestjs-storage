@@ -13,15 +13,21 @@ import {
   TwoFactorStatusResponseModel,
 } from '../../account/security/security.model';
 import { plainToInstance } from 'class-transformer';
+import { RedisService } from '@modules/redis/redis.service';
+import { AuthKeys } from '@modules/redis/redis.keys';
 
 @Injectable()
 export class TwoFactorService {
   private readonly ISSUER = process.env.APP_NAME || 'Storage';
   private readonly BACKUP_CODE_COUNT = 10;
 
+  /** Cache TTL for isTwoFactorEnabled check (seconds) */
+  private readonly TwoFactorCacheTtl = 300; // 5 minutes
+
   constructor(
     @InjectRepository(TwoFactorEntity)
     private readonly twoFactorRepository: Repository<TwoFactorEntity>,
+    private readonly RedisService: RedisService,
   ) {
     // Configure TOTP settings
     authenticator.options = {
@@ -126,6 +132,9 @@ export class TwoFactorService {
 
     await this.twoFactorRepository.save(twoFactor);
 
+    // Invalidate 2FA cache
+    await this.RedisService.Delete(AuthKeys.TwoFactorEnabled(User.Id));
+
     return plainToInstance(TwoFactorBackupCodesResponseModel, {
       BackupCodes: backupCodes,
     });
@@ -197,6 +206,8 @@ export class TwoFactorService {
     }
 
     await this.twoFactorRepository.delete({ UserId: User.Id });
+    // Invalidate 2FA cache
+    await this.RedisService.Delete(AuthKeys.TwoFactorEnabled(User.Id));
     return true;
   }
 
@@ -250,9 +261,15 @@ export class TwoFactorService {
   }
 
   async isTwoFactorEnabled(userId: string): Promise<boolean> {
+    const cacheKey = AuthKeys.TwoFactorEnabled(userId);
+    const cached = await this.RedisService.Get<boolean>(cacheKey);
+    if (cached !== undefined && cached !== null) return cached;
+
     const twoFactor = await this.twoFactorRepository.findOne({
       where: { UserId: userId, IsEnabled: true },
     });
-    return !!twoFactor;
+    const result = !!twoFactor;
+    await this.RedisService.Set(cacheKey, result, this.TwoFactorCacheTtl);
+    return result;
   }
 }

@@ -19,6 +19,64 @@ export namespace ApiKeyKeys {
   /** api-key:rate-limit:{apiKeyId} — per-minute request counter */
   export const RateLimit = (apiKeyId: string) =>
     `api-key:rate-limit:${apiKeyId}`;
+
+  /** api-key:entity:{publicKey} — cached API key entity */
+  export const Entity = (publicKey: string) =>
+    `api-key:entity:${publicKey}`;
+
+  /** api-key:entity:* — pattern to invalidate all cached API key entities */
+  export const EntityPattern = `api-key:entity:*`;
+}
+
+// ─── Authentication Keys ─────────────────────────────────────────────────────
+
+export namespace AuthKeys {
+  /** auth:2fa-enabled:{userId} — cached boolean for isTwoFactorEnabled */
+  export const TwoFactorEnabled = (userId: string) =>
+    `auth:2fa-enabled:${userId}`;
+
+  /** auth:has-passkey:{userId} — cached boolean for hasPasskey */
+  export const HasPasskey = (userId: string) =>
+    `auth:has-passkey:${userId}`;
+}
+
+// ─── Subscription Keys ──────────────────────────────────────────────────────
+
+export namespace SubscriptionKeys {
+  /** subscription:list — cached list of all subscription plans */
+  export const List = `subscription:list`;
+
+  /** subscription:user:{userId} — cached user subscription */
+  export const UserSubscription = (userId: string) =>
+    `subscription:user:${userId}`;
+}
+
+// ─── Definition Keys ─────────────────────────────────────────────────────────
+
+export namespace DefinitionKeys {
+  /** definition:group:{skip}:{take}[:{search}] — cached definition groups */
+  export const Group = (skip: number, take: number, search?: string) =>
+    `definition:group:${skip}:${take}${search ? ':' + encodeURIComponent(search) : ''}`;
+
+  /** definition:list:{groupCode}:{skip}:{take}[:{search}] — cached definitions */
+  export const ListDefinition = (
+    groupCode: string,
+    skip: number,
+    take: number,
+    search?: string,
+  ) =>
+    `definition:list:${groupCode}:${skip}:${take}${search ? ':' + encodeURIComponent(search) : ''}`;
+
+  /** definition:* — pattern to invalidate all definition caches */
+  export const AllPattern = `definition:*`;
+}
+
+// ─── Account Keys ────────────────────────────────────────────────────────────
+
+export namespace AccountKeys {
+  /** account:profile:{userId} — cached user profile */
+  export const Profile = (userId: string) =>
+    `account:profile:${userId}`;
 }
 
 // ─── Cloud Keys ──────────────────────────────────────────────────────────────
@@ -105,6 +163,10 @@ export namespace CloudKeys {
 
   /** cloud:user:{userId}:* — pattern to invalidate all cloud caches for a user */
   export const UserCachePattern = (userId: string) => `cloud:user:${userId}:*`;
+
+  /** cloud:encrypted-manifest:{userId} — cached encrypted folder manifest */
+  export const EncryptedFolderManifest = (userId: string) =>
+    `cloud:encrypted-manifest:${userId}`;
 
   /** cloud:encrypted-folder:session:{userId}:{normalizedPath} — unlock session */
   export const EncryptedFolderSession = (

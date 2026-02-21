@@ -13,9 +13,17 @@ import { UserSubscriptionEntity } from '@entities/user-subscription.entity';
 import { UserEntity } from '@entities/user.entity';
 import { plainToInstance } from 'class-transformer';
 import { SubscriptionStatus } from '@common/enums/subscription.enum';
+import { RedisService } from '@modules/redis/redis.service';
+import { SubscriptionKeys } from '@modules/redis/redis.keys';
 
 @Injectable()
 export class SubscriptionService {
+  /** Cache TTL for subscription list (seconds) */
+  private readonly ListCacheTtl = 1800; // 30 minutes
+
+  /** Cache TTL for user subscription (seconds) */
+  private readonly UserSubscriptionCacheTtl = 600; // 10 minutes
+
   constructor(
     @InjectRepository(SubscriptionEntity)
     private subscriptionRepository: Repository<SubscriptionEntity>,
@@ -23,13 +31,25 @@ export class SubscriptionService {
     private userSubscriptionRepository: Repository<UserSubscriptionEntity>,
     @InjectRepository(UserEntity)
     private userRepository: Repository<UserEntity>,
+    private readonly RedisService: RedisService,
   ) {}
 
   async List(): Promise<SubscriptionListResponseModel[]> {
+    const cached = await this.RedisService.Get<SubscriptionListResponseModel[]>(
+      SubscriptionKeys.List,
+    );
+    if (cached) return cached;
+
     const result = await this.subscriptionRepository.find({
       withDeleted: true,
     });
-    return plainToInstance(SubscriptionListResponseModel, result);
+    const mapped = plainToInstance(SubscriptionListResponseModel, result);
+    await this.RedisService.Set(
+      SubscriptionKeys.List,
+      mapped,
+      this.ListCacheTtl,
+    );
+    return mapped;
   }
 
   async Find({ id }: { id: string }): Promise<SubscriptionFindResponseModel> {
@@ -57,6 +77,7 @@ export class SubscriptionService {
       Status: model.Status,
     });
     await this.subscriptionRepository.save(newEntity);
+    await this.RedisService.Delete(SubscriptionKeys.List);
     return true;
   }
 
@@ -82,12 +103,14 @@ export class SubscriptionService {
         Status: model.Status,
       },
     );
+    await this.RedisService.Delete(SubscriptionKeys.List);
     return true;
   }
 
   async Delete({ id }: { id: string }): Promise<boolean> {
     await this.subscriptionRepository.findOneOrFail({ where: { Id: id } });
     await this.subscriptionRepository.softDelete({ Id: id });
+    await this.RedisService.Delete(SubscriptionKeys.List);
     return true;
   }
 
@@ -133,6 +156,9 @@ export class SubscriptionService {
     });
 
     await this.userSubscriptionRepository.save(entity);
+
+    // Invalidate user subscription cache
+    await this.RedisService.Delete(SubscriptionKeys.UserSubscription(userId));
 
     return true;
   }
@@ -181,6 +207,9 @@ export class SubscriptionService {
 
     await this.userSubscriptionRepository.save(entity);
 
+    // Invalidate user subscription cache
+    await this.RedisService.Delete(SubscriptionKeys.UserSubscription(userId));
+
     return true;
   }
 
@@ -189,6 +218,12 @@ export class SubscriptionService {
   }: {
     userId: string;
   }): Promise<UserSubscriptionResponseModel | null> {
+    // Try Redis cache first
+    const cacheKey = SubscriptionKeys.UserSubscription(userId);
+    const cached =
+      await this.RedisService.Get<UserSubscriptionResponseModel>(cacheKey);
+    if (cached !== undefined && cached !== null) return cached;
+
     const entity = await this.userSubscriptionRepository.findOne({
       where: {
         User: { Id: userId },
@@ -198,18 +233,29 @@ export class SubscriptionService {
 
     if (!entity) return null;
 
-    return plainToInstance(UserSubscriptionResponseModel, entity);
+    const result = plainToInstance(UserSubscriptionResponseModel, entity);
+    await this.RedisService.Set(
+      cacheKey,
+      result,
+      this.UserSubscriptionCacheTtl,
+    );
+    return result;
   }
 
   async Unsubscribe({ id }: { id: string }): Promise<boolean> {
     const entity = await this.userSubscriptionRepository.findOneOrFail({
       where: { Id: id },
+      relations: ['User'],
     });
+    const userId = entity.User?.Id;
     entity.EndAt = new Date();
     entity.Status = SubscriptionStatus.CANCELLED;
     await this.userSubscriptionRepository.save(entity);
     // Aboneliği tamamen sil
     await this.userSubscriptionRepository.remove(entity);
+    if (userId) {
+      await this.RedisService.Delete(SubscriptionKeys.UserSubscription(userId));
+    }
     return true;
   }
 
@@ -225,6 +271,7 @@ export class SubscriptionService {
     await this.userSubscriptionRepository.save(entity);
     // Aboneliği tamamen sil
     await this.userSubscriptionRepository.remove(entity);
+    await this.RedisService.Delete(SubscriptionKeys.UserSubscription(userId));
     return true;
   }
 }

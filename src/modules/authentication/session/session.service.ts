@@ -9,6 +9,7 @@ import { Role, Status } from '@common/enums';
 @Injectable()
 export class SessionService {
   private readonly SESSION_TTL = 60 * 60 * 24 * 7; // 7 days in seconds
+  private readonly ACTIVITY_THROTTLE_SECONDS = 60; // Skip writes if last activity < 60s ago
 
   constructor(private readonly redisService: RedisService) {}
 
@@ -115,6 +116,13 @@ export class SessionService {
   async updateSessionActivity(sessionId: string): Promise<void> {
     const session = await this.getSession(sessionId);
     if (!session) return;
+
+    // Throttle: skip write if last activity is within the threshold
+    const lastActivity = new Date(session.LastActivityAt).getTime();
+    const now = Date.now();
+    if (now - lastActivity < this.ACTIVITY_THROTTLE_SECONDS * 1000) {
+      return;
+    }
 
     session.LastActivityAt = new Date();
 

@@ -9,13 +9,18 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { UserEntity } from '@entities//user.entity';
 import { plainToInstance } from 'class-transformer';
+import { RedisService } from '@modules/redis/redis.service';
+import { AccountKeys } from '@modules/redis/redis.keys';
 
 @Injectable()
 export class AccountService {
+  /** Cache TTL for profile (seconds) */
+  private readonly ProfileCacheTtl = 300; // 5 minutes
+
   constructor(
     @InjectRepository(UserEntity)
     private userRepository: Repository<UserEntity>,
-    // private readonly uploadService: UploadService,
+    private readonly RedisService: RedisService,
   ) {}
 
   async Profile({
@@ -23,6 +28,12 @@ export class AccountService {
   }: {
     user: UserContext;
   }): Promise<AccountProfileResponseModel> {
+    // Try Redis cache first
+    const cacheKey = AccountKeys.Profile(user.Id);
+    const cached =
+      await this.RedisService.Get<AccountProfileResponseModel>(cacheKey);
+    if (cached) return cached;
+
     const query = await this.userRepository
       .findOneOrFail({
         where: { Id: user.Id },
@@ -50,7 +61,9 @@ export class AccountService {
       Date: query.Date,
     };
 
-    return plainToInstance(AccountProfileResponseModel, userQuery);
+    const result = plainToInstance(AccountProfileResponseModel, userQuery);
+    await this.RedisService.Set(cacheKey, result, this.ProfileCacheTtl);
+    return result;
   }
 
   async Edit({
@@ -80,6 +93,9 @@ export class AccountService {
           PhoneNumber: model.PhoneNumber,
         },
       );
+
+      // Invalidate profile cache
+      await this.RedisService.Delete(AccountKeys.Profile(user.Id));
 
       return true;
     } catch (error) {
@@ -129,6 +145,9 @@ export class AccountService {
       { Id: user.Id },
       { Password: hashedPassword },
     );
+
+    // Invalidate profile cache
+    await this.RedisService.Delete(AccountKeys.Profile(user.Id));
 
     return true;
   }

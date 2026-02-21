@@ -836,9 +836,20 @@ export class CloudDirectoryService {
     return set;
   }
 
+  /** TTL for cached encrypted folder manifest (seconds) */
+  private readonly EncryptedManifestCacheTtl = 600; // 10 minutes
+
   private async GetEncryptedFolderManifest(
     User: UserContext,
   ): Promise<EncryptedFolderManifest> {
+    // Try Redis cache first
+    const cacheKey = CloudKeys.EncryptedFolderManifest(User.Id);
+    const cached =
+      await this.RedisService.Get<EncryptedFolderManifest>(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     const manifestKey = KeyBuilder([User.Id, this.EncryptedFoldersManifestKey]);
 
     try {
@@ -851,12 +862,16 @@ export class CloudDirectoryService {
 
       const body = command.Body as Readable;
       if (!body) {
-        return { folders: {} };
+        const empty: EncryptedFolderManifest = { folders: {} };
+        await this.RedisService.Set(cacheKey, empty, this.EncryptedManifestCacheTtl);
+        return empty;
       }
 
       const json = await this.ReadStreamToString(body);
       if (!json) {
-        return { folders: {} };
+        const empty: EncryptedFolderManifest = { folders: {} };
+        await this.RedisService.Set(cacheKey, empty, this.EncryptedManifestCacheTtl);
+        return empty;
       }
 
       let raw: Record<string, unknown> = {};
@@ -867,7 +882,9 @@ export class CloudDirectoryService {
           'Failed to parse encrypted folder manifest, returning empty manifest',
           parseError,
         );
-        return { folders: {} };
+        const empty: EncryptedFolderManifest = { folders: {} };
+        await this.RedisService.Set(cacheKey, empty, this.EncryptedManifestCacheTtl);
+        return empty;
       }
       const normalized: Record<string, EncryptedFolderRecord> = {};
       if (raw && typeof raw === 'object' && raw.folders) {
@@ -888,10 +905,14 @@ export class CloudDirectoryService {
           }
         }
       }
-      return { folders: normalized };
+      const manifest: EncryptedFolderManifest = { folders: normalized };
+      await this.RedisService.Set(cacheKey, manifest, this.EncryptedManifestCacheTtl);
+      return manifest;
     } catch (error) {
       if (this.CloudS3Service.IsNotFoundError(error)) {
-        return { folders: {} };
+        const empty: EncryptedFolderManifest = { folders: {} };
+        await this.RedisService.Set(cacheKey, empty, this.EncryptedManifestCacheTtl);
+        return empty;
       }
       this.Logger.error('Failed to load encrypted folder manifest', error);
       throw error;
@@ -912,6 +933,9 @@ export class CloudDirectoryService {
         ContentType: 'application/json',
       }),
     );
+
+    // Invalidate the cached manifest
+    await this.RedisService.Delete(CloudKeys.EncryptedFolderManifest(User.Id));
   }
 
   private EncryptFolderKey(
