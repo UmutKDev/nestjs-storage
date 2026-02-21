@@ -64,7 +64,10 @@ export const DEFINITION_CACHE_TTL = 3600;
 // ─── Cloud ───────────────────────────────────────────────────────────────────
 
 /** Cloud listing cache (objects, directories, combined) */
-export const CLOUD_LIST_CACHE_TTL = envInt('CLOUD_LIST_CACHE_TTL_SECONDS', 3600);
+export const CLOUD_LIST_CACHE_TTL = envInt(
+  'CLOUD_LIST_CACHE_TTL_SECONDS',
+  3600,
+);
 
 /** Directory thumbnail cache */
 export const CLOUD_THUMBNAIL_CACHE_TTL = envInt(

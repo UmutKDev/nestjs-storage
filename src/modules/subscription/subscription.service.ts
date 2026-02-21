@@ -22,7 +22,6 @@ import {
 
 @Injectable()
 export class SubscriptionService {
-
   constructor(
     @InjectRepository(SubscriptionEntity)
     private subscriptionRepository: Repository<SubscriptionEntity>,
@@ -233,11 +232,7 @@ export class SubscriptionService {
     if (!entity) return null;
 
     const result = plainToInstance(UserSubscriptionResponseModel, entity);
-    await this.RedisService.Set(
-      cacheKey,
-      result,
-      USER_SUBSCRIPTION_CACHE_TTL,
-    );
+    await this.RedisService.Set(cacheKey, result, USER_SUBSCRIPTION_CACHE_TTL);
     return result;
   }
 

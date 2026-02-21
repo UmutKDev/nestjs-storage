@@ -15,7 +15,6 @@ import { ACCOUNT_PROFILE_CACHE_TTL } from '@modules/redis/redis.ttl';
 
 @Injectable()
 export class AccountService {
-
   constructor(
     @InjectRepository(UserEntity)
     private userRepository: Repository<UserEntity>,

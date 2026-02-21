@@ -30,7 +30,10 @@ import {
 import { CloudS3Service } from './cloud.s3.service';
 import { RedisService } from '@modules/redis/redis.service';
 import { CloudKeys } from '@modules/redis/redis.keys';
-import { ENCRYPTED_FOLDER_SESSION_TTL, ENCRYPTED_MANIFEST_CACHE_TTL } from '@modules/redis/redis.ttl';
+import {
+  ENCRYPTED_FOLDER_SESSION_TTL,
+  ENCRYPTED_MANIFEST_CACHE_TTL,
+} from '@modules/redis/redis.ttl';
 import { KeyBuilder } from '@common/helpers/cast.helper';
 import { EnsureTrailingSlash, NormalizeDirectoryPath } from './cloud.utils';
 import { CloudUsageService } from './cloud.usage.service';

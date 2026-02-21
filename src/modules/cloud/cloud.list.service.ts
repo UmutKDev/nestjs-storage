@@ -27,7 +27,10 @@ import { CloudMetadataService } from './cloud.metadata.service';
 import { NormalizeDirectoryPath } from './cloud.utils';
 import { RedisService } from '@modules/redis/redis.service';
 import { CloudKeys } from '@modules/redis/redis.keys';
-import { CLOUD_LIST_CACHE_TTL, CLOUD_THUMBNAIL_CACHE_TTL } from '@modules/redis/redis.ttl';
+import {
+  CLOUD_LIST_CACHE_TTL,
+  CLOUD_THUMBNAIL_CACHE_TTL,
+} from '@modules/redis/redis.ttl';
 
 @Injectable()
 export class CloudListService {

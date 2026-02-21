@@ -16,7 +16,6 @@ import { DEFINITION_CACHE_TTL } from '@modules/redis/redis.ttl';
 
 @Injectable()
 export class DefinitionService {
-
   constructor(
     @InjectRepository(DefinitionEntity)
     private definitionRepository: Repository<DefinitionEntity>,

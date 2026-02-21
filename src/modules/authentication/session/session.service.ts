@@ -1,7 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { RedisService } from '@modules/redis/redis.service';
 import { SessionKeys } from '@modules/redis/redis.keys';
-import { SESSION_TTL, SESSION_ACTIVITY_THROTTLE } from '@modules/redis/redis.ttl';
+import {
+  SESSION_TTL,
+  SESSION_ACTIVITY_THROTTLE,
+} from '@modules/redis/redis.ttl';
 import { SessionData, DeviceInfo, SessionListItem } from './session.interface';
 import { randomBytes } from 'crypto';
 import { UserEntity } from '@entities/user.entity';
