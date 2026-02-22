@@ -50,6 +50,7 @@ import { promisify } from 'util';
 import type { Response } from 'express';
 import {
   FOLDER_SESSION_HEADER,
+  HIDDEN_SESSION_HEADER,
   CLOUD_DOWNLOAD_THROTTLE,
 } from './cloud.constants';
 
@@ -70,13 +71,24 @@ export class CloudController {
     required: false,
     description: 'Session token for encrypted folder access',
   })
+  @ApiHeader({
+    name: HIDDEN_SESSION_HEADER,
+    required: false,
+    description: 'Session token for hidden folder access',
+  })
   @ApiSuccessResponse(CloudListResponseModel)
   async List(
     @Query() model: CloudListRequestModel,
     @User() user: UserContext,
     @Headers(FOLDER_SESSION_HEADER) sessionToken?: string,
+    @Headers(HIDDEN_SESSION_HEADER) hiddenSessionToken?: string,
   ): Promise<CloudListResponseModel> {
-    return this.cloudService.List(model, user, sessionToken);
+    return this.cloudService.List(
+      model,
+      user,
+      sessionToken,
+      hiddenSessionToken,
+    );
   }
 
   @ApiOperation({
@@ -103,13 +115,24 @@ export class CloudController {
     required: false,
     description: 'Session token for encrypted folder access',
   })
+  @ApiHeader({
+    name: HIDDEN_SESSION_HEADER,
+    required: false,
+    description: 'Session token for hidden folder access',
+  })
   @ApiSuccessArrayResponse(CloudDirectoryModel)
   async ListDirectories(
     @Query() model: CloudListDirectoriesRequestModel,
     @User() user: UserContext,
     @Headers(FOLDER_SESSION_HEADER) sessionToken?: string,
+    @Headers(HIDDEN_SESSION_HEADER) hiddenSessionToken?: string,
   ): Promise<CloudDirectoryModel[]> {
-    return this.cloudService.ListDirectories(model, user, sessionToken);
+    return this.cloudService.ListDirectories(
+      model,
+      user,
+      sessionToken,
+      hiddenSessionToken,
+    );
   }
 
   @ApiOperation({
@@ -145,13 +168,24 @@ export class CloudController {
     required: false,
     description: 'Session token for encrypted folder access',
   })
+  @ApiHeader({
+    name: HIDDEN_SESSION_HEADER,
+    required: false,
+    description: 'Session token for hidden folder access',
+  })
   @ApiSuccessResponse(CloudSearchResponseModel)
   async Search(
     @Query() model: CloudSearchRequestModel,
     @User() user: UserContext,
     @Headers(FOLDER_SESSION_HEADER) sessionToken?: string,
+    @Headers(HIDDEN_SESSION_HEADER) hiddenSessionToken?: string,
   ): Promise<CloudSearchResponseModel> {
-    return this.cloudService.Search(model, user, sessionToken);
+    return this.cloudService.Search(
+      model,
+      user,
+      sessionToken,
+      hiddenSessionToken,
+    );
   }
 
   @ApiOperation({

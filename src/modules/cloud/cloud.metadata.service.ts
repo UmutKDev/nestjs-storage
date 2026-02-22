@@ -95,8 +95,6 @@ export class CloudMetadataService {
         );
 
         return this.DecodeMetadataFromS3(newMetadata);
-      } else {
-        this.Logger.warn('Sharp did not return width/height', metadata);
       }
       return existingMetadata;
     } catch (error) {
@@ -137,11 +135,8 @@ export class CloudMetadataService {
         const b64 = value.slice(4);
         try {
           decoded[key] = Buffer.from(b64, 'base64').toString('utf8');
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
         } catch (err) {
-          this.Logger.warn(
-            `Failed to decode metadata value for key ${key}:`,
-            err,
-          );
           decoded[key] = value;
         }
       } else {

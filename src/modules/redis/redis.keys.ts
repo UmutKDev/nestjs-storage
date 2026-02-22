@@ -86,8 +86,9 @@ export namespace CloudKeys {
     delimiter: boolean,
     metadata: boolean,
     hasSession: boolean,
+    hasHiddenSession: boolean,
   ) =>
-    `cloud:list:${userId}:${path || 'root'}:full:${delimiter ? 'delim' : 'nodelim'}:${metadata ? 'meta' : 'nometa'}:${hasSession ? 'auth' : 'noauth'}`;
+    `cloud:list:${userId}:${path || 'root'}:full:${delimiter ? 'delim' : 'nodelim'}:${metadata ? 'meta' : 'nometa'}:${hasSession ? 'auth' : 'noauth'}:${hasHiddenSession ? 'hauth' : 'nohauth'}`;
 
   /** cloud:list:{userId}:{path}:objects:{delim|nodelim}:{meta|nometa}:{skip}:{take}[:{search}] */
   export const ListObjects = (
@@ -101,16 +102,17 @@ export namespace CloudKeys {
   ) =>
     `cloud:list:${userId}:${path || 'root'}:objects:${delimiter ? 'delim' : 'nodelim'}:${metadata ? 'meta' : 'nometa'}:${skip}:${take}${search ? ':' + encodeURIComponent(search) : ''}`;
 
-  /** cloud:list:{userId}:{path}:dirs:{skip}:{take}:{auth|noauth}[:{search}] */
+  /** cloud:list:{userId}:{path}:dirs:{skip}:{take}:{auth|noauth}:{hauth|nohauth}[:{search}] */
   export const ListDirectories = (
     userId: string,
     path: string,
     skip: number,
     take: number,
     hasSession: boolean,
+    hasHiddenSession: boolean,
     search?: string,
   ) =>
-    `cloud:list:${userId}:${path || 'root'}:dirs:${skip}:${take}:${hasSession ? 'auth' : 'noauth'}${search ? ':' + encodeURIComponent(search) : ''}`;
+    `cloud:list:${userId}:${path || 'root'}:dirs:${skip}:${take}:${hasSession ? 'auth' : 'noauth'}:${hasHiddenSession ? 'hauth' : 'nohauth'}${search ? ':' + encodeURIComponent(search) : ''}`;
 
   /** cloud:list:{userId}:* — invalidate all listing caches for a user */
   export const ListAllPattern = (userId: string) => `cloud:list:${userId}:*`;
@@ -188,4 +190,18 @@ export namespace CloudKeys {
     userId: string,
     normalizedPath: string,
   ) => `${EncryptedFolderSession(userId, normalizedPath)}*`;
+
+  /** cloud:hidden-manifest:{userId} — cached hidden folder manifest */
+  export const HiddenFolderManifest = (userId: string) =>
+    `cloud:hidden-manifest:${userId}`;
+
+  /** cloud:hidden-folder:session:{userId}:{normalizedPath} — reveal session */
+  export const HiddenFolderSession = (userId: string, normalizedPath: string) =>
+    `cloud:hidden-folder:session:${userId}:${normalizedPath}`;
+
+  /** Glob pattern that matches the hidden-folder session key + any child paths */
+  export const HiddenFolderSessionPattern = (
+    userId: string,
+    normalizedPath: string,
+  ) => `${HiddenFolderSession(userId, normalizedPath)}*`;
 }

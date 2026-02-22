@@ -125,6 +125,17 @@ export class CloudDirectoryModel {
   IsLocked?: boolean = true;
 
   @Expose()
+  @ApiProperty({ default: false, description: 'Whether directory is hidden' })
+  IsHidden?: boolean = false;
+
+  @Expose()
+  @ApiProperty({
+    default: true,
+    description: 'True if hidden folder is concealed (no valid hidden session)',
+  })
+  IsConcealed?: boolean = true;
+
+  @Expose()
   @ApiProperty({ required: false, type: CloudObjectModel, isArray: true })
   @Type(() => CloudObjectModel)
   Thumbnails?: Array<CloudObjectModel> = [];
@@ -999,6 +1010,89 @@ export class DirectoryResponseModel {
   @Expose()
   @ApiProperty({ required: false })
   UpdatedAt?: string;
+}
+
+// ============================================================================
+// HIDDEN DIRECTORIES API
+// ============================================================================
+
+/**
+ * Request model for hiding a directory.
+ * Passphrase must be provided via X-Folder-Passphrase header.
+ */
+export class DirectoryHideRequestModel {
+  @ApiProperty({ description: 'Directory path to hide' })
+  @IsString()
+  @IsNotEmpty()
+  @Transform(({ value }) => S3KeyConverter(value))
+  Path: string;
+}
+
+/**
+ * Request model for unhiding a directory.
+ * Passphrase must be provided via X-Folder-Passphrase header.
+ */
+export class DirectoryUnhideRequestModel {
+  @ApiProperty({ description: 'Hidden directory path to unhide' })
+  @IsString()
+  @IsNotEmpty()
+  @Transform(({ value }) => S3KeyConverter(value))
+  Path: string;
+}
+
+/**
+ * Request model for revealing hidden directories (create session).
+ * Passphrase must be provided via X-Folder-Passphrase header.
+ */
+export class DirectoryRevealRequestModel {
+  @ApiProperty({ description: 'Path containing hidden directories to reveal' })
+  @IsString()
+  @IsNotEmpty()
+  @Transform(({ value }) => S3KeyConverter(value))
+  Path: string;
+}
+
+/**
+ * Response model for directory reveal operation.
+ */
+export class DirectoryRevealResponseModel {
+  @Expose()
+  @ApiProperty({ description: 'Directory path that was requested for reveal' })
+  Path: string;
+
+  @Expose()
+  @ApiProperty({
+    description: 'The hidden folder path that was revealed',
+  })
+  HiddenFolderPath: string;
+
+  @Expose()
+  @ApiProperty({
+    description:
+      'Session token for subsequent requests. Pass via X-Hidden-Session header.',
+  })
+  SessionToken: string;
+
+  @Expose()
+  @ApiProperty({
+    description: 'Session expiration timestamp (Unix epoch in seconds)',
+  })
+  ExpiresAt: number;
+
+  @Expose()
+  @ApiProperty({ description: 'Session TTL in seconds' })
+  TTL: number;
+}
+
+/**
+ * Request model for concealing hidden directories (invalidate session).
+ */
+export class DirectoryConcealRequestModel {
+  @ApiProperty({ description: 'Hidden directory path to conceal' })
+  @IsString()
+  @IsNotEmpty()
+  @Transform(({ value }) => S3KeyConverter(value))
+  Path: string;
 }
 
 // ============================================================================

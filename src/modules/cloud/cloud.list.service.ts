@@ -6,7 +6,7 @@ import {
   ListObjectsV2CommandInput,
   _Object,
 } from '@aws-sdk/client-s3';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { plainToInstance } from 'class-transformer';
 import {
@@ -34,6 +34,7 @@ import {
 
 @Injectable()
 export class CloudListService {
+  private readonly Logger = new Logger(CloudListService.name);
   private readonly MaxProcessMetadataObjects = Math.max(
     1,
     parseInt(process.env.CLOUD_LIST_METADATA_MAX ?? '1000', 10),
@@ -72,6 +73,13 @@ export class CloudListService {
       folderPath: string,
       sessionToken: string,
     ) => Promise<unknown>,
+    HiddenFolders?: Set<string>,
+    HiddenSessionToken?: string,
+    ValidateHiddenSession?: (
+      userId: string,
+      folderPath: string,
+      sessionToken: string,
+    ) => Promise<unknown>,
   ): Promise<CloudListResponseModel> {
     const cleanedPath = Path ? Path.replace(/^\/+|\/+$/g, '') : '';
 
@@ -81,6 +89,7 @@ export class CloudListService {
       !!Delimiter,
       !!IsMetadataProcessing,
       !!SessionToken,
+      !!HiddenSessionToken,
     );
     const cached =
       await this.RedisService.Get<CloudListResponseModel>(cacheKey);
@@ -111,6 +120,11 @@ export class CloudListService {
         EncryptedFolders,
         SessionToken,
         ValidateDirectorySession,
+        false,
+        false,
+        HiddenFolders,
+        HiddenSessionToken,
+        ValidateHiddenSession,
       ),
       this.ProcessObjects(
         command.Contents ?? [],
@@ -291,6 +305,13 @@ export class CloudListService {
       folderPath: string,
       sessionToken: string,
     ) => Promise<unknown>,
+    HiddenFolders?: Set<string>,
+    HiddenSessionToken?: string,
+    ValidateHiddenSession?: (
+      userId: string,
+      folderPath: string,
+      sessionToken: string,
+    ) => Promise<unknown>,
   ): Promise<{ Directories: CloudDirectoryModel[]; TotalCount: number }> {
     const cleanedPath = Path ? Path.replace(/^\/+|\/+$/g, '') : '';
 
@@ -300,6 +321,7 @@ export class CloudListService {
       typeof skip === 'number' && skip > 0 ? skip : 0,
       typeof take === 'number' && take > 0 ? take : 0,
       !!SessionToken,
+      !!HiddenSessionToken,
       search,
     );
     const cached = await this.RedisService.Get<{
@@ -336,6 +358,9 @@ export class CloudListService {
         ValidateDirectorySession,
         true,
         this.IsSignedUrlProcessing,
+        HiddenFolders,
+        HiddenSessionToken,
+        ValidateHiddenSession,
       );
 
       const result = {
@@ -407,6 +432,9 @@ export class CloudListService {
       ValidateDirectorySession,
       true,
       this.IsSignedUrlProcessing,
+      HiddenFolders,
+      HiddenSessionToken,
+      ValidateHiddenSession,
     );
 
     let totalCount = aggregated.length;
@@ -455,6 +483,13 @@ export class CloudListService {
     EncryptedFolders?: Set<string>,
     SessionToken?: string,
     ValidateDirectorySession?: (
+      userId: string,
+      folderPath: string,
+      sessionToken: string,
+    ) => Promise<unknown>,
+    HiddenFolders?: Set<string>,
+    HiddenSessionToken?: string,
+    ValidateHiddenSession?: (
       userId: string,
       folderPath: string,
       sessionToken: string,
@@ -521,6 +556,29 @@ export class CloudListService {
               sessionCache.set(encFolder, !!session);
             }
             if (!sessionCache.get(encFolder)) continue;
+          }
+        }
+
+        // Check hidden folder access
+        if (this.IsInsideHiddenFolder(relativePath, HiddenFolders)) {
+          const hiddenFolder = this.FindHiddenFolder(
+            relativePath,
+            HiddenFolders,
+          );
+          if (hiddenFolder) {
+            const hiddenCacheKey = `hidden:${hiddenFolder}`;
+            if (!sessionCache.has(hiddenCacheKey)) {
+              const session =
+                HiddenSessionToken && ValidateHiddenSession
+                  ? await ValidateHiddenSession(
+                      User.Id,
+                      hiddenFolder,
+                      HiddenSessionToken,
+                    )
+                  : null;
+              sessionCache.set(hiddenCacheKey, !!session);
+            }
+            if (!sessionCache.get(hiddenCacheKey)) continue;
           }
         }
 
@@ -593,6 +651,8 @@ export class CloudListService {
       Prefix: dirPrefix.endsWith('/') ? dirPrefix : dirPrefix + '/',
       IsEncrypted: EncryptedFolders?.has(dirPrefix) ?? false,
       IsLocked: false,
+      IsHidden: HiddenFolders?.has(dirPrefix) ?? false,
+      IsConcealed: false,
     }));
 
     return {
@@ -651,6 +711,13 @@ export class CloudListService {
     ) => Promise<unknown>,
     IncludeThumbnails = false,
     IsSignedUrlProcessing = false,
+    HiddenFolders?: Set<string>,
+    HiddenSessionToken?: string,
+    ValidateHiddenSession?: (
+      userId: string,
+      folderPath: string,
+      sessionToken: string,
+    ) => Promise<unknown>,
   ): Promise<CloudDirectoryModel[]> {
     const CommonPrefixesFiltered = CommonPrefixes.filter(
       (cp) => !cp.Prefix.includes('.secure/'),
@@ -684,12 +751,41 @@ export class CloudListService {
           isLocked = !session;
         }
 
-        directories.push({
-          Name: DirectoryName,
-          Prefix: DirectoryPrefix,
-          IsEncrypted: isEncrypted,
-          IsLocked: isEncrypted ? isLocked : false,
-        });
+        const isHidden = HiddenFolders?.has(normalizedPrefix) ?? false;
+
+        if (isHidden) {
+          let isConcealed = true;
+          if (HiddenSessionToken && ValidateHiddenSession) {
+            const hiddenSession = await ValidateHiddenSession(
+              User.Id,
+              normalizedPrefix,
+              HiddenSessionToken,
+            );
+
+            isConcealed = !hiddenSession;
+          }
+          if (isConcealed) {
+            continue;
+          }
+
+          directories.push({
+            Name: DirectoryName,
+            Prefix: DirectoryPrefix,
+            IsEncrypted: isEncrypted,
+            IsLocked: isEncrypted ? isLocked : false,
+            IsHidden: true,
+            IsConcealed: false,
+          });
+        } else {
+          directories.push({
+            Name: DirectoryName,
+            Prefix: DirectoryPrefix,
+            IsEncrypted: isEncrypted,
+            IsLocked: isEncrypted ? isLocked : false,
+            IsHidden: false,
+            IsConcealed: false,
+          });
+        }
       }
     }
 
@@ -707,6 +803,10 @@ export class CloudListService {
           }
           const directory = directories[index];
           if (directory.IsEncrypted && directory.IsLocked) {
+            directory.Thumbnails = [];
+            continue;
+          }
+          if (directory.IsHidden && directory.IsConcealed) {
             directory.Thumbnails = [];
             continue;
           }
@@ -1095,6 +1195,32 @@ export class CloudListService {
   ): string | null {
     if (!encryptedFolders) return null;
     for (const folder of encryptedFolders) {
+      if (relativePath === folder || relativePath.startsWith(folder + '/')) {
+        return folder;
+      }
+    }
+    return null;
+  }
+
+  private IsInsideHiddenFolder(
+    relativePath: string,
+    hiddenFolders?: Set<string>,
+  ): boolean {
+    if (!hiddenFolders || hiddenFolders.size === 0) return false;
+    for (const folder of hiddenFolders) {
+      if (relativePath === folder || relativePath.startsWith(folder + '/')) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private FindHiddenFolder(
+    relativePath: string,
+    hiddenFolders?: Set<string>,
+  ): string | null {
+    if (!hiddenFolders) return null;
+    for (const folder of hiddenFolders) {
       if (relativePath === folder || relativePath.startsWith(folder + '/')) {
         return folder;
       }

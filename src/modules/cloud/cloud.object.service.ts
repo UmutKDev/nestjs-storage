@@ -281,10 +281,6 @@ export class CloudObjectService {
           );
 
           if (missingKeys.length) {
-            this.Logger.warn(
-              `CloudObjectService.Update: metadata keys not persisted after copy: ${missingKeys.join(',')}. Falling back to GetObject+PutObject for ${targetKey}`,
-            );
-
             const getResp = await this.CloudS3Service.Send(
               new GetObjectCommand({
                 Bucket: bucket,
@@ -337,10 +333,6 @@ export class CloudObjectService {
         );
 
         if (missingKeys2.length) {
-          this.Logger.warn(
-            `CloudObjectService.Update: metadata keys not persisted after REPLACE for ${sourceKey}, missing: ${missingKeys2.join(',')}. Falling back to GetObject+PutObject`,
-          );
-
           const getResp = await this.CloudS3Service.Send(
             new GetObjectCommand({
               Bucket: bucket,

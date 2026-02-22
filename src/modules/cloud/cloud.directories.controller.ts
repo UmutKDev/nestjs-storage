@@ -17,6 +17,11 @@ import {
   DirectoryConvertToEncryptedRequestModel,
   DirectoryDecryptRequestModel,
   DirectoryResponseModel,
+  DirectoryHideRequestModel,
+  DirectoryUnhideRequestModel,
+  DirectoryRevealRequestModel,
+  DirectoryRevealResponseModel,
+  DirectoryConcealRequestModel,
 } from './cloud.model';
 import { ApiSuccessResponse } from '@common/decorators/response.decorator';
 import { User } from '@common/decorators/user.decorator';
@@ -225,5 +230,87 @@ export class CloudDirectoriesController {
       user,
       sessionToken,
     );
+  }
+
+  // ============================================================================
+  // HIDDEN DIRECTORIES API
+  // ============================================================================
+
+  @ApiOperation({
+    summary: 'Hide a directory',
+    description:
+      'Marks a directory as hidden. Hidden directories are not shown in directory listings unless a valid hidden session token is provided. Provide passphrase via X-Folder-Passphrase header.',
+  })
+  @Post('Hide')
+  @ApiHeader({
+    name: FOLDER_PASSPHRASE_HEADER,
+    required: true,
+    description: 'Passphrase for hidden directory (min 8 chars)',
+  })
+  @ApiSuccessResponse(DirectoryResponseModel)
+  async DirectoryHide(
+    @Body() model: DirectoryHideRequestModel,
+    @User() user: UserContext,
+    @Headers(FOLDER_PASSPHRASE_HEADER) passphrase?: string,
+  ): Promise<DirectoryResponseModel> {
+    return this.cloudService.DirectoryHide(model, passphrase, user);
+  }
+
+  @ApiOperation({
+    summary: 'Unhide a directory',
+    description:
+      'Removes hidden status from a directory. Provide passphrase via X-Folder-Passphrase header.',
+  })
+  @Post('Unhide')
+  @ApiHeader({
+    name: FOLDER_PASSPHRASE_HEADER,
+    required: true,
+    description: 'Passphrase for hidden directory',
+  })
+  @ApiSuccessResponse(DirectoryResponseModel)
+  async DirectoryUnhide(
+    @Body() model: DirectoryUnhideRequestModel,
+    @User() user: UserContext,
+    @Headers(FOLDER_PASSPHRASE_HEADER) passphrase?: string,
+  ): Promise<DirectoryResponseModel> {
+    return this.cloudService.DirectoryUnhide(model, passphrase, user);
+  }
+
+  @ApiOperation({
+    summary: 'Reveal hidden directories',
+    description:
+      'Validates passphrase and creates a session token for viewing hidden directories. The session token should be passed via X-Hidden-Session header in subsequent list requests.',
+  })
+  @Post('Reveal')
+  @ApiHeader({
+    name: FOLDER_PASSPHRASE_HEADER,
+    required: true,
+    description: 'Passphrase for hidden directory (min 8 chars)',
+  })
+  @ApiSuccessResponse(DirectoryRevealResponseModel)
+  async DirectoryReveal(
+    @Body() model: DirectoryRevealRequestModel,
+    @User() user: UserContext,
+    @Headers(FOLDER_PASSPHRASE_HEADER) passphrase?: string,
+  ): Promise<DirectoryRevealResponseModel> {
+    return this.cloudService.DirectoryReveal(model, passphrase, user);
+  }
+
+  @ApiOperation({
+    summary: 'Conceal hidden directories',
+    description:
+      'Invalidates the session token for hidden directories, hiding them from listings again.',
+  })
+  @Post('Conceal')
+  @ApiResponse({
+    status: 200,
+    description: 'Directory concealed',
+    schema: { type: 'boolean' },
+  })
+  async DirectoryConceal(
+    @Body() model: DirectoryConcealRequestModel,
+    @User() user: UserContext,
+  ): Promise<boolean> {
+    return this.cloudService.DirectoryConceal(model, user);
   }
 }

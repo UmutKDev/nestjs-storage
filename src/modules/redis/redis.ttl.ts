@@ -81,6 +81,12 @@ export const ENCRYPTED_MANIFEST_CACHE_TTL = 600;
 /** Encrypted folder unlock-session TTL — 15 minutes */
 export const ENCRYPTED_FOLDER_SESSION_TTL = 15 * 60;
 
+/** Hidden folder manifest cache — 10 minutes */
+export const HIDDEN_MANIFEST_CACHE_TTL = 600;
+
+/** Hidden folder reveal-session TTL — 15 minutes */
+export const HIDDEN_FOLDER_SESSION_TTL = 15 * 60;
+
 /** Idempotency key cache for cloud mutations */
 export const CLOUD_IDEMPOTENCY_TTL = envInt(
   'CLOUD_IDEMPOTENCY_TTL_SECONDS',

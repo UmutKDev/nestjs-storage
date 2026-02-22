@@ -26,6 +26,11 @@ import {
   DirectoryConvertToEncryptedRequestModel,
   DirectoryDecryptRequestModel,
   DirectoryResponseModel,
+  DirectoryHideRequestModel,
+  DirectoryUnhideRequestModel,
+  DirectoryRevealRequestModel,
+  DirectoryRevealResponseModel,
+  DirectoryConcealRequestModel,
 } from './cloud.model';
 import { CloudS3Service } from './cloud.s3.service';
 import { RedisService } from '@modules/redis/redis.service';
@@ -33,6 +38,8 @@ import { CloudKeys } from '@modules/redis/redis.keys';
 import {
   ENCRYPTED_FOLDER_SESSION_TTL,
   ENCRYPTED_MANIFEST_CACHE_TTL,
+  HIDDEN_FOLDER_SESSION_TTL,
+  HIDDEN_MANIFEST_CACHE_TTL,
 } from '@modules/redis/redis.ttl';
 import { KeyBuilder } from '@common/helpers/cast.helper';
 import { EnsureTrailingSlash, NormalizeDirectoryPath } from './cloud.utils';
@@ -58,12 +65,33 @@ type EncryptedFolderSession = {
   expiresAt: number;
 };
 
+type HiddenFolderRecord = {
+  ciphertext: string;
+  iv: string;
+  authTag: string;
+  salt: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+type HiddenFolderManifest = {
+  folders: Record<string, HiddenFolderRecord>;
+};
+
+type HiddenFolderSession = {
+  token: string;
+  folderPath: string;
+  folderKey: string;
+  expiresAt: number;
+};
+
 @Injectable()
 export class CloudDirectoryService {
   private readonly Logger = new Logger(CloudDirectoryService.name);
   private readonly EmptyFolderPlaceholder = '.emptyFolderPlaceholder';
   private readonly EncryptedFoldersManifestKey =
     '.secure/encrypted-folders.json';
+  private readonly HiddenFoldersManifestKey = '.secure/hidden-folders.json';
   private readonly EncryptedFolderKeyBytes = 32;
   private readonly EncryptedFolderIvLength = 12;
   private readonly EncryptedFolderKdfIterations = 120000;
@@ -242,6 +270,12 @@ export class CloudDirectoryService {
       } while (continuationToken);
 
       await this.UpdateEncryptedFoldersAfterRename(
+        sourcePath,
+        normalizedTargetPath,
+        User,
+      );
+
+      await this.UpdateHiddenFoldersAfterRename(
         sourcePath,
         normalizedTargetPath,
         User,
@@ -516,9 +550,6 @@ export class CloudDirectoryService {
     try {
       folderKey = this.DecryptFolderKey(passphrase, entry);
     } catch {
-      this.Logger.warn(
-        `Failed to unlock encrypted folder ${normalizedPath} for user ${User.Id}`,
-      );
       throw new HttpException('Invalid passphrase', HttpStatus.BAD_REQUEST);
     }
 
@@ -885,11 +916,8 @@ export class CloudDirectoryService {
       let raw: Record<string, unknown> = {};
       try {
         raw = JSON.parse(json) as Record<string, unknown>;
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
       } catch (parseError) {
-        this.Logger.warn(
-          'Failed to parse encrypted folder manifest, returning empty manifest',
-          parseError,
-        );
         const empty: EncryptedFolderManifest = { folders: {} };
         await this.RedisService.Set(
           cacheKey,
@@ -1023,5 +1051,465 @@ export class CloudDirectoryService {
     userId: string,
   ): Promise<EncryptedFolderManifest> {
     return this.GetEncryptedFolderManifest({ Id: userId } as UserContext);
+  }
+
+  // ============================================================================
+  // HIDDEN FOLDER METHODS
+  // ============================================================================
+
+  async DirectoryHide(
+    { Path }: DirectoryHideRequestModel,
+    passphrase: string | undefined,
+    User: UserContext,
+  ): Promise<DirectoryResponseModel> {
+    if (!Path) {
+      throw new HttpException(
+        'Directory path is required',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+    const normalizedPath = NormalizeDirectoryPath(Path);
+
+    if (!passphrase || passphrase.length < 8) {
+      throw new HttpException(
+        'Passphrase is required (min 8 characters) for hidden directories. Provide via X-Folder-Passphrase header.',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const manifest = await this.GetHiddenFolderManifest(User);
+    if (manifest.folders[normalizedPath]) {
+      throw new HttpException(
+        'Directory is already hidden',
+        HttpStatus.CONFLICT,
+      );
+    }
+
+    const ensureTrailingSlash = (value: string): string =>
+      value.endsWith('/') ? value : value + '/';
+    const directoryPrefix = ensureTrailingSlash(
+      KeyBuilder([User.Id, normalizedPath]),
+    );
+
+    const listResponse = await this.CloudS3Service.Send(
+      new ListObjectsV2Command({
+        Bucket: this.CloudS3Service.GetBuckets().Storage,
+        Prefix: directoryPrefix,
+        MaxKeys: 1,
+      }),
+    );
+
+    const hasObjects = (listResponse.Contents?.length ?? 0) > 0;
+    if (!hasObjects) {
+      throw new HttpException(
+        'Directory not found or is empty',
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    const folderKey = randomBytes(this.EncryptedFolderKeyBytes).toString(
+      'base64',
+    );
+    const encrypted = this.EncryptFolderKey(passphrase, folderKey);
+    const now = new Date().toISOString();
+
+    manifest.folders[normalizedPath] = {
+      ...encrypted,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    await this.SaveHiddenFolderManifest(User, manifest);
+
+    return plainToInstance(DirectoryResponseModel, {
+      Path: normalizedPath,
+      IsEncrypted: false,
+      CreatedAt: now,
+      UpdatedAt: now,
+    });
+  }
+
+  async DirectoryUnhide(
+    { Path }: DirectoryUnhideRequestModel,
+    passphrase: string | undefined,
+    User: UserContext,
+  ): Promise<DirectoryResponseModel> {
+    if (!Path) {
+      throw new HttpException(
+        'Directory path is required',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+    const normalizedPath = NormalizeDirectoryPath(Path);
+
+    if (!passphrase) {
+      throw new HttpException(
+        'Passphrase is required. Provide via X-Folder-Passphrase header.',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const manifest = await this.GetHiddenFolderManifest(User);
+    const entry = manifest.folders[normalizedPath];
+
+    if (!entry) {
+      throw new HttpException(
+        'Directory is not hidden',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    try {
+      this.DecryptFolderKey(passphrase, entry);
+    } catch {
+      throw new HttpException('Invalid passphrase', HttpStatus.BAD_REQUEST);
+    }
+
+    delete manifest.folders[normalizedPath];
+    await this.SaveHiddenFolderManifest(User, manifest);
+
+    return plainToInstance(DirectoryResponseModel, {
+      Path: normalizedPath,
+      IsEncrypted: false,
+    });
+  }
+
+  async DirectoryReveal(
+    { Path }: DirectoryRevealRequestModel,
+    passphrase: string | undefined,
+    User: UserContext,
+  ): Promise<DirectoryRevealResponseModel> {
+    if (!Path) {
+      throw new HttpException(
+        'Directory path is required',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+    const normalizedPath = NormalizeDirectoryPath(Path);
+
+    if (!passphrase || passphrase.length < 8) {
+      throw new HttpException(
+        'Passphrase is required (min 8 characters). Provide via X-Folder-Passphrase header.',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const manifest = await this.GetHiddenFolderManifest(User);
+
+    let entry = manifest.folders[normalizedPath];
+    let hiddenFolderPath = normalizedPath;
+
+    if (!entry) {
+      const pathSegments = normalizedPath.split('/');
+
+      for (let i = pathSegments.length - 1; i > 0; i--) {
+        const parentPath = pathSegments.slice(0, i).join('/');
+        if (manifest.folders[parentPath]) {
+          entry = manifest.folders[parentPath];
+          hiddenFolderPath = parentPath;
+          break;
+        }
+      }
+
+      // If parent search also fails, search for descendant hidden folders
+      if (!entry) {
+        return this.RevealDescendantHiddenFolders(
+          normalizedPath,
+          passphrase,
+          manifest,
+          User,
+        );
+      }
+    }
+
+    let folderKey: string;
+    try {
+      folderKey = this.DecryptFolderKey(passphrase, entry);
+    } catch {
+      throw new HttpException('Invalid passphrase', HttpStatus.BAD_REQUEST);
+    }
+
+    const sessionToken = randomBytes(32).toString('hex');
+    const expiresAt = Math.floor(Date.now() / 1000) + HIDDEN_FOLDER_SESSION_TTL;
+
+    const session: HiddenFolderSession = {
+      token: sessionToken,
+      folderPath: hiddenFolderPath,
+      folderKey,
+      expiresAt,
+    };
+
+    const cacheKey = CloudKeys.HiddenFolderSession(User.Id, hiddenFolderPath);
+    await this.RedisService.Set(cacheKey, session, HIDDEN_FOLDER_SESSION_TTL);
+
+    if (normalizedPath !== hiddenFolderPath) {
+      const childCacheKey = CloudKeys.HiddenFolderSession(
+        User.Id,
+        normalizedPath,
+      );
+      await this.RedisService.Set(
+        childCacheKey,
+        session,
+        HIDDEN_FOLDER_SESSION_TTL,
+      );
+    }
+
+    return plainToInstance(DirectoryRevealResponseModel, {
+      Path: normalizedPath,
+      HiddenFolderPath: hiddenFolderPath,
+      SessionToken: sessionToken,
+      ExpiresAt: expiresAt,
+      TTL: HIDDEN_FOLDER_SESSION_TTL,
+    });
+  }
+
+  async DirectoryConceal(
+    { Path }: DirectoryConcealRequestModel,
+    User: UserContext,
+  ): Promise<boolean> {
+    if (!Path) {
+      throw new HttpException(
+        'Directory path is required',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+    const normalizedPath = NormalizeDirectoryPath(Path);
+
+    await this.RedisService.DeleteByPattern(
+      CloudKeys.HiddenFolderSessionPattern(User.Id, normalizedPath),
+    );
+
+    return true;
+  }
+
+  async ValidateHiddenSession(
+    userId: string,
+    folderPath: string,
+    sessionToken: string,
+  ): Promise<HiddenFolderSession | null> {
+    const normalizedPath = NormalizeDirectoryPath(folderPath);
+
+    const cacheKey = CloudKeys.HiddenFolderSession(userId, normalizedPath);
+    const session = await this.RedisService.Get<HiddenFolderSession>(cacheKey);
+
+    if (!session || session.token !== sessionToken) {
+      return null;
+    }
+
+    if (session.expiresAt < Math.floor(Date.now() / 1000)) {
+      await this.RedisService.Delete(cacheKey);
+      return null;
+    }
+
+    return session;
+  }
+
+  async GetHiddenFolderSet(User: UserContext): Promise<Set<string>> {
+    const manifest = await this.GetHiddenFolderManifest(User);
+    return this.BuildHiddenFolderSet(manifest);
+  }
+
+  async UpdateHiddenFoldersAfterRename(
+    sourcePath: string,
+    targetPath: string,
+    User: UserContext,
+  ): Promise<void> {
+    const manifest = await this.GetHiddenFolderManifest(User);
+    const folders = manifest.folders || {};
+    const updatedFolders: Record<string, HiddenFolderRecord> = {};
+    const sourcePrefix = sourcePath + '/';
+    let hasChanges = false;
+    const now = new Date().toISOString();
+
+    for (const [path, record] of Object.entries(folders)) {
+      if (path === sourcePath || path.startsWith(sourcePrefix)) {
+        const suffix = path.slice(sourcePath.length);
+        const normalizedSuffix = suffix.startsWith('/')
+          ? suffix.slice(1)
+          : suffix;
+        const updatedPath = normalizedSuffix
+          ? `${targetPath}/${normalizedSuffix}`
+          : targetPath;
+        const normalizedUpdatedPath = NormalizeDirectoryPath(updatedPath);
+        updatedFolders[normalizedUpdatedPath] = {
+          ...record,
+          updatedAt: now,
+        };
+        hasChanges = true;
+      } else {
+        updatedFolders[path] = record;
+      }
+    }
+
+    if (hasChanges) {
+      manifest.folders = updatedFolders;
+      await this.SaveHiddenFolderManifest(User, manifest);
+    }
+  }
+
+  private BuildHiddenFolderSet(manifest: HiddenFolderManifest): Set<string> {
+    const folders = manifest.folders || {};
+    const set = new Set<string>();
+    for (const path of Object.keys(folders)) {
+      set.add(NormalizeDirectoryPath(path));
+    }
+    return set;
+  }
+
+  private async RevealDescendantHiddenFolders(
+    normalizedPath: string,
+    passphrase: string,
+    manifest: HiddenFolderManifest,
+    User: UserContext,
+  ): Promise<DirectoryRevealResponseModel> {
+    const matched: Array<{ path: string; folderKey: string }> = [];
+
+    for (const [folderPath, folderEntry] of Object.entries(manifest.folders)) {
+      const isDescendant =
+        normalizedPath === ''
+          ? true
+          : folderPath.startsWith(normalizedPath + '/');
+
+      if (!isDescendant) continue;
+
+      try {
+        const key = this.DecryptFolderKey(passphrase, folderEntry);
+        matched.push({ path: folderPath, folderKey: key });
+      } catch {
+        // Passphrase does not match this folder
+      }
+    }
+
+    if (matched.length === 0) {
+      throw new HttpException('Hidden folder not found', HttpStatus.NOT_FOUND);
+    }
+
+    const sessionToken = randomBytes(32).toString('hex');
+    const expiresAt = Math.floor(Date.now() / 1000) + HIDDEN_FOLDER_SESSION_TTL;
+
+    for (const match of matched) {
+      const session: HiddenFolderSession = {
+        token: sessionToken,
+        folderPath: match.path,
+        folderKey: match.folderKey,
+        expiresAt,
+      };
+      await this.RedisService.Set(
+        CloudKeys.HiddenFolderSession(User.Id, match.path),
+        session,
+        HIDDEN_FOLDER_SESSION_TTL,
+      );
+    }
+
+    return plainToInstance(DirectoryRevealResponseModel, {
+      Path: normalizedPath,
+      HiddenFolderPath: matched[0].path,
+      SessionToken: sessionToken,
+      ExpiresAt: expiresAt,
+      TTL: HIDDEN_FOLDER_SESSION_TTL,
+    });
+  }
+
+  private async GetHiddenFolderManifest(
+    User: UserContext,
+  ): Promise<HiddenFolderManifest> {
+    const cacheKey = CloudKeys.HiddenFolderManifest(User.Id);
+    const cached = await this.RedisService.Get<HiddenFolderManifest>(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    const manifestKey = KeyBuilder([User.Id, this.HiddenFoldersManifestKey]);
+
+    try {
+      const command = await this.CloudS3Service.Send(
+        new GetObjectCommand({
+          Bucket: this.CloudS3Service.GetBuckets().Storage,
+          Key: manifestKey,
+        }),
+      );
+
+      const body = command.Body as Readable;
+      if (!body) {
+        const empty: HiddenFolderManifest = { folders: {} };
+        await this.RedisService.Set(cacheKey, empty, HIDDEN_MANIFEST_CACHE_TTL);
+        return empty;
+      }
+
+      const json = await this.ReadStreamToString(body);
+      if (!json) {
+        const empty: HiddenFolderManifest = { folders: {} };
+        await this.RedisService.Set(cacheKey, empty, HIDDEN_MANIFEST_CACHE_TTL);
+        return empty;
+      }
+
+      let raw: Record<string, unknown> = {};
+      try {
+        raw = JSON.parse(json) as Record<string, unknown>;
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      } catch (parseError) {
+        const empty: HiddenFolderManifest = { folders: {} };
+        await this.RedisService.Set(cacheKey, empty, HIDDEN_MANIFEST_CACHE_TTL);
+
+        return empty;
+      }
+      const normalized: Record<string, HiddenFolderRecord> = {};
+      if (raw && typeof raw === 'object' && raw.folders) {
+        for (const [path, entry] of Object.entries(
+          raw.folders as Record<string, HiddenFolderRecord>,
+        )) {
+          const normalizedPath = NormalizeDirectoryPath(path);
+          if (
+            entry &&
+            typeof entry === 'object' &&
+            entry.ciphertext &&
+            entry.iv &&
+            entry.authTag &&
+            entry.salt
+          ) {
+            normalized[normalizedPath] = entry;
+          }
+        }
+      }
+      const manifest: HiddenFolderManifest = { folders: normalized };
+      await this.RedisService.Set(
+        cacheKey,
+        manifest,
+        HIDDEN_MANIFEST_CACHE_TTL,
+      );
+      return manifest;
+    } catch (error) {
+      if (this.CloudS3Service.IsNotFoundError(error)) {
+        const empty: HiddenFolderManifest = { folders: {} };
+        await this.RedisService.Set(cacheKey, empty, HIDDEN_MANIFEST_CACHE_TTL);
+        return empty;
+      }
+      this.Logger.error('Failed to load hidden folder manifest', error);
+      throw error;
+    }
+  }
+
+  private async SaveHiddenFolderManifest(
+    User: UserContext,
+    manifest: HiddenFolderManifest,
+  ): Promise<void> {
+    const manifestKey = KeyBuilder([User.Id, this.HiddenFoldersManifestKey]);
+
+    await this.CloudS3Service.Send(
+      new PutObjectCommand({
+        Bucket: this.CloudS3Service.GetBuckets().Storage,
+        Key: manifestKey,
+        Body: JSON.stringify({ folders: manifest.folders || {} }),
+        ContentType: 'application/json',
+      }),
+    );
+
+    await this.RedisService.Delete(CloudKeys.HiddenFolderManifest(User.Id));
+  }
+
+  private async GetHiddenFolderManifestByUserId(
+    userId: string,
+  ): Promise<HiddenFolderManifest> {
+    return this.GetHiddenFolderManifest({ Id: userId } as UserContext);
   }
 }

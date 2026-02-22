@@ -1,4 +1,4 @@
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { createHash } from 'crypto';
 import { Readable } from 'stream';
 import {
@@ -52,6 +52,11 @@ import {
   DirectoryConvertToEncryptedRequestModel,
   DirectoryDecryptRequestModel,
   DirectoryResponseModel,
+  DirectoryHideRequestModel,
+  DirectoryUnhideRequestModel,
+  DirectoryRevealRequestModel,
+  DirectoryRevealResponseModel,
+  DirectoryConcealRequestModel,
 } from './cloud.model';
 import { asyncLocalStorage } from '@common/context/context.service';
 import { CloudListService } from './cloud.list.service';
@@ -69,6 +74,7 @@ import { CLOUD_IDEMPOTENCY_TTL } from '@modules/redis/redis.ttl';
 
 @Injectable()
 export class CloudService {
+  private readonly Logger = new Logger(CloudService.name);
   public readonly MaxMultipartUploadSizeBytes = 50 * 1024 * 1024; // 50 MB
 
   constructor(
@@ -88,6 +94,7 @@ export class CloudService {
     { Path, Delimiter, IsMetadataProcessing }: CloudListRequestModel,
     User: UserContext,
     sessionToken?: string,
+    hiddenSessionToken?: string,
   ): Promise<CloudListResponseModel> {
     const cleanedPath = Path ? Path.replace(/^\/+|\/+$/g, '') : '';
 
@@ -106,6 +113,7 @@ export class CloudService {
     }
 
     const encryptedFolders = await this.GetEncryptedFolderSet(User);
+    const hiddenFolders = await this.GetHiddenFolderSet(User);
 
     return this.CloudListService.List(
       {
@@ -120,6 +128,9 @@ export class CloudService {
       encryptedFolders,
       sessionToken,
       this.ValidateDirectorySession.bind(this),
+      hiddenFolders,
+      hiddenSessionToken,
+      this.ValidateHiddenSession.bind(this),
     );
   }
 
@@ -156,6 +167,7 @@ export class CloudService {
     { Path, Delimiter, Search, Skip, Take }: CloudListDirectoriesRequestModel,
     User: UserContext,
     sessionToken?: string,
+    hiddenSessionToken?: string,
   ): Promise<CloudDirectoryModel[]> {
     const store = asyncLocalStorage.getStore();
     const request: Request = store?.get('request');
@@ -177,12 +189,17 @@ export class CloudService {
     }
 
     const encryptedFolders = await this.GetEncryptedFolderSet(User);
+    const hiddenFolders = await this.GetHiddenFolderSet(User);
+
     const result = await this.CloudListService.ListDirectories(
       { Path, Delimiter, IsMetadataProcessing: false, Search, Skip, Take },
       User,
       encryptedFolders,
       sessionToken,
       this.ValidateDirectorySession.bind(this),
+      hiddenFolders,
+      hiddenSessionToken,
+      this.ValidateHiddenSession.bind(this),
     );
 
     if (request) {
@@ -254,6 +271,7 @@ export class CloudService {
     }: CloudSearchRequestModel,
     User: UserContext,
     sessionToken?: string,
+    hiddenSessionToken?: string,
   ): Promise<CloudSearchResponseModel> {
     const store = asyncLocalStorage.getStore();
     const request: Request = store?.get('request');
@@ -275,6 +293,7 @@ export class CloudService {
     }
 
     const encryptedFolders = await this.GetEncryptedFolderSet(User);
+    const hiddenFolders = await this.GetHiddenFolderSet(User);
 
     const result = await this.CloudListService.SearchObjects(
       { Query, Path, Extension, IsMetadataProcessing, Skip, Take },
@@ -282,6 +301,9 @@ export class CloudService {
       encryptedFolders,
       sessionToken,
       this.ValidateDirectorySession.bind(this),
+      hiddenFolders,
+      hiddenSessionToken,
+      this.ValidateHiddenSession.bind(this),
     );
 
     if (request) {
@@ -557,6 +579,22 @@ export class CloudService {
     folderPath: string,
   ): Promise<unknown | null> {
     return this.CloudDirectoryService.GetActiveSession(userId, folderPath);
+  }
+
+  async GetHiddenFolderSet(User: UserContext): Promise<Set<string>> {
+    return this.CloudDirectoryService.GetHiddenFolderSet(User);
+  }
+
+  async ValidateHiddenSession(
+    userId: string,
+    folderPath: string,
+    sessionToken: string,
+  ): Promise<unknown | null> {
+    return this.CloudDirectoryService.ValidateHiddenSession(
+      userId,
+      folderPath,
+      sessionToken,
+    );
   }
 
   //#endregion
@@ -938,6 +976,68 @@ export class CloudService {
     await this.CloudListService.InvalidateDirectoryThumbnailCache(
       User.Id,
       Path,
+    );
+    await this.CloudListService.InvalidateListCache(User.Id);
+    return result;
+  }
+
+  //#endregion
+
+  // ============================================================================
+  // HIDDEN DIRECTORIES API
+  // ============================================================================
+
+  //#region Hidden Directories API
+
+  async DirectoryHide(
+    model: DirectoryHideRequestModel,
+    passphrase: string | undefined,
+    User: UserContext,
+  ): Promise<DirectoryResponseModel> {
+    const result = await this.CloudDirectoryService.DirectoryHide(
+      model,
+      passphrase,
+      User,
+    );
+    await this.CloudListService.InvalidateListCache(User.Id);
+    return result;
+  }
+
+  async DirectoryUnhide(
+    model: DirectoryUnhideRequestModel,
+    passphrase: string | undefined,
+    User: UserContext,
+  ): Promise<DirectoryResponseModel> {
+    const result = await this.CloudDirectoryService.DirectoryUnhide(
+      model,
+      passphrase,
+      User,
+    );
+    await this.CloudListService.InvalidateListCache(User.Id);
+    return result;
+  }
+
+  async DirectoryReveal(
+    model: DirectoryRevealRequestModel,
+    passphrase: string | undefined,
+    User: UserContext,
+  ): Promise<DirectoryRevealResponseModel> {
+    const result = await this.CloudDirectoryService.DirectoryReveal(
+      model,
+      passphrase,
+      User,
+    );
+    await this.CloudListService.InvalidateListCache(User.Id);
+    return result;
+  }
+
+  async DirectoryConceal(
+    model: DirectoryConcealRequestModel,
+    User: UserContext,
+  ): Promise<boolean> {
+    const result = await this.CloudDirectoryService.DirectoryConceal(
+      model,
+      User,
     );
     await this.CloudListService.InvalidateListCache(User.Id);
     return result;

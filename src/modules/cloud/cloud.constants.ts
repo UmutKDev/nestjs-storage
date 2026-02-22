@@ -10,6 +10,11 @@ export const FOLDER_SESSION_HEADER = 'x-folder-session';
  */
 export const FOLDER_PASSPHRASE_HEADER = 'x-folder-passphrase';
 
+/**
+ * Header name for hidden folder session token
+ */
+export const HIDDEN_SESSION_HEADER = 'x-hidden-session';
+
 export const CLOUD_UPLOAD_THROTTLE = {
   default: {
     ttl: Number(process.env.CLOUD_UPLOAD_RATE_TTL ?? 60000),

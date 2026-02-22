@@ -1035,9 +1035,6 @@ export class CloudArchiveService implements OnModuleInit, OnModuleDestroy {
           });
         } catch (error) {
           if (this.CloudS3Service.IsNotFoundError(error as { name?: string })) {
-            this.Logger.warn(
-              `Skipping missing file during archive creation: ${key}`,
-            );
             continue;
           }
           throw error;
