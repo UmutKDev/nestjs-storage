@@ -86,3 +86,11 @@ export const CLOUD_IDEMPOTENCY_TTL = envInt(
   'CLOUD_IDEMPOTENCY_TTL_SECONDS',
   300,
 );
+
+// ─── Archive ────────────────────────────────────────────────────────────────
+
+/** Archive creation result cache TTL — 1 hour (how long the download link stays valid) */
+export const ARCHIVE_CREATE_RESULT_TTL = envInt(
+  'ARCHIVE_CREATE_TTL_SECONDS',
+  3600,
+);

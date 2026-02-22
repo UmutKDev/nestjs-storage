@@ -129,9 +129,21 @@ export namespace CloudKeys {
     return `cloud:scan:${userId}:${encodedKey}`;
   };
 
-  /** cloud:zip-extract:cancel:{jobId} — signal to cancel a running zip extraction */
+  /** @deprecated Use ArchiveExtractCancel instead */
   export const ZipExtractCancel = (jobId: string) =>
     `cloud:zip-extract:cancel:${jobId}`;
+
+  /** cloud:archive-extract:cancel:{jobId} — signal to cancel a running archive extraction */
+  export const ArchiveExtractCancel = (jobId: string) =>
+    `cloud:archive-extract:cancel:${jobId}`;
+
+  /** cloud:archive-create:cancel:{jobId} — signal to cancel archive creation */
+  export const ArchiveCreateCancel = (jobId: string) =>
+    `cloud:archive-create:cancel:${jobId}`;
+
+  /** cloud:archive-create:result:{jobId} — cached creation result */
+  export const ArchiveCreateResult = (jobId: string) =>
+    `cloud:archive-create:result:${jobId}`;
 
   /** cloud:idempotency:{userId}:{action}:{idempotencyKey} — dedup cache for mutations */
   export const Idempotency = (

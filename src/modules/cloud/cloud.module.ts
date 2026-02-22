@@ -3,6 +3,9 @@ import { Module } from '@nestjs/common';
 import { AwsSdkModule } from 'aws-sdk-v3-nest';
 import { Agent } from 'https';
 import { CloudController } from './cloud.controller';
+import { CloudUploadController } from './cloud.upload.controller';
+import { CloudDirectoriesController } from './cloud.directories.controller';
+import { CloudArchiveController } from './cloud.archive.controller';
 import { CloudService } from './cloud.service';
 import { UserSubscriptionEntity } from '@entities/user-subscription.entity';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -11,7 +14,8 @@ import { CloudS3Service } from './cloud.s3.service';
 import { CloudMetadataService } from './cloud.metadata.service';
 import { CloudListService } from './cloud.list.service';
 import { CloudObjectService } from './cloud.object.service';
-import { CloudZipService } from './cloud.zip.service';
+import { CloudArchiveService } from './cloud.archive.service';
+import { ArchiveHandlerRegistry } from './archive/archive-handler.registry';
 import { CloudUploadService } from './cloud.upload.service';
 import { CloudDirectoryService } from './cloud.directory.service';
 import { CloudUsageService } from './cloud.usage.service';
@@ -36,14 +40,20 @@ import { CloudScanService } from './cloud.scan.service';
     }),
     TypeOrmModule.forFeature([UserSubscriptionEntity]),
   ],
-  controllers: [CloudController],
+  controllers: [
+    CloudController,
+    CloudUploadController,
+    CloudDirectoriesController,
+    CloudArchiveController,
+  ],
   providers: [
     CloudService,
     CloudS3Service,
     CloudMetadataService,
     CloudListService,
     CloudObjectService,
-    CloudZipService,
+    CloudArchiveService,
+    ArchiveHandlerRegistry,
     CloudUploadService,
     CloudDirectoryService,
     CloudUsageService,
@@ -55,7 +65,7 @@ import { CloudScanService } from './cloud.scan.service';
     CloudMetadataService,
     CloudListService,
     CloudObjectService,
-    CloudZipService,
+    CloudArchiveService,
     CloudUploadService,
     CloudDirectoryService,
     CloudUsageService,

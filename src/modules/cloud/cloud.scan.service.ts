@@ -13,6 +13,7 @@ import { CloudS3Service } from './cloud.s3.service';
 import { RedisService } from '@modules/redis/redis.service';
 import { CloudKeys } from '@modules/redis/redis.keys';
 import { KeyBuilder } from '@common/helpers/cast.helper';
+import { ScanStatus } from '@common/enums';
 
 type ScanJobData = {
   userId: string;
@@ -20,7 +21,7 @@ type ScanJobData = {
 };
 
 type ScanResult = {
-  status: 'pending' | 'clean' | 'infected' | 'error' | 'skipped';
+  status: ScanStatus;
   reason?: string;
   signature?: string;
   scannedAt?: string;
@@ -112,7 +113,7 @@ export class CloudScanService implements OnModuleInit, OnModuleDestroy {
     if (!this.IsScanEnabled || !this.Queue) {
       return;
     }
-    await this.SetStatus(userId, key, { status: 'pending' });
+    await this.SetStatus(userId, key, { status: ScanStatus.PENDING });
     await this.Queue.add('scan', { userId, key });
   }
 
@@ -141,7 +142,7 @@ export class CloudScanService implements OnModuleInit, OnModuleDestroy {
       const size = Number(object.ContentLength ?? 0);
       if (size > this.MaxScanBytes) {
         await this.SetStatus(userId, key, {
-          status: 'skipped',
+          status: ScanStatus.SKIPPED,
           reason: 'size_limit',
           scannedAt: new Date().toISOString(),
         });
@@ -157,7 +158,7 @@ export class CloudScanService implements OnModuleInit, OnModuleDestroy {
     } catch (error) {
       this.Logger.error(`AV scan failed for ${key}`, error as Error);
       await this.SetStatus(userId, key, {
-        status: 'error',
+        status: ScanStatus.ERROR,
         reason: 'scan_failed',
         scannedAt: new Date().toISOString(),
       });
@@ -193,7 +194,7 @@ export class CloudScanService implements OnModuleInit, OnModuleDestroy {
     const host = process.env.CLOUD_AV_HOST;
     const port = parseInt(process.env.CLOUD_AV_PORT ?? '', 10);
     if (!host || Number.isNaN(port)) {
-      return { status: 'error', reason: 'clamav_not_configured' };
+      return { status: ScanStatus.ERROR, reason: 'clamav_not_configured' };
     }
 
     return new Promise<ScanResult>((resolve, reject) => {
@@ -225,15 +226,18 @@ export class CloudScanService implements OnModuleInit, OnModuleDestroy {
         cleanup();
         const normalized = response.trim();
         if (normalized.endsWith('OK')) {
-          resolve({ status: 'clean' });
+          resolve({ status: ScanStatus.CLEAN });
           return;
         }
         if (normalized.includes('FOUND')) {
           const signature = normalized.split('FOUND')[0]?.trim();
-          resolve({ status: 'infected', signature });
+          resolve({ status: ScanStatus.INFECTED, signature });
           return;
         }
-        resolve({ status: 'error', reason: 'clamav_unknown_response' });
+        resolve({
+          status: ScanStatus.ERROR,
+          reason: 'clamav_unknown_response',
+        });
       });
 
       socket.on('connect', async () => {

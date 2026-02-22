@@ -71,11 +71,38 @@ export declare global {
       // Cloud Idempotency
       CLOUD_IDEMPOTENCY_TTL_SECONDS?: string;
 
-      // Zip Extraction Limits
+      // Zip Extraction Limits (legacy, use ARCHIVE_EXTRACT_* instead)
       ZIP_EXTRACT_MAX_ENTRIES?: string;
       ZIP_EXTRACT_MAX_ENTRY_BYTES?: string;
       ZIP_EXTRACT_MAX_TOTAL_BYTES?: string;
       ZIP_EXTRACT_MAX_RATIO?: string;
+      ZIP_EXTRACT_JOB_CONCURRENCY?: string;
+      ZIP_EXTRACT_ENTRY_CONCURRENCY?: string;
+      ZIP_EXTRACT_PROGRESS_ENTRIES?: string;
+      ZIP_EXTRACT_PROGRESS_BYTES?: string;
+
+      // Archive Extraction Limits
+      ARCHIVE_EXTRACT_JOB_CONCURRENCY?: string;
+      ARCHIVE_EXTRACT_ENTRY_CONCURRENCY?: string;
+      ARCHIVE_EXTRACT_PROGRESS_ENTRIES?: string;
+      ARCHIVE_EXTRACT_PROGRESS_BYTES?: string;
+      ARCHIVE_EXTRACT_MAX_ENTRIES?: string;
+      ARCHIVE_EXTRACT_MAX_ENTRY_BYTES?: string;
+      ARCHIVE_EXTRACT_MAX_TOTAL_BYTES?: string;
+      ARCHIVE_EXTRACT_MAX_RATIO?: string;
+
+      // Archive Creation Limits
+      ARCHIVE_CREATE_JOB_CONCURRENCY?: string;
+      ARCHIVE_CREATE_MAX_FILES?: string;
+      ARCHIVE_CREATE_MAX_TOTAL_BYTES?: string;
+      ARCHIVE_CREATE_TEMP_PREFIX?: string;
+      ARCHIVE_CREATE_TTL_SECONDS?: string;
+
+      // Archive Preview
+      ARCHIVE_PREVIEW_MAX_BYTES?: string;
+
+      // RAR Specific
+      RAR_MAX_BUFFER_BYTES?: string;
 
       // Mail Configuration
       MAIL_HOST: string;

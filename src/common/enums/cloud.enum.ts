@@ -42,6 +42,39 @@ enum CloudBreadcrumbLevelType {
   SUBFOLDER = 'SUBFOLDER',
 }
 
+enum ArchiveJobState {
+  WAITING = 'waiting',
+  DELAYED = 'delayed',
+  ACTIVE = 'active',
+  COMPLETED = 'completed',
+  FAILED = 'failed',
+}
+
+enum ArchivePhase {
+  EXTRACT = 'extract',
+  CREATE = 'create',
+}
+
+enum ArchiveFormat {
+  ZIP = 'zip',
+  TAR = 'tar',
+  TAR_GZ = 'tar.gz',
+  RAR = 'rar',
+}
+
+enum ArchiveEntryType {
+  FILE = 'file',
+  DIRECTORY = 'directory',
+}
+
+enum ScanStatus {
+  PENDING = 'pending',
+  CLEAN = 'clean',
+  INFECTED = 'infected',
+  ERROR = 'error',
+  SKIPPED = 'skipped',
+}
+
 export {
   Role,
   Status,
@@ -51,4 +84,9 @@ export {
   CloudContextLevel,
   CloudDirectoryType,
   CloudBreadcrumbLevelType,
+  ArchiveJobState,
+  ArchivePhase,
+  ArchiveFormat,
+  ArchiveEntryType,
+  ScanStatus,
 };

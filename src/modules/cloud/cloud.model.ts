@@ -1,4 +1,11 @@
-import { CloudBreadcrumbLevelType } from '@common/enums';
+import {
+  ArchiveEntryType,
+  ArchiveFormat,
+  ArchiveJobState,
+  ArchivePhase,
+  CloudBreadcrumbLevelType,
+  ScanStatus,
+} from '@common/enums';
 import { CDNPathResolver, S3KeyConverter } from '@common/helpers/cast.helper';
 import { PaginationRequestModel } from '@common/models/pagination.model';
 import { ApiProperty, OmitType } from '@nestjs/swagger';
@@ -389,39 +396,89 @@ export class CloudCompleteMultipartUploadRequestModel {
   Parts: Array<CloudMultipartPartModel>;
 }
 
-export class CloudExtractZipStartRequestModel {
-  @ApiProperty()
+// ============================================================================
+// ARCHIVE API - Multi-format archive operations
+// ============================================================================
+
+export class CloudArchiveExtractStartRequestModel {
+  @ApiProperty({ description: 'Key of the archive file to extract' })
   @IsString()
   @IsNotEmpty()
   @Transform(({ value }) => S3KeyConverter(value))
   Key: string;
+
+  @ApiProperty({
+    required: false,
+    type: [String],
+    description:
+      'Specific entry paths to extract (selective extraction). Omit for full extraction.',
+  })
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  SelectedEntries?: string[];
 }
 
-export class CloudExtractZipStartResponseModel {
+export class CloudArchiveExtractStartResponseModel {
   @Expose()
   @ApiProperty()
   JobId: string;
+
+  @Expose()
+  @ApiProperty({ description: 'Detected archive format', enum: ArchiveFormat })
+  Format: string;
 }
 
-export class CloudExtractZipStatusRequestModel {
+export class CloudArchiveExtractStatusRequestModel {
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
   JobId: string;
 }
 
-export class CloudExtractZipStatusResponseModel {
+export class CloudArchiveExtractProgressModel {
+  @Expose()
+  @ApiProperty({ enum: ArchivePhase })
+  Phase: string;
+
+  @Expose()
+  @ApiProperty()
+  EntriesProcessed: number;
+
+  @Expose()
+  @ApiProperty({ required: false })
+  TotalEntries?: number;
+
+  @Expose()
+  @ApiProperty()
+  BytesRead: number;
+
+  @Expose()
+  @ApiProperty()
+  TotalBytes: number;
+
+  @Expose()
+  @ApiProperty({ required: false })
+  CurrentEntry?: string;
+}
+
+export class CloudArchiveExtractStatusResponseModel {
   @Expose()
   @ApiProperty()
   JobId: string;
 
   @Expose()
-  @ApiProperty()
+  @ApiProperty({ enum: ArchiveJobState })
   State: string;
 
   @Expose()
-  @ApiProperty({ required: false, type: Object })
-  Progress?: Record<string, unknown>;
+  @ApiProperty({ required: false, enum: ArchiveFormat })
+  Format?: string;
+
+  @Expose()
+  @Type(() => CloudArchiveExtractProgressModel)
+  @ApiProperty({ required: false, type: CloudArchiveExtractProgressModel })
+  Progress?: CloudArchiveExtractProgressModel;
 
   @Expose()
   @ApiProperty({ required: false })
@@ -432,14 +489,153 @@ export class CloudExtractZipStatusResponseModel {
   FailedReason?: string;
 }
 
-export class CloudExtractZipCancelRequestModel {
+export class CloudArchiveExtractCancelRequestModel {
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
   JobId: string;
 }
 
-export class CloudExtractZipCancelResponseModel {
+export class CloudArchiveExtractCancelResponseModel {
+  @Expose()
+  @ApiProperty()
+  Cancelled: boolean;
+}
+
+export class CloudArchivePreviewRequestModel {
+  @ApiProperty({ description: 'Key of the archive file to preview' })
+  @IsString()
+  @IsNotEmpty()
+  @Transform(({ value }) => S3KeyConverter(value))
+  Key: string;
+}
+
+export class CloudArchivePreviewEntryModel {
+  @Expose()
+  @ApiProperty()
+  Path: string;
+
+  @Expose()
+  @ApiProperty({ enum: ArchiveEntryType })
+  Type: string;
+
+  @Expose()
+  @ApiProperty()
+  Size: number;
+
+  @Expose()
+  @ApiProperty({ required: false })
+  CompressedSize?: number;
+
+  @Expose()
+  @ApiProperty({ required: false })
+  LastModified?: string;
+}
+
+export class CloudArchivePreviewResponseModel {
+  @Expose()
+  @ApiProperty()
+  Key: string;
+
+  @Expose()
+  @ApiProperty({ enum: ArchiveFormat })
+  Format: string;
+
+  @Expose()
+  @ApiProperty()
+  TotalEntries: number;
+
+  @Expose()
+  @ApiProperty({ type: CloudArchivePreviewEntryModel, isArray: true })
+  @Type(() => CloudArchivePreviewEntryModel)
+  Entries: CloudArchivePreviewEntryModel[];
+}
+
+export class CloudArchiveCreateStartRequestModel {
+  @ApiProperty({
+    type: [String],
+    description: 'S3 keys to include in the archive (files and/or directories)',
+  })
+  @IsArray()
+  @IsString({ each: true })
+  @IsNotEmpty()
+  @Transform(({ value }) => value.map((v: string) => S3KeyConverter(v)))
+  Keys: string[];
+
+  @ApiProperty({
+    required: false,
+    description: 'Output format',
+    enum: ArchiveFormat,
+    default: ArchiveFormat.ZIP,
+  })
+  @IsString()
+  @IsOptional()
+  Format?: string = ArchiveFormat.ZIP;
+
+  @ApiProperty({
+    required: false,
+    description: 'Custom output filename (without extension)',
+  })
+  @IsString()
+  @IsOptional()
+  OutputName?: string;
+}
+
+export class CloudArchiveCreateStartResponseModel {
+  @Expose()
+  @ApiProperty()
+  JobId: string;
+
+  @Expose()
+  @ApiProperty({ enum: ArchiveFormat })
+  Format: string;
+
+  @Expose()
+  @ApiProperty({ description: 'S3 key where the archive will be created' })
+  OutputKey: string;
+}
+
+export class CloudArchiveCreateStatusRequestModel {
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  JobId: string;
+}
+
+export class CloudArchiveCreateStatusResponseModel {
+  @Expose()
+  @ApiProperty()
+  JobId: string;
+
+  @Expose()
+  @ApiProperty({ enum: ArchiveJobState })
+  State: string;
+
+  @Expose()
+  @ApiProperty({ required: false, type: Object })
+  Progress?: Record<string, unknown>;
+
+  @Expose()
+  @ApiProperty({ required: false })
+  ArchiveKey?: string;
+
+  @Expose()
+  @ApiProperty({ required: false })
+  ArchiveSize?: number;
+
+  @Expose()
+  @ApiProperty({ required: false })
+  FailedReason?: string;
+}
+
+export class CloudArchiveCreateCancelRequestModel {
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  JobId: string;
+}
+
+export class CloudArchiveCreateCancelResponseModel {
   @Expose()
   @ApiProperty()
   Cancelled: boolean;
@@ -499,7 +695,7 @@ export class CloudUserStorageUsageResponseModel {
 
 export class CloudScanStatusResponseModel {
   @Expose()
-  @ApiProperty()
+  @ApiProperty({ enum: ScanStatus })
   Status: string;
 
   @Expose()

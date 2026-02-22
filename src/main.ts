@@ -111,6 +111,9 @@ const SwaggerConfig = new DocumentBuilder()
   .addTag('User')
   .addTag('Definition')
   .addTag('Cloud')
+  .addTag('Cloud / Upload')
+  .addTag('Cloud / Directories')
+  .addTag('Cloud / Archive')
   .addCookieAuth('session_id')
   .build();
 

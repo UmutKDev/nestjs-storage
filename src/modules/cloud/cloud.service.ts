@@ -6,12 +6,20 @@ import {
   CloudBreadCrumbModel,
   CloudCompleteMultipartUploadRequestModel,
   CloudCompleteMultipartUploadResponseModel,
-  CloudExtractZipStartRequestModel,
-  CloudExtractZipStartResponseModel,
-  CloudExtractZipStatusRequestModel,
-  CloudExtractZipStatusResponseModel,
-  CloudExtractZipCancelRequestModel,
-  CloudExtractZipCancelResponseModel,
+  CloudArchiveExtractStartRequestModel,
+  CloudArchiveExtractStartResponseModel,
+  CloudArchiveExtractStatusRequestModel,
+  CloudArchiveExtractStatusResponseModel,
+  CloudArchiveExtractCancelRequestModel,
+  CloudArchiveExtractCancelResponseModel,
+  CloudArchivePreviewRequestModel,
+  CloudArchivePreviewResponseModel,
+  CloudArchiveCreateStartRequestModel,
+  CloudArchiveCreateStartResponseModel,
+  CloudArchiveCreateStatusRequestModel,
+  CloudArchiveCreateStatusResponseModel,
+  CloudArchiveCreateCancelRequestModel,
+  CloudArchiveCreateCancelResponseModel,
   CloudCreateMultipartUploadRequestModel,
   CloudCreateMultipartUploadResponseModel,
   CloudKeyRequestModel,
@@ -48,7 +56,7 @@ import {
 import { asyncLocalStorage } from '@common/context/context.service';
 import { CloudListService } from './cloud.list.service';
 import { CloudObjectService } from './cloud.object.service';
-import { CloudZipService } from './cloud.zip.service';
+import { CloudArchiveService } from './cloud.archive.service';
 import { CloudUploadService } from './cloud.upload.service';
 import { CloudDirectoryService } from './cloud.directory.service';
 import { CloudUsageService } from './cloud.usage.service';
@@ -66,7 +74,7 @@ export class CloudService {
   constructor(
     private readonly CloudListService: CloudListService,
     private readonly CloudObjectService: CloudObjectService,
-    private readonly CloudZipService: CloudZipService,
+    private readonly CloudArchiveService: CloudArchiveService,
     private readonly CloudUploadService: CloudUploadService,
     private readonly CloudDirectoryService: CloudDirectoryService,
     private readonly CloudUsageService: CloudUsageService,
@@ -663,28 +671,74 @@ export class CloudService {
   //#region Image Metadata Processing
   //#endregion
 
-  async ExtractZipStart(
-    { Key }: CloudExtractZipStartRequestModel,
+  // ============================================================================
+  // ARCHIVE API - Multi-format archive operations
+  // ============================================================================
+
+  //#region Archive Extract
+
+  async ArchiveExtractStart(
+    model: CloudArchiveExtractStartRequestModel,
     User: UserContext,
     sessionToken?: string,
-  ): Promise<CloudExtractZipStartResponseModel> {
-    await this.EnsureUploadAccess(Key, User.Id, sessionToken);
-    return this.CloudZipService.ExtractZipStart({ Key }, User);
+  ): Promise<CloudArchiveExtractStartResponseModel> {
+    await this.EnsureUploadAccess(model.Key, User.Id, sessionToken);
+    return this.CloudArchiveService.ArchiveExtractStart(model, User);
   }
 
-  async ExtractZipStatus(
-    { JobId }: CloudExtractZipStatusRequestModel,
+  async ArchiveExtractStatus(
+    model: CloudArchiveExtractStatusRequestModel,
     User: UserContext,
-  ): Promise<CloudExtractZipStatusResponseModel> {
-    return this.CloudZipService.ExtractZipStatus({ JobId }, User);
+  ): Promise<CloudArchiveExtractStatusResponseModel> {
+    return this.CloudArchiveService.ArchiveExtractStatus(model, User);
   }
 
-  async ExtractZipCancel(
-    { JobId }: CloudExtractZipCancelRequestModel,
+  async ArchiveExtractCancel(
+    model: CloudArchiveExtractCancelRequestModel,
     User: UserContext,
-  ): Promise<CloudExtractZipCancelResponseModel> {
-    return this.CloudZipService.ExtractZipCancel({ JobId }, User);
+  ): Promise<CloudArchiveExtractCancelResponseModel> {
+    return this.CloudArchiveService.ArchiveExtractCancel(model, User);
   }
+
+  //#endregion
+
+  //#region Archive Preview
+
+  async ArchivePreview(
+    model: CloudArchivePreviewRequestModel,
+    User: UserContext,
+    sessionToken?: string,
+  ): Promise<CloudArchivePreviewResponseModel> {
+    await this.EnsureUploadAccess(model.Key, User.Id, sessionToken);
+    return this.CloudArchiveService.ArchivePreview(model, User);
+  }
+
+  //#endregion
+
+  //#region Archive Create
+
+  async ArchiveCreateStart(
+    model: CloudArchiveCreateStartRequestModel,
+    User: UserContext,
+  ): Promise<CloudArchiveCreateStartResponseModel> {
+    return this.CloudArchiveService.ArchiveCreateStart(model, User);
+  }
+
+  async ArchiveCreateStatus(
+    model: CloudArchiveCreateStatusRequestModel,
+    User: UserContext,
+  ): Promise<CloudArchiveCreateStatusResponseModel> {
+    return this.CloudArchiveService.ArchiveCreateStatus(model, User);
+  }
+
+  async ArchiveCreateCancel(
+    model: CloudArchiveCreateCancelRequestModel,
+    User: UserContext,
+  ): Promise<CloudArchiveCreateCancelResponseModel> {
+    return this.CloudArchiveService.ArchiveCreateCancel(model, User);
+  }
+
+  //#endregion
 
   //#region Abort Multipart Upload
 

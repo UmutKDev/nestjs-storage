@@ -1,6 +1,6 @@
 import { AllMimeTypesExtensions, MimeTypeGroups } from '@common/enums';
 import { camelCase, startCase } from 'lodash';
-import { randomBytes, randomInt, randomUUID } from 'crypto';
+import { randomInt, randomUUID } from 'crypto';
 
 export const slugify = (value: string): string =>
   value
