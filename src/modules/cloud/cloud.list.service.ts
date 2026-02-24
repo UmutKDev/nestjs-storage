@@ -25,6 +25,7 @@ import {
 import { CloudS3Service } from './cloud.s3.service';
 import { CloudMetadataService } from './cloud.metadata.service';
 import { NormalizeDirectoryPath } from './cloud.utils';
+import { GetStorageOwnerId } from './cloud.context';
 import { RedisService } from '@modules/redis/redis.service';
 import { CloudKeys } from '@modules/redis/redis.keys';
 import {
@@ -84,7 +85,7 @@ export class CloudListService {
     const cleanedPath = Path ? Path.replace(/^\/+|\/+$/g, '') : '';
 
     const cacheKey = CloudKeys.List(
-      User.Id,
+      GetStorageOwnerId(User),
       cleanedPath,
       !!Delimiter,
       !!IsMetadataProcessing,
@@ -97,7 +98,7 @@ export class CloudListService {
       return cached;
     }
 
-    let prefix = KeyBuilder([User.Id, cleanedPath]);
+    let prefix = KeyBuilder([GetStorageOwnerId(User),cleanedPath]);
     if (!prefix.endsWith('/')) {
       prefix = prefix + '/';
     }
@@ -157,7 +158,7 @@ export class CloudListService {
   ): Promise<{ Objects: CloudObjectModel[]; TotalCount: number }> {
     const cleanedPath = Path ? Path.replace(/^\/+|\/+$/g, '') : '';
 
-    let prefix = KeyBuilder([User.Id, cleanedPath]);
+    let prefix = KeyBuilder([GetStorageOwnerId(User),cleanedPath]);
     if (!prefix.endsWith('/')) {
       prefix = prefix + '/';
     }
@@ -167,7 +168,7 @@ export class CloudListService {
       typeof Take === 'number' && Take > 0 ? Take : this.MaxListObjects;
 
     const cacheKey = CloudKeys.ListObjects(
-      User.Id,
+      GetStorageOwnerId(User),
       cleanedPath,
       !!Delimiter,
       !!IsMetadataProcessing,
@@ -316,7 +317,7 @@ export class CloudListService {
     const cleanedPath = Path ? Path.replace(/^\/+|\/+$/g, '') : '';
 
     const cacheKey = CloudKeys.ListDirectories(
-      User.Id,
+      GetStorageOwnerId(User),
       cleanedPath,
       typeof skip === 'number' && skip > 0 ? skip : 0,
       typeof take === 'number' && take > 0 ? take : 0,
@@ -332,7 +333,7 @@ export class CloudListService {
       return cached;
     }
 
-    let prefix = KeyBuilder([User.Id, cleanedPath]);
+    let prefix = KeyBuilder([GetStorageOwnerId(User),cleanedPath]);
     if (!prefix.endsWith('/')) {
       prefix = prefix + '/';
     }
@@ -502,7 +503,7 @@ export class CloudListService {
   }> {
     const cleanedPath = Path ? Path.replace(/^\/+|\/+$/g, '') : '';
 
-    let prefix = KeyBuilder([User.Id, cleanedPath]);
+    let prefix = KeyBuilder([GetStorageOwnerId(User),cleanedPath]);
     if (!prefix.endsWith('/')) {
       prefix = prefix + '/';
     }
@@ -535,7 +536,7 @@ export class CloudListService {
         if (!obj.Key) continue;
         if (obj.Key.includes('.secure/')) continue;
 
-        const relativePath = obj.Key.replace(User.Id + '/', '');
+        const relativePath = obj.Key.replace(GetStorageOwnerId(User) + '/', '');
 
         // Check encrypted folder access
         if (this.IsInsideEncryptedFolder(relativePath, EncryptedFolders)) {
@@ -548,7 +549,7 @@ export class CloudListService {
               const session =
                 SessionToken && ValidateDirectorySession
                   ? await ValidateDirectorySession(
-                      User.Id,
+                      GetStorageOwnerId(User),
                       encFolder,
                       SessionToken,
                     )
@@ -571,7 +572,7 @@ export class CloudListService {
               const session =
                 HiddenSessionToken && ValidateHiddenSession
                   ? await ValidateHiddenSession(
-                      User.Id,
+                      GetStorageOwnerId(User),
                       hiddenFolder,
                       HiddenSessionToken,
                     )
@@ -735,7 +736,7 @@ export class CloudListService {
           '',
         );
         const DirectoryPrefix: string = commonPrefix.Prefix.replace(
-          User.Id + '/',
+          GetStorageOwnerId(User) + '/',
           '',
         );
         const normalizedPrefix = NormalizeDirectoryPath(DirectoryPrefix);
@@ -744,7 +745,7 @@ export class CloudListService {
         let isLocked = true;
         if (isEncrypted && SessionToken && ValidateDirectorySession) {
           const session = await ValidateDirectorySession(
-            User.Id,
+            GetStorageOwnerId(User),
             normalizedPrefix,
             SessionToken,
           );
@@ -757,7 +758,7 @@ export class CloudListService {
           let isConcealed = true;
           if (HiddenSessionToken && ValidateHiddenSession) {
             const hiddenSession = await ValidateHiddenSession(
-              User.Id,
+              GetStorageOwnerId(User),
               normalizedPrefix,
               HiddenSessionToken,
             );
@@ -901,7 +902,7 @@ export class CloudListService {
         'application/octet-stream',
       Path: {
         Host: this.CloudS3Service.GetPublicHostname(),
-        Key: this.CloudS3Service.GetKey(content.Key!, User.Id),
+        Key: this.CloudS3Service.GetKey(content.Key!, GetStorageOwnerId(User)),
         Url: SignedUrl,
       },
       Metadata: metadata,
@@ -923,9 +924,9 @@ export class CloudListService {
       return [];
     }
 
-    const prefix = KeyBuilder([User.Id, normalizedPrefix]);
+    const prefix = KeyBuilder([GetStorageOwnerId(User),normalizedPrefix]);
     const cacheKey = CloudKeys.DirectoryThumbnails(
-      User.Id,
+      GetStorageOwnerId(User),
       normalizedPrefix,
       IsSignedUrlProcessing,
     );

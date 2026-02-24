@@ -29,12 +29,19 @@ import {
   FOLDER_SESSION_HEADER,
   FOLDER_PASSPHRASE_HEADER,
 } from './cloud.constants';
+import { TEAM_ID_HEADER } from '@modules/team/guards/team-context.guard';
 import { CheckPolicies } from '@modules/authentication/casl/check-policies.decorator';
 import { CaslAction, CaslSubject } from '@common/enums';
 
 @Controller('Cloud/Directories')
 @ApiTags('Cloud / Directories')
 @ApiCookieAuth()
+@ApiHeader({
+  name: TEAM_ID_HEADER,
+  required: false,
+  description:
+    'Optional team ID. When provided, directory operations target the team storage.',
+})
 export class CloudDirectoriesController {
   constructor(private readonly cloudService: CloudService) {}
 

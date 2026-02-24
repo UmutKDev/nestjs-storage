@@ -20,6 +20,7 @@ import {
 import { CloudS3Service } from './cloud.s3.service';
 import { CloudMetadataService } from './cloud.metadata.service';
 import { KeyBuilder } from '@common/helpers/cast.helper';
+import { GetStorageOwnerId } from './cloud.context';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 @Injectable()
@@ -38,7 +39,7 @@ export class CloudUploadService {
     const command = await this.CloudS3Service.Send(
       new CreateMultipartUploadCommand({
         Bucket: this.CloudS3Service.GetBuckets().Storage,
-        Key: KeyBuilder([User.Id, Key]),
+        Key: KeyBuilder([GetStorageOwnerId(User),Key]),
         ContentType: ContentType,
         Metadata: this.CloudMetadataService.SanitizeMetadataForS3(Metadata),
       }),
@@ -46,7 +47,7 @@ export class CloudUploadService {
 
     return plainToInstance(CloudCreateMultipartUploadResponseModel, {
       UploadId: command.UploadId,
-      Key: command.Key.replace('' + User.Id + '/', ''),
+      Key: command.Key.replace('' + GetStorageOwnerId(User) + '/', ''),
     });
   }
 
@@ -56,7 +57,7 @@ export class CloudUploadService {
   ): Promise<CloudGetMultipartPartUrlResponseModel> {
     const command = new UploadPartCommand({
       Bucket: this.CloudS3Service.GetBuckets().Storage,
-      Key: KeyBuilder([User.Id, Key]),
+      Key: KeyBuilder([GetStorageOwnerId(User),Key]),
       UploadId: UploadId,
       PartNumber: PartNumber,
     });
@@ -83,7 +84,7 @@ export class CloudUploadService {
   ): Promise<CloudUploadPartResponseModel> {
     const command = new UploadPartCommand({
       Bucket: this.CloudS3Service.GetBuckets().Storage,
-      Key: KeyBuilder([User.Id, Key]),
+      Key: KeyBuilder([GetStorageOwnerId(User),Key]),
       UploadId: UploadId,
       PartNumber: PartNumber,
       Body: File.buffer,
@@ -104,7 +105,7 @@ export class CloudUploadService {
     const command = await this.CloudS3Service.Send(
       new CompleteMultipartUploadCommand({
         Bucket: this.CloudS3Service.GetBuckets().Storage,
-        Key: KeyBuilder([User.Id, Key]),
+        Key: KeyBuilder([GetStorageOwnerId(User),Key]),
         UploadId: UploadId,
         MultipartUpload: {
           Parts: Parts,
@@ -113,12 +114,12 @@ export class CloudUploadService {
     );
 
     const metadata = await this.CloudMetadataService.MetadataProcessor(
-      KeyBuilder([User.Id, Key]),
+      KeyBuilder([GetStorageOwnerId(User),Key]),
     );
 
     return plainToInstance(CloudCompleteMultipartUploadResponseModel, {
       Location: command.Location,
-      Key: command.Key.replace('' + User.Id + '/', ''),
+      Key: command.Key.replace('' + GetStorageOwnerId(User) + '/', ''),
       Bucket: command.Bucket,
       ETag: command.ETag,
       Metadata: metadata,
@@ -132,7 +133,7 @@ export class CloudUploadService {
     await this.CloudS3Service.Send(
       new AbortMultipartUploadCommand({
         Bucket: this.CloudS3Service.GetBuckets().Storage,
-        Key: KeyBuilder([User.Id, Key]),
+        Key: KeyBuilder([GetStorageOwnerId(User),Key]),
         UploadId: UploadId,
       }),
     );

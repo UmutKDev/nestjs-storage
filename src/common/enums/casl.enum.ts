@@ -1,5 +1,5 @@
 export enum CaslAction {
-  Manage = 'Manage',
+  Manage = 'manage',
   Create = 'Create',
   Read = 'Read',
   Update = 'Update',
@@ -12,7 +12,7 @@ export enum CaslAction {
 }
 
 export enum CaslSubject {
-  All = 'All',
+  All = 'all',
   User = 'User',
   Subscription = 'Subscription',
   MySubscription = 'MySubscription',
@@ -26,4 +26,11 @@ export enum CaslSubject {
   TwoFactor = 'TwoFactor',
   ApiKey = 'ApiKey',
   Definition = 'Definition',
+  Team = 'Team',
+  TeamMember = 'TeamMember',
+  TeamInvitation = 'TeamInvitation',
+  TeamCloud = 'TeamCloud',
+  TeamCloudDirectory = 'TeamCloudDirectory',
+  TeamCloudUpload = 'TeamCloudUpload',
+  TeamCloudArchive = 'TeamCloudArchive',
 }

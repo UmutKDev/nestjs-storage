@@ -42,6 +42,7 @@ import {
   HIDDEN_MANIFEST_CACHE_TTL,
 } from '@modules/redis/redis.ttl';
 import { KeyBuilder } from '@common/helpers/cast.helper';
+import { GetStorageOwnerId } from './cloud.context';
 import { EnsureTrailingSlash, NormalizeDirectoryPath } from './cloud.utils';
 import { CloudUsageService } from './cloud.usage.service';
 
@@ -114,7 +115,7 @@ export class CloudDirectoryService {
     await this.CloudS3Service.Send(
       new PutObjectCommand({
         Bucket: this.CloudS3Service.GetBuckets().Storage,
-        Key: KeyBuilder([User.Id, directoryKey]),
+        Key: KeyBuilder([GetStorageOwnerId(User),directoryKey]),
         Body: '',
       }),
     );
@@ -188,10 +189,10 @@ export class CloudDirectoryService {
 
     const bucket = this.CloudS3Service.GetBuckets().Storage;
     const sourcePrefixFull = EnsureTrailingSlash(
-      KeyBuilder([User.Id, sourcePath]),
+      KeyBuilder([GetStorageOwnerId(User),sourcePath]),
     );
     const targetPrefixFull = EnsureTrailingSlash(
-      KeyBuilder([User.Id, normalizedTargetPath]),
+      KeyBuilder([GetStorageOwnerId(User),normalizedTargetPath]),
     );
 
     try {
@@ -459,7 +460,7 @@ export class CloudDirectoryService {
       return 0;
     }
 
-    const prefix = EnsureTrailingSlash(KeyBuilder([User.Id, normalized]));
+    const prefix = EnsureTrailingSlash(KeyBuilder([GetStorageOwnerId(User),normalized]));
     let continuationToken: string | undefined = undefined;
     let totalBytes = 0;
 
@@ -495,7 +496,7 @@ export class CloudDirectoryService {
     } while (continuationToken);
 
     if (totalBytes > 0) {
-      await this.CloudUsageService.DecrementUsage(User.Id, totalBytes);
+      await this.CloudUsageService.DecrementUsage(GetStorageOwnerId(User), totalBytes);
     }
 
     return totalBytes;
@@ -565,7 +566,7 @@ export class CloudDirectoryService {
     };
 
     const cacheKey = CloudKeys.EncryptedFolderSession(
-      User.Id,
+      GetStorageOwnerId(User),
       encryptedFolderPath,
     );
     await this.RedisService.Set(
@@ -576,7 +577,7 @@ export class CloudDirectoryService {
 
     if (normalizedPath !== encryptedFolderPath) {
       const childCacheKey = CloudKeys.EncryptedFolderSession(
-        User.Id,
+        GetStorageOwnerId(User),
         normalizedPath,
       );
       await this.RedisService.Set(
@@ -608,7 +609,7 @@ export class CloudDirectoryService {
     }
 
     await this.RedisService.DeleteByPattern(
-      CloudKeys.EncryptedFolderSessionPattern(User.Id, normalizedPath),
+      CloudKeys.EncryptedFolderSessionPattern(GetStorageOwnerId(User), normalizedPath),
     );
 
     return true;
@@ -645,7 +646,7 @@ export class CloudDirectoryService {
     const ensureTrailingSlash = (value: string): string =>
       value.endsWith('/') ? value : value + '/';
     const directoryPrefix = ensureTrailingSlash(
-      KeyBuilder([User.Id, normalizedPath]),
+      KeyBuilder([GetStorageOwnerId(User),normalizedPath]),
     );
 
     const listResponse = await this.CloudS3Service.Send(
@@ -874,14 +875,14 @@ export class CloudDirectoryService {
     User: UserContext,
   ): Promise<EncryptedFolderManifest> {
     // Try Redis cache first
-    const cacheKey = CloudKeys.EncryptedFolderManifest(User.Id);
+    const cacheKey = CloudKeys.EncryptedFolderManifest(GetStorageOwnerId(User));
     const cached =
       await this.RedisService.Get<EncryptedFolderManifest>(cacheKey);
     if (cached) {
       return cached;
     }
 
-    const manifestKey = KeyBuilder([User.Id, this.EncryptedFoldersManifestKey]);
+    const manifestKey = KeyBuilder([GetStorageOwnerId(User),this.EncryptedFoldersManifestKey]);
 
     try {
       const command = await this.CloudS3Service.Send(
@@ -971,7 +972,7 @@ export class CloudDirectoryService {
     User: UserContext,
     manifest: EncryptedFolderManifest,
   ): Promise<void> {
-    const manifestKey = KeyBuilder([User.Id, this.EncryptedFoldersManifestKey]);
+    const manifestKey = KeyBuilder([GetStorageOwnerId(User),this.EncryptedFoldersManifestKey]);
 
     await this.CloudS3Service.Send(
       new PutObjectCommand({
@@ -983,7 +984,7 @@ export class CloudDirectoryService {
     );
 
     // Invalidate the cached manifest
-    await this.RedisService.Delete(CloudKeys.EncryptedFolderManifest(User.Id));
+    await this.RedisService.Delete(CloudKeys.EncryptedFolderManifest(GetStorageOwnerId(User)));
   }
 
   private EncryptFolderKey(
@@ -1088,7 +1089,7 @@ export class CloudDirectoryService {
     const ensureTrailingSlash = (value: string): string =>
       value.endsWith('/') ? value : value + '/';
     const directoryPrefix = ensureTrailingSlash(
-      KeyBuilder([User.Id, normalizedPath]),
+      KeyBuilder([GetStorageOwnerId(User),normalizedPath]),
     );
 
     const listResponse = await this.CloudS3Service.Send(
@@ -1239,12 +1240,12 @@ export class CloudDirectoryService {
       expiresAt,
     };
 
-    const cacheKey = CloudKeys.HiddenFolderSession(User.Id, hiddenFolderPath);
+    const cacheKey = CloudKeys.HiddenFolderSession(GetStorageOwnerId(User), hiddenFolderPath);
     await this.RedisService.Set(cacheKey, session, HIDDEN_FOLDER_SESSION_TTL);
 
     if (normalizedPath !== hiddenFolderPath) {
       const childCacheKey = CloudKeys.HiddenFolderSession(
-        User.Id,
+        GetStorageOwnerId(User),
         normalizedPath,
       );
       await this.RedisService.Set(
@@ -1276,7 +1277,7 @@ export class CloudDirectoryService {
     const normalizedPath = NormalizeDirectoryPath(Path);
 
     await this.RedisService.DeleteByPattern(
-      CloudKeys.HiddenFolderSessionPattern(User.Id, normalizedPath),
+      CloudKeys.HiddenFolderSessionPattern(GetStorageOwnerId(User), normalizedPath),
     );
 
     return true;
@@ -1395,7 +1396,7 @@ export class CloudDirectoryService {
         expiresAt,
       };
       await this.RedisService.Set(
-        CloudKeys.HiddenFolderSession(User.Id, match.path),
+        CloudKeys.HiddenFolderSession(GetStorageOwnerId(User), match.path),
         session,
         HIDDEN_FOLDER_SESSION_TTL,
       );
@@ -1413,13 +1414,13 @@ export class CloudDirectoryService {
   private async GetHiddenFolderManifest(
     User: UserContext,
   ): Promise<HiddenFolderManifest> {
-    const cacheKey = CloudKeys.HiddenFolderManifest(User.Id);
+    const cacheKey = CloudKeys.HiddenFolderManifest(GetStorageOwnerId(User));
     const cached = await this.RedisService.Get<HiddenFolderManifest>(cacheKey);
     if (cached) {
       return cached;
     }
 
-    const manifestKey = KeyBuilder([User.Id, this.HiddenFoldersManifestKey]);
+    const manifestKey = KeyBuilder([GetStorageOwnerId(User),this.HiddenFoldersManifestKey]);
 
     try {
       const command = await this.CloudS3Service.Send(
@@ -1493,7 +1494,7 @@ export class CloudDirectoryService {
     User: UserContext,
     manifest: HiddenFolderManifest,
   ): Promise<void> {
-    const manifestKey = KeyBuilder([User.Id, this.HiddenFoldersManifestKey]);
+    const manifestKey = KeyBuilder([GetStorageOwnerId(User),this.HiddenFoldersManifestKey]);
 
     await this.CloudS3Service.Send(
       new PutObjectCommand({
@@ -1504,7 +1505,7 @@ export class CloudDirectoryService {
       }),
     );
 
-    await this.RedisService.Delete(CloudKeys.HiddenFolderManifest(User.Id));
+    await this.RedisService.Delete(CloudKeys.HiddenFolderManifest(GetStorageOwnerId(User)));
   }
 
   private async GetHiddenFolderManifestByUserId(

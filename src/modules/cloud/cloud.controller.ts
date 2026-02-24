@@ -53,12 +53,19 @@ import {
   HIDDEN_SESSION_HEADER,
   CLOUD_DOWNLOAD_THROTTLE,
 } from './cloud.constants';
+import { TEAM_ID_HEADER } from '@modules/team/guards/team-context.guard';
 import { CheckPolicies } from '@modules/authentication/casl/check-policies.decorator';
 import { CaslAction, CaslSubject } from '@common/enums';
 
 @Controller('Cloud')
 @ApiTags('Cloud')
 @ApiCookieAuth()
+@ApiHeader({
+  name: TEAM_ID_HEADER,
+  required: false,
+  description:
+    'Optional team ID. When provided, all cloud operations target the team storage instead of personal storage.',
+})
 @CheckPolicies((Ability) => Ability.can(CaslAction.Read, CaslSubject.Cloud))
 export class CloudController {
   constructor(private readonly cloudService: CloudService) {}

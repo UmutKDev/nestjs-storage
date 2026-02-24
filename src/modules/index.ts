@@ -6,6 +6,7 @@ import { UserModule } from './user/user.module';
 import { HealthModule } from './health/health.module';
 import { SubscriptionModule } from './subscription/subscription.module';
 import { RedisModule } from './redis/redis.module';
+import { TeamModule } from './team/team.module';
 
 import { DefinitionModule } from './definition/definition.module';
 
@@ -16,7 +17,7 @@ export default [
   AccountModule,
   AuthenticationModule,
   UserModule,
-  CloudModule,
+  TeamModule,
   SubscriptionModule,
   HealthModule,
   DefinitionModule,

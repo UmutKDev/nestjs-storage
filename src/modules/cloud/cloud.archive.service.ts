@@ -37,6 +37,7 @@ import {
 import { CloudS3Service } from './cloud.s3.service';
 import { CloudMetadataService } from './cloud.metadata.service';
 import { KeyBuilder, MimeTypeFromExtension } from '@common/helpers/cast.helper';
+import { GetStorageOwnerId } from './cloud.context';
 import {
   BuildArchiveExtractPrefix,
   GetArchiveFormat,
@@ -67,6 +68,7 @@ import type {
 
 type ArchiveExtractJobData = {
   userId: string;
+  ownerId: string;
   key: string;
   format: ArchiveFormat;
   selectedEntries?: string[];
@@ -78,6 +80,7 @@ type ArchiveExtractJobResult = {
 
 type ArchiveCreateJobData = {
   userId: string;
+  ownerId: string;
   keys: string[];
   outputFormat: ArchiveFormat;
   outputKey: string;
@@ -357,6 +360,7 @@ export class CloudArchiveService implements OnModuleInit, OnModuleDestroy {
     const jobData: ArchiveExtractJobData = {
       key: Key,
       userId: User.Id,
+      ownerId: GetStorageOwnerId(User),
       format,
       selectedEntries: SelectedEntries,
     };
@@ -466,7 +470,7 @@ export class CloudArchiveService implements OnModuleInit, OnModuleDestroy {
       );
     }
 
-    const sourceKey = KeyBuilder([User.Id, Key]);
+    const sourceKey = KeyBuilder([GetStorageOwnerId(User),Key]);
 
     // Size guard
     const head = await this.CloudS3Service.Send(
@@ -551,6 +555,7 @@ export class CloudArchiveService implements OnModuleInit, OnModuleDestroy {
 
     const jobData: ArchiveCreateJobData = {
       userId: User.Id,
+      ownerId: GetStorageOwnerId(User),
       keys: Keys,
       outputFormat,
       outputKey,
@@ -658,7 +663,7 @@ export class CloudArchiveService implements OnModuleInit, OnModuleDestroy {
     const jobId = job.id?.toString() ?? '';
     const cancelKey = CloudKeys.ArchiveExtractCancel(jobId);
     const { key, format, selectedEntries } = job.data;
-    const user = { Id: job.data.userId } as UserContext;
+    const user = { Id: job.data.ownerId } as UserContext;
 
     const handler = this.ArchiveHandlerRegistry.GetHandlerByFormat(format);
     if (!handler) {
@@ -822,7 +827,7 @@ export class CloudArchiveService implements OnModuleInit, OnModuleDestroy {
   ): Promise<ArchiveCreateJobResult> {
     const jobId = job.id?.toString() ?? '';
     const cancelKey = CloudKeys.ArchiveCreateCancel(jobId);
-    const { userId, keys, outputFormat, outputKey } = job.data;
+    const { ownerId, keys, outputFormat, outputKey } = job.data;
 
     const handler =
       this.ArchiveHandlerRegistry.GetHandlerByFormat(outputFormat);
@@ -834,7 +839,7 @@ export class CloudArchiveService implements OnModuleInit, OnModuleDestroy {
 
     try {
       // Resolve all entries (expand directories)
-      const entries = await this.ResolveCreateEntries(userId, keys);
+      const entries = await this.ResolveCreateEntries(ownerId, keys);
 
       if (entries.length === 0) {
         throw new Error('No files found to include in the archive.');
@@ -854,7 +859,7 @@ export class CloudArchiveService implements OnModuleInit, OnModuleDestroy {
 
       // Create archive via handler
       const output = new PassThrough();
-      const s3Key = KeyBuilder([userId, outputKey]);
+      const s3Key = KeyBuilder([ownerId, outputKey]);
 
       // Start streaming upload to S3
       const uploadPromise = this.StreamToS3(s3Key, output, outputFormat);
@@ -903,7 +908,7 @@ export class CloudArchiveService implements OnModuleInit, OnModuleDestroy {
       );
 
       // Invalidate listing caches
-      await this.CloudListService.InvalidateListCache(userId);
+      await this.CloudListService.InvalidateListCache(ownerId);
 
       return result;
     } catch (error) {
@@ -975,14 +980,14 @@ export class CloudArchiveService implements OnModuleInit, OnModuleDestroy {
   // ══════════════════════════════════════════════════════════════════════════
 
   private async ResolveCreateEntries(
-    userId: string,
+    ownerId: string,
     keys: string[],
   ): Promise<ArchiveCreateEntry[]> {
     const entries: ArchiveCreateEntry[] = [];
 
     for (const key of keys) {
       const isDirectory = key.endsWith('/');
-      const s3Prefix = KeyBuilder([userId, key]);
+      const s3Prefix = KeyBuilder([ownerId, key]);
 
       if (isDirectory) {
         // Expand directory by listing all objects
@@ -1003,9 +1008,9 @@ export class CloudArchiveService implements OnModuleInit, OnModuleDestroy {
               continue;
             }
 
-            // Name relative to the user root
-            const relativeName = obj.Key.startsWith(`${userId}/`)
-              ? obj.Key.slice(userId.length + 1)
+            // Name relative to the owner root
+            const relativeName = obj.Key.startsWith(`${ownerId}/`)
+              ? obj.Key.slice(ownerId.length + 1)
               : obj.Key;
 
             entries.push({

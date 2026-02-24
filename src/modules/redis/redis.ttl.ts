@@ -100,3 +100,17 @@ export const ARCHIVE_CREATE_RESULT_TTL = envInt(
   'ARCHIVE_CREATE_TTL_SECONDS',
   3600,
 );
+
+// ─── Team ───────────────────────────────────────────────────────────────────
+
+/** Team membership cache — 5 minutes (used by TeamContextGuard) */
+export const TEAM_MEMBERSHIP_CACHE_TTL = 300;
+
+/** Team list cache — 10 minutes */
+export const TEAM_LIST_CACHE_TTL = 600;
+
+/** Team detail cache — 10 minutes */
+export const TEAM_DETAIL_CACHE_TTL = 600;
+
+/** Team invitation expiry — 7 days */
+export const TEAM_INVITATION_EXPIRY = 60 * 60 * 24 * 7;

@@ -67,6 +67,7 @@ import { CloudDirectoryService } from './cloud.directory.service';
 import { CloudUsageService } from './cloud.usage.service';
 import { CloudScanService } from './cloud.scan.service';
 import { NormalizeDirectoryPath } from './cloud.utils';
+import { GetStorageOwnerId } from './cloud.context';
 import { SizeFormatter } from '@common/helpers/cast.helper';
 import { RedisService } from '@modules/redis/redis.service';
 import { CloudKeys } from '@modules/redis/redis.keys';
@@ -101,7 +102,7 @@ export class CloudService {
     // Check if we're trying to access an encrypted folder
     const accessCheck = await this.CheckEncryptedFolderAccess(
       cleanedPath,
-      User.Id,
+      GetStorageOwnerId(User),
       sessionToken,
     );
 
@@ -177,7 +178,7 @@ export class CloudService {
     // Check encrypted folder access
     const accessCheck = await this.CheckEncryptedFolderAccess(
       cleanedPath,
-      User.Id,
+      GetStorageOwnerId(User),
       sessionToken,
     );
 
@@ -233,7 +234,7 @@ export class CloudService {
     // Check encrypted folder access
     const accessCheck = await this.CheckEncryptedFolderAccess(
       cleanedPath,
-      User.Id,
+      GetStorageOwnerId(User),
       sessionToken,
     );
 
@@ -280,7 +281,7 @@ export class CloudService {
       const cleanedPath = Path.replace(/^\/+|\/+$/g, '');
       const accessCheck = await this.CheckEncryptedFolderAccess(
         cleanedPath,
-        User.Id,
+        GetStorageOwnerId(User),
         sessionToken,
       );
 
@@ -332,7 +333,7 @@ export class CloudService {
     { Key }: CloudKeyRequestModel,
     User: UserContext,
   ): Promise<CloudScanStatusResponseModel | null> {
-    const status = await this.CloudScanService.GetScanStatus(User.Id, Key);
+    const status = await this.CloudScanService.GetScanStatus(GetStorageOwnerId(User), Key);
     if (!status) {
       return null;
     }
@@ -396,7 +397,7 @@ export class CloudService {
     idempotencyKey?: string,
   ): Promise<boolean> {
     const cached = await this.GetIdempotentResult<boolean>(
-      User.Id,
+      GetStorageOwnerId(User),
       'move',
       idempotencyKey,
     );
@@ -409,18 +410,18 @@ export class CloudService {
     );
     for (const sourceKey of SourceKeys) {
       await this.CloudListService.InvalidateThumbnailCacheForObjectKey(
-        User.Id,
+        GetStorageOwnerId(User),
         sourceKey,
       );
     }
     if (DestinationKey) {
       await this.CloudListService.InvalidateDirectoryThumbnailCache(
-        User.Id,
+        GetStorageOwnerId(User),
         DestinationKey,
       );
     }
-    await this.SetIdempotentResult(User.Id, 'move', idempotencyKey, result);
-    await this.CloudListService.InvalidateListCache(User.Id);
+    await this.SetIdempotentResult(GetStorageOwnerId(User), 'move', idempotencyKey, result);
+    await this.CloudListService.InvalidateListCache(GetStorageOwnerId(User));
     return result;
   }
 
@@ -437,7 +438,7 @@ export class CloudService {
     // mark _options as used to avoid unused-parameter errors
     void _options;
     const cached = await this.GetIdempotentResult<boolean>(
-      User.Id,
+      GetStorageOwnerId(User),
       'delete',
       idempotencyKey,
     );
@@ -453,7 +454,7 @@ export class CloudService {
           User,
         );
         await this.CloudListService.InvalidateDirectoryThumbnailCache(
-          User.Id,
+          GetStorageOwnerId(User),
           item.Key,
         );
         continue;
@@ -483,22 +484,22 @@ export class CloudService {
       );
       for (const file of files) {
         await this.CloudListService.InvalidateThumbnailCacheForObjectKey(
-          User.Id,
+          GetStorageOwnerId(User),
           file.Key,
         );
       }
-      await this.CloudUsageService.DecrementUsage(User.Id, bytesToDecrement);
+      await this.CloudUsageService.DecrementUsage(GetStorageOwnerId(User), bytesToDecrement);
       await this.SetIdempotentResult(
-        User.Id,
+        GetStorageOwnerId(User),
         'delete',
         idempotencyKey,
         deleted,
       );
-      await this.CloudListService.InvalidateListCache(User.Id);
+      await this.CloudListService.InvalidateListCache(GetStorageOwnerId(User));
       return deleted;
     }
-    await this.SetIdempotentResult(User.Id, 'delete', idempotencyKey, true);
-    await this.CloudListService.InvalidateListCache(User.Id);
+    await this.SetIdempotentResult(GetStorageOwnerId(User), 'delete', idempotencyKey, true);
+    await this.CloudListService.InvalidateListCache(GetStorageOwnerId(User));
     return true;
   }
 
@@ -514,8 +515,8 @@ export class CloudService {
       { Key },
       User,
     );
-    await this.CloudListService.InvalidateDirectoryThumbnailCache(User.Id, Key);
-    await this.CloudListService.InvalidateListCache(User.Id);
+    await this.CloudListService.InvalidateDirectoryThumbnailCache(GetStorageOwnerId(User), Key);
+    await this.CloudListService.InvalidateListCache(GetStorageOwnerId(User));
     return result;
   }
 
@@ -529,16 +530,16 @@ export class CloudService {
       User,
       options,
     );
-    await this.CloudListService.InvalidateDirectoryThumbnailCache(User.Id, Key);
+    await this.CloudListService.InvalidateDirectoryThumbnailCache(GetStorageOwnerId(User), Key);
     if (Name) {
       const parent = this.GetParentDirectoryPath(Key);
       const renamedPath = parent ? `${parent}/${Name}` : Name;
       await this.CloudListService.InvalidateDirectoryThumbnailCache(
-        User.Id,
+        GetStorageOwnerId(User),
         renamedPath,
       );
     }
-    await this.CloudListService.InvalidateListCache(User.Id);
+    await this.CloudListService.InvalidateListCache(GetStorageOwnerId(User));
     return result;
   }
 
@@ -611,7 +612,7 @@ export class CloudService {
     User: UserContext,
     sessionToken?: string,
   ): Promise<CloudCreateMultipartUploadResponseModel> {
-    await this.EnsureUploadAccess(Key, User.Id, sessionToken);
+    await this.EnsureUploadAccess(Key, GetStorageOwnerId(User), sessionToken);
     return this.CloudUploadService.UploadCreateMultipartUpload(
       { Key, ContentType, Metadata, TotalSize },
       User,
@@ -627,7 +628,7 @@ export class CloudService {
     User: UserContext,
     sessionToken?: string,
   ): Promise<CloudGetMultipartPartUrlResponseModel> {
-    await this.EnsureUploadAccess(Key, User.Id, sessionToken);
+    await this.EnsureUploadAccess(Key, GetStorageOwnerId(User), sessionToken);
     return this.CloudUploadService.UploadGetMultipartPartUrl(
       { Key, UploadId, PartNumber },
       User,
@@ -645,7 +646,7 @@ export class CloudService {
     sessionToken?: string,
     contentMd5?: string,
   ): Promise<CloudUploadPartResponseModel> {
-    await this.EnsureUploadAccess(Key, User.Id, sessionToken);
+    await this.EnsureUploadAccess(Key, GetStorageOwnerId(User), sessionToken);
     if (contentMd5) {
       const hash = createHash('md5').update(file.buffer).digest('base64');
       if (hash !== contentMd5) {
@@ -671,10 +672,10 @@ export class CloudService {
     sessionToken?: string,
     idempotencyKey?: string,
   ): Promise<CloudCompleteMultipartUploadResponseModel> {
-    await this.EnsureUploadAccess(Key, User.Id, sessionToken);
+    await this.EnsureUploadAccess(Key, GetStorageOwnerId(User), sessionToken);
     const cached =
       await this.GetIdempotentResult<CloudCompleteMultipartUploadResponseModel>(
-        User.Id,
+        GetStorageOwnerId(User),
         'upload-complete',
         idempotencyKey,
       );
@@ -687,20 +688,20 @@ export class CloudService {
     );
     const uploadedObject = await this.CloudObjectService.Find({ Key }, User);
     const uploadedSize = uploadedObject.Size || 0;
-    await this.CloudUsageService.IncrementUsage(User.Id, uploadedSize);
+    await this.CloudUsageService.IncrementUsage(GetStorageOwnerId(User), uploadedSize);
     await this.EnsureUploadedObjectWithinLimits(Key, User, uploadedSize);
-    await this.CloudScanService.EnqueueScan(User.Id, Key);
+    await this.CloudScanService.EnqueueScan(GetStorageOwnerId(User), Key);
     await this.CloudListService.InvalidateThumbnailCacheForObjectKey(
-      User.Id,
+      GetStorageOwnerId(User),
       Key,
     );
     await this.SetIdempotentResult(
-      User.Id,
+      GetStorageOwnerId(User),
       'upload-complete',
       idempotencyKey,
       result,
     );
-    await this.CloudListService.InvalidateListCache(User.Id);
+    await this.CloudListService.InvalidateListCache(GetStorageOwnerId(User));
     return result;
   }
 
@@ -720,7 +721,7 @@ export class CloudService {
     User: UserContext,
     sessionToken?: string,
   ): Promise<CloudArchiveExtractStartResponseModel> {
-    await this.EnsureUploadAccess(model.Key, User.Id, sessionToken);
+    await this.EnsureUploadAccess(model.Key, GetStorageOwnerId(User), sessionToken);
     return this.CloudArchiveService.ArchiveExtractStart(model, User);
   }
 
@@ -747,7 +748,7 @@ export class CloudService {
     User: UserContext,
     sessionToken?: string,
   ): Promise<CloudArchivePreviewResponseModel> {
-    await this.EnsureUploadAccess(model.Key, User.Id, sessionToken);
+    await this.EnsureUploadAccess(model.Key, GetStorageOwnerId(User), sessionToken);
     return this.CloudArchiveService.ArchivePreview(model, User);
   }
 
@@ -801,10 +802,10 @@ export class CloudService {
       User,
     );
     await this.CloudListService.InvalidateThumbnailCacheForObjectKey(
-      User.Id,
+      GetStorageOwnerId(User),
       Key,
     );
-    await this.CloudListService.InvalidateListCache(User.Id);
+    await this.CloudListService.InvalidateListCache(GetStorageOwnerId(User));
     return result;
   }
 
@@ -826,17 +827,17 @@ export class CloudService {
     User: UserContext,
     sessionToken?: string,
   ): Promise<DirectoryResponseModel> {
-    await this.EnsureDirectoryAccess(Path, User.Id, sessionToken);
+    await this.EnsureDirectoryAccess(Path, GetStorageOwnerId(User), sessionToken);
     const result = await this.CloudDirectoryService.DirectoryCreate(
       { Path, IsEncrypted },
       passphrase,
       User,
     );
     await this.CloudListService.InvalidateDirectoryThumbnailCache(
-      User.Id,
+      GetStorageOwnerId(User),
       Path,
     );
-    await this.CloudListService.InvalidateListCache(User.Id);
+    await this.CloudListService.InvalidateListCache(GetStorageOwnerId(User));
     return result;
   }
 
@@ -849,25 +850,25 @@ export class CloudService {
     User: UserContext,
     sessionToken?: string,
   ): Promise<DirectoryResponseModel> {
-    await this.EnsureDirectoryAccess(Path, User.Id, sessionToken);
+    await this.EnsureDirectoryAccess(Path, GetStorageOwnerId(User), sessionToken);
     const result = await this.CloudDirectoryService.DirectoryRename(
       { Path, Name },
       passphrase,
       User,
     );
     await this.CloudListService.InvalidateDirectoryThumbnailCache(
-      User.Id,
+      GetStorageOwnerId(User),
       Path,
     );
     if (Name) {
       const parent = this.GetParentDirectoryPath(Path);
       const renamedPath = parent ? `${parent}/${Name}` : Name;
       await this.CloudListService.InvalidateDirectoryThumbnailCache(
-        User.Id,
+        GetStorageOwnerId(User),
         renamedPath,
       );
     }
-    await this.CloudListService.InvalidateListCache(User.Id);
+    await this.CloudListService.InvalidateListCache(GetStorageOwnerId(User));
     return result;
   }
 
@@ -880,17 +881,17 @@ export class CloudService {
     User: UserContext,
     sessionToken?: string,
   ): Promise<boolean> {
-    await this.EnsureDirectoryAccess(Path, User.Id, sessionToken);
+    await this.EnsureDirectoryAccess(Path, GetStorageOwnerId(User), sessionToken);
     const result = await this.CloudDirectoryService.DirectoryDelete(
       { Path },
       passphrase,
       User,
     );
     await this.CloudListService.InvalidateDirectoryThumbnailCache(
-      User.Id,
+      GetStorageOwnerId(User),
       Path,
     );
-    await this.CloudListService.InvalidateListCache(User.Id);
+    await this.CloudListService.InvalidateListCache(GetStorageOwnerId(User));
     return result;
   }
 
@@ -909,10 +910,10 @@ export class CloudService {
       User,
     );
     await this.CloudListService.InvalidateDirectoryThumbnailCache(
-      User.Id,
+      GetStorageOwnerId(User),
       Path,
     );
-    await this.CloudListService.InvalidateListCache(User.Id);
+    await this.CloudListService.InvalidateListCache(GetStorageOwnerId(User));
     return result;
   }
 
@@ -928,10 +929,10 @@ export class CloudService {
       User,
     );
     await this.CloudListService.InvalidateDirectoryThumbnailCache(
-      User.Id,
+      GetStorageOwnerId(User),
       Path,
     );
-    await this.CloudListService.InvalidateListCache(User.Id);
+    await this.CloudListService.InvalidateListCache(GetStorageOwnerId(User));
     return result;
   }
 
@@ -944,17 +945,17 @@ export class CloudService {
     User: UserContext,
     sessionToken?: string,
   ): Promise<DirectoryResponseModel> {
-    await this.EnsureDirectoryAccess(Path, User.Id, sessionToken);
+    await this.EnsureDirectoryAccess(Path, GetStorageOwnerId(User), sessionToken);
     const result = await this.CloudDirectoryService.DirectoryConvertToEncrypted(
       { Path },
       passphrase,
       User,
     );
     await this.CloudListService.InvalidateDirectoryThumbnailCache(
-      User.Id,
+      GetStorageOwnerId(User),
       Path,
     );
-    await this.CloudListService.InvalidateListCache(User.Id);
+    await this.CloudListService.InvalidateListCache(GetStorageOwnerId(User));
     return result;
   }
 
@@ -967,17 +968,17 @@ export class CloudService {
     User: UserContext,
     sessionToken?: string,
   ): Promise<DirectoryResponseModel> {
-    await this.EnsureDirectoryAccess(Path, User.Id, sessionToken);
+    await this.EnsureDirectoryAccess(Path, GetStorageOwnerId(User), sessionToken);
     const result = await this.CloudDirectoryService.DirectoryDecrypt(
       { Path },
       passphrase,
       User,
     );
     await this.CloudListService.InvalidateDirectoryThumbnailCache(
-      User.Id,
+      GetStorageOwnerId(User),
       Path,
     );
-    await this.CloudListService.InvalidateListCache(User.Id);
+    await this.CloudListService.InvalidateListCache(GetStorageOwnerId(User));
     return result;
   }
 
@@ -999,7 +1000,7 @@ export class CloudService {
       passphrase,
       User,
     );
-    await this.CloudListService.InvalidateListCache(User.Id);
+    await this.CloudListService.InvalidateListCache(GetStorageOwnerId(User));
     return result;
   }
 
@@ -1013,7 +1014,7 @@ export class CloudService {
       passphrase,
       User,
     );
-    await this.CloudListService.InvalidateListCache(User.Id);
+    await this.CloudListService.InvalidateListCache(GetStorageOwnerId(User));
     return result;
   }
 
@@ -1027,7 +1028,7 @@ export class CloudService {
       passphrase,
       User,
     );
-    await this.CloudListService.InvalidateListCache(User.Id);
+    await this.CloudListService.InvalidateListCache(GetStorageOwnerId(User));
     return result;
   }
 
@@ -1039,7 +1040,7 @@ export class CloudService {
       model,
       User,
     );
-    await this.CloudListService.InvalidateListCache(User.Id);
+    await this.CloudListService.InvalidateListCache(GetStorageOwnerId(User));
     return result;
   }
 
@@ -1115,7 +1116,7 @@ export class CloudService {
         { Items: [{ Key: key, IsDirectory: false }] },
         user,
       );
-      await this.CloudUsageService.DecrementUsage(user.Id, resolvedSize);
+      await this.CloudUsageService.DecrementUsage(GetStorageOwnerId(user), resolvedSize);
       throw new HttpException(
         `File size exceeds the maximum upload size of ${SizeFormatter({ From: usage.MaxUploadSizeBytes, FromUnit: 'B', ToUnit: 'MB' })} MB.`,
         HttpStatus.BAD_REQUEST,
@@ -1130,7 +1131,7 @@ export class CloudService {
         { Items: [{ Key: key, IsDirectory: false }] },
         user,
       );
-      await this.CloudUsageService.DecrementUsage(user.Id, resolvedSize);
+      await this.CloudUsageService.DecrementUsage(GetStorageOwnerId(user), resolvedSize);
       throw new HttpException(
         'Storage limit exceeded. Please upgrade your subscription.',
         HttpStatus.BAD_REQUEST,

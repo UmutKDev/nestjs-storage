@@ -7,6 +7,7 @@ import { CloudUserStorageUsageResponseModel } from './cloud.model';
 import { UserSubscriptionEntity } from '@entities/user-subscription.entity';
 import { CloudS3Service } from './cloud.s3.service';
 import { KeyBuilder } from '@common/helpers/cast.helper';
+import { GetStorageOwnerId } from './cloud.context';
 import { RedisService } from '@modules/redis/redis.service';
 
 @Injectable()
@@ -76,7 +77,7 @@ export class CloudUsageService {
       throw new HttpException(Codes.Error.Subscription.NOT_FOUND, 404);
     }
 
-    const totalSize = await this.GetOrSeedUsage(User.Id);
+    const totalSize = await this.GetOrSeedUsage(GetStorageOwnerId(User));
 
     return plainToInstance(CloudUserStorageUsageResponseModel, {
       UsedStorageInBytes: totalSize,

@@ -12,12 +12,14 @@ import { ApiKeyService } from './api-key/api-key.service';
 
 import { CombinedAuthGuard } from './guards/combined-auth.guard';
 import { PoliciesGuard } from './guards/policies.guard';
+import { TeamContextGuard } from '../team/guards/team-context.guard';
 import { CaslAbilityFactory } from './casl/casl-ability.factory';
 
 import { UserEntity } from '@entities/user.entity';
 import { PasskeyEntity } from '@entities/passkey.entity';
 import { TwoFactorEntity } from '@entities/two-factor.entity';
 import { ApiKeyEntity } from '@entities/api-key.entity';
+import { TeamMemberEntity } from '@entities/team-member.entity';
 
 import { MailModule } from '../mail/mail.module';
 import { RedisModule } from '../redis/redis.module';
@@ -29,6 +31,7 @@ import { RedisModule } from '../redis/redis.module';
       PasskeyEntity,
       TwoFactorEntity,
       ApiKeyEntity,
+      TeamMemberEntity,
     ]),
     MailModule,
     RedisModule,
@@ -44,6 +47,10 @@ import { RedisModule } from '../redis/redis.module';
     {
       provide: APP_GUARD,
       useClass: CombinedAuthGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: TeamContextGuard,
     },
     {
       provide: APP_GUARD,

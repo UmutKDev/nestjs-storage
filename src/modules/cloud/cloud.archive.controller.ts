@@ -25,12 +25,19 @@ import {
 import { ApiSuccessResponse } from '@common/decorators/response.decorator';
 import { User } from '@common/decorators/user.decorator';
 import { FOLDER_SESSION_HEADER } from './cloud.constants';
+import { TEAM_ID_HEADER } from '@modules/team/guards/team-context.guard';
 import { CheckPolicies } from '@modules/authentication/casl/check-policies.decorator';
 import { CaslAction, CaslSubject } from '@common/enums';
 
 @Controller('Cloud/Archive')
 @ApiTags('Cloud / Archive')
 @ApiCookieAuth()
+@ApiHeader({
+  name: TEAM_ID_HEADER,
+  required: false,
+  description:
+    'Optional team ID. When provided, archive operations target the team storage.',
+})
 @CheckPolicies((Ability) =>
   Ability.can(CaslAction.Read, CaslSubject.CloudArchive),
 )

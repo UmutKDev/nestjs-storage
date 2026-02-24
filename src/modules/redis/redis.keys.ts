@@ -205,3 +205,29 @@ export namespace CloudKeys {
     normalizedPath: string,
   ) => `${HiddenFolderSession(userId, normalizedPath)}*`;
 }
+
+// ─── Team Keys ──────────────────────────────────────────────────────────────
+
+export namespace TeamKeys {
+  /** team:member:{teamId}:{userId} — cached membership for fast guard checks */
+  export const Membership = (teamId: string, userId: string) =>
+    `team:member:${teamId}:${userId}`;
+
+  /** team:member:{teamId}:* — pattern to invalidate all membership caches for a team */
+  export const MembershipPattern = (teamId: string) =>
+    `team:member:${teamId}:*`;
+
+  /** team:list:{userId} — cached list of teams for a user */
+  export const UserTeams = (userId: string) => `team:list:${userId}`;
+
+  /** team:detail:{teamId} — cached team details */
+  export const Detail = (teamId: string) => `team:detail:${teamId}`;
+
+  /** team:invitations:{teamId} — cached pending invitations for a team */
+  export const Invitations = (teamId: string) =>
+    `team:invitations:${teamId}`;
+
+  /** team:user-invitations:{email} — cached pending invitations for a user email */
+  export const UserInvitations = (email: string) =>
+    `team:user-invitations:${email}`;
+}

@@ -1,4 +1,4 @@
-import { Role, Status } from '@common/enums';
+import { Role, Status, TeamRole } from '@common/enums';
 
 export declare global {
   type AnyObject = Record<string, unknown>;
@@ -129,11 +129,21 @@ export declare global {
     Role: Role;
     Status: Status;
     Image?: string;
+    TeamId?: string;
+    TeamRole?: TeamRole;
+  }
+
+  interface TeamContext {
+    TeamId: string;
+    TeamRole: TeamRole;
+    TeamSlug: string;
+    TeamName: string;
   }
 
   interface Request {
     user: UserContext;
     TotalRowCount: number;
+    TeamContext?: TeamContext;
   }
 
   namespace Codes {
