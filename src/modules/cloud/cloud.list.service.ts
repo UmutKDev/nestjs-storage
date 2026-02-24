@@ -98,7 +98,7 @@ export class CloudListService {
       return cached;
     }
 
-    let prefix = KeyBuilder([GetStorageOwnerId(User),cleanedPath]);
+    let prefix = KeyBuilder([GetStorageOwnerId(User), cleanedPath]);
     if (!prefix.endsWith('/')) {
       prefix = prefix + '/';
     }
@@ -158,7 +158,7 @@ export class CloudListService {
   ): Promise<{ Objects: CloudObjectModel[]; TotalCount: number }> {
     const cleanedPath = Path ? Path.replace(/^\/+|\/+$/g, '') : '';
 
-    let prefix = KeyBuilder([GetStorageOwnerId(User),cleanedPath]);
+    let prefix = KeyBuilder([GetStorageOwnerId(User), cleanedPath]);
     if (!prefix.endsWith('/')) {
       prefix = prefix + '/';
     }
@@ -333,7 +333,7 @@ export class CloudListService {
       return cached;
     }
 
-    let prefix = KeyBuilder([GetStorageOwnerId(User),cleanedPath]);
+    let prefix = KeyBuilder([GetStorageOwnerId(User), cleanedPath]);
     if (!prefix.endsWith('/')) {
       prefix = prefix + '/';
     }
@@ -503,7 +503,7 @@ export class CloudListService {
   }> {
     const cleanedPath = Path ? Path.replace(/^\/+|\/+$/g, '') : '';
 
-    let prefix = KeyBuilder([GetStorageOwnerId(User),cleanedPath]);
+    let prefix = KeyBuilder([GetStorageOwnerId(User), cleanedPath]);
     if (!prefix.endsWith('/')) {
       prefix = prefix + '/';
     }
@@ -924,7 +924,7 @@ export class CloudListService {
       return [];
     }
 
-    const prefix = KeyBuilder([GetStorageOwnerId(User),normalizedPrefix]);
+    const prefix = KeyBuilder([GetStorageOwnerId(User), normalizedPrefix]);
     const cacheKey = CloudKeys.DirectoryThumbnails(
       GetStorageOwnerId(User),
       normalizedPrefix,

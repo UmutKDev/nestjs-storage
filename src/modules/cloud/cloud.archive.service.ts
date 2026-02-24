@@ -470,7 +470,7 @@ export class CloudArchiveService implements OnModuleInit, OnModuleDestroy {
       );
     }
 
-    const sourceKey = KeyBuilder([GetStorageOwnerId(User),Key]);
+    const sourceKey = KeyBuilder([GetStorageOwnerId(User), Key]);
 
     // Size guard
     const head = await this.CloudS3Service.Send(

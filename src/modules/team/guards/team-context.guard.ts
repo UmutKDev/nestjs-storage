@@ -52,8 +52,7 @@ export class TeamContextGuard implements CanActivate {
 
     // Check cache first
     const cacheKey = TeamKeys.Membership(teamId, user.Id);
-    let membership =
-      await this.RedisService.Get<CachedMembership>(cacheKey);
+    let membership = await this.RedisService.Get<CachedMembership>(cacheKey);
 
     if (!membership) {
       const dbMembership = await this.teamMemberRepository.findOne({

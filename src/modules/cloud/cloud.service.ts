@@ -333,7 +333,10 @@ export class CloudService {
     { Key }: CloudKeyRequestModel,
     User: UserContext,
   ): Promise<CloudScanStatusResponseModel | null> {
-    const status = await this.CloudScanService.GetScanStatus(GetStorageOwnerId(User), Key);
+    const status = await this.CloudScanService.GetScanStatus(
+      GetStorageOwnerId(User),
+      Key,
+    );
     if (!status) {
       return null;
     }
@@ -420,7 +423,12 @@ export class CloudService {
         DestinationKey,
       );
     }
-    await this.SetIdempotentResult(GetStorageOwnerId(User), 'move', idempotencyKey, result);
+    await this.SetIdempotentResult(
+      GetStorageOwnerId(User),
+      'move',
+      idempotencyKey,
+      result,
+    );
     await this.CloudListService.InvalidateListCache(GetStorageOwnerId(User));
     return result;
   }
@@ -488,7 +496,10 @@ export class CloudService {
           file.Key,
         );
       }
-      await this.CloudUsageService.DecrementUsage(GetStorageOwnerId(User), bytesToDecrement);
+      await this.CloudUsageService.DecrementUsage(
+        GetStorageOwnerId(User),
+        bytesToDecrement,
+      );
       await this.SetIdempotentResult(
         GetStorageOwnerId(User),
         'delete',
@@ -498,7 +509,12 @@ export class CloudService {
       await this.CloudListService.InvalidateListCache(GetStorageOwnerId(User));
       return deleted;
     }
-    await this.SetIdempotentResult(GetStorageOwnerId(User), 'delete', idempotencyKey, true);
+    await this.SetIdempotentResult(
+      GetStorageOwnerId(User),
+      'delete',
+      idempotencyKey,
+      true,
+    );
     await this.CloudListService.InvalidateListCache(GetStorageOwnerId(User));
     return true;
   }
@@ -515,7 +531,10 @@ export class CloudService {
       { Key },
       User,
     );
-    await this.CloudListService.InvalidateDirectoryThumbnailCache(GetStorageOwnerId(User), Key);
+    await this.CloudListService.InvalidateDirectoryThumbnailCache(
+      GetStorageOwnerId(User),
+      Key,
+    );
     await this.CloudListService.InvalidateListCache(GetStorageOwnerId(User));
     return result;
   }
@@ -530,7 +549,10 @@ export class CloudService {
       User,
       options,
     );
-    await this.CloudListService.InvalidateDirectoryThumbnailCache(GetStorageOwnerId(User), Key);
+    await this.CloudListService.InvalidateDirectoryThumbnailCache(
+      GetStorageOwnerId(User),
+      Key,
+    );
     if (Name) {
       const parent = this.GetParentDirectoryPath(Key);
       const renamedPath = parent ? `${parent}/${Name}` : Name;
@@ -688,7 +710,10 @@ export class CloudService {
     );
     const uploadedObject = await this.CloudObjectService.Find({ Key }, User);
     const uploadedSize = uploadedObject.Size || 0;
-    await this.CloudUsageService.IncrementUsage(GetStorageOwnerId(User), uploadedSize);
+    await this.CloudUsageService.IncrementUsage(
+      GetStorageOwnerId(User),
+      uploadedSize,
+    );
     await this.EnsureUploadedObjectWithinLimits(Key, User, uploadedSize);
     await this.CloudScanService.EnqueueScan(GetStorageOwnerId(User), Key);
     await this.CloudListService.InvalidateThumbnailCacheForObjectKey(
@@ -721,7 +746,11 @@ export class CloudService {
     User: UserContext,
     sessionToken?: string,
   ): Promise<CloudArchiveExtractStartResponseModel> {
-    await this.EnsureUploadAccess(model.Key, GetStorageOwnerId(User), sessionToken);
+    await this.EnsureUploadAccess(
+      model.Key,
+      GetStorageOwnerId(User),
+      sessionToken,
+    );
     return this.CloudArchiveService.ArchiveExtractStart(model, User);
   }
 
@@ -748,7 +777,11 @@ export class CloudService {
     User: UserContext,
     sessionToken?: string,
   ): Promise<CloudArchivePreviewResponseModel> {
-    await this.EnsureUploadAccess(model.Key, GetStorageOwnerId(User), sessionToken);
+    await this.EnsureUploadAccess(
+      model.Key,
+      GetStorageOwnerId(User),
+      sessionToken,
+    );
     return this.CloudArchiveService.ArchivePreview(model, User);
   }
 
@@ -827,7 +860,11 @@ export class CloudService {
     User: UserContext,
     sessionToken?: string,
   ): Promise<DirectoryResponseModel> {
-    await this.EnsureDirectoryAccess(Path, GetStorageOwnerId(User), sessionToken);
+    await this.EnsureDirectoryAccess(
+      Path,
+      GetStorageOwnerId(User),
+      sessionToken,
+    );
     const result = await this.CloudDirectoryService.DirectoryCreate(
       { Path, IsEncrypted },
       passphrase,
@@ -850,7 +887,11 @@ export class CloudService {
     User: UserContext,
     sessionToken?: string,
   ): Promise<DirectoryResponseModel> {
-    await this.EnsureDirectoryAccess(Path, GetStorageOwnerId(User), sessionToken);
+    await this.EnsureDirectoryAccess(
+      Path,
+      GetStorageOwnerId(User),
+      sessionToken,
+    );
     const result = await this.CloudDirectoryService.DirectoryRename(
       { Path, Name },
       passphrase,
@@ -881,7 +922,11 @@ export class CloudService {
     User: UserContext,
     sessionToken?: string,
   ): Promise<boolean> {
-    await this.EnsureDirectoryAccess(Path, GetStorageOwnerId(User), sessionToken);
+    await this.EnsureDirectoryAccess(
+      Path,
+      GetStorageOwnerId(User),
+      sessionToken,
+    );
     const result = await this.CloudDirectoryService.DirectoryDelete(
       { Path },
       passphrase,
@@ -945,7 +990,11 @@ export class CloudService {
     User: UserContext,
     sessionToken?: string,
   ): Promise<DirectoryResponseModel> {
-    await this.EnsureDirectoryAccess(Path, GetStorageOwnerId(User), sessionToken);
+    await this.EnsureDirectoryAccess(
+      Path,
+      GetStorageOwnerId(User),
+      sessionToken,
+    );
     const result = await this.CloudDirectoryService.DirectoryConvertToEncrypted(
       { Path },
       passphrase,
@@ -968,7 +1017,11 @@ export class CloudService {
     User: UserContext,
     sessionToken?: string,
   ): Promise<DirectoryResponseModel> {
-    await this.EnsureDirectoryAccess(Path, GetStorageOwnerId(User), sessionToken);
+    await this.EnsureDirectoryAccess(
+      Path,
+      GetStorageOwnerId(User),
+      sessionToken,
+    );
     const result = await this.CloudDirectoryService.DirectoryDecrypt(
       { Path },
       passphrase,
@@ -1116,7 +1169,10 @@ export class CloudService {
         { Items: [{ Key: key, IsDirectory: false }] },
         user,
       );
-      await this.CloudUsageService.DecrementUsage(GetStorageOwnerId(user), resolvedSize);
+      await this.CloudUsageService.DecrementUsage(
+        GetStorageOwnerId(user),
+        resolvedSize,
+      );
       throw new HttpException(
         `File size exceeds the maximum upload size of ${SizeFormatter({ From: usage.MaxUploadSizeBytes, FromUnit: 'B', ToUnit: 'MB' })} MB.`,
         HttpStatus.BAD_REQUEST,
@@ -1131,7 +1187,10 @@ export class CloudService {
         { Items: [{ Key: key, IsDirectory: false }] },
         user,
       );
-      await this.CloudUsageService.DecrementUsage(GetStorageOwnerId(user), resolvedSize);
+      await this.CloudUsageService.DecrementUsage(
+        GetStorageOwnerId(user),
+        resolvedSize,
+      );
       throw new HttpException(
         'Storage limit exceeded. Please upgrade your subscription.',
         HttpStatus.BAD_REQUEST,

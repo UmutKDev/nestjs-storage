@@ -8,7 +8,12 @@ import {
   Post,
   Put,
 } from '@nestjs/common';
-import { ApiCookieAuth, ApiHeader, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiCookieAuth,
+  ApiHeader,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
 import { TEAM_ID_HEADER } from './guards/team-context.guard';
 import {
   ApiSuccessArrayResponse,
@@ -66,9 +71,7 @@ export class TeamController {
     return this.teamService.Find(Id, User);
   }
 
-  @CheckPolicies((Ability) =>
-    Ability.can(CaslAction.Update, CaslSubject.Team),
-  )
+  @CheckPolicies((Ability) => Ability.can(CaslAction.Update, CaslSubject.Team))
   @Put(':Id')
   @ApiHeader({
     name: TEAM_ID_HEADER,
@@ -85,9 +88,7 @@ export class TeamController {
     return this.teamService.Update(Id, Model, User);
   }
 
-  @CheckPolicies((Ability) =>
-    Ability.can(CaslAction.Delete, CaslSubject.Team),
-  )
+  @CheckPolicies((Ability) => Ability.can(CaslAction.Delete, CaslSubject.Team))
   @Delete(':Id')
   @ApiHeader({
     name: TEAM_ID_HEADER,

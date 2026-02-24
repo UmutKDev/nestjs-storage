@@ -1,5 +1,10 @@
 import { Body, Controller, Delete, Get, Param, Post } from '@nestjs/common';
-import { ApiCookieAuth, ApiHeader, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiCookieAuth,
+  ApiHeader,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
 import { TEAM_ID_HEADER } from './guards/team-context.guard';
 import {
   ApiSuccessArrayResponse,
@@ -21,9 +26,7 @@ import {
 @ApiTags('Team / Invitations')
 @ApiCookieAuth()
 export class TeamInvitationController {
-  constructor(
-    private readonly teamInvitationService: TeamInvitationService,
-  ) {}
+  constructor(private readonly teamInvitationService: TeamInvitationService) {}
 
   @CheckPolicies((Ability) =>
     Ability.can(CaslAction.Create, CaslSubject.TeamInvitation),

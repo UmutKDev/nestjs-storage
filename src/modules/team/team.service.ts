@@ -215,9 +215,7 @@ export class TeamService {
 
   private async InvalidateTeamCaches(teamId: string): Promise<void> {
     await this.RedisService.Delete(TeamKeys.Detail(teamId));
-    await this.RedisService.DeleteByPattern(
-      TeamKeys.MembershipPattern(teamId),
-    );
+    await this.RedisService.DeleteByPattern(TeamKeys.MembershipPattern(teamId));
   }
 
   private async InvalidateUserTeamsCache(userId: string): Promise<void> {

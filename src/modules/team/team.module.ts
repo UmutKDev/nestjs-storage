@@ -20,11 +20,7 @@ import { TeamInvitationService } from './team-invitation.service';
       UserEntity,
     ]),
   ],
-  controllers: [
-    TeamMemberController,
-    TeamInvitationController,
-    TeamController,
-  ],
+  controllers: [TeamMemberController, TeamInvitationController, TeamController],
   providers: [TeamService, TeamMemberService, TeamInvitationService],
   exports: [TeamService, TeamMemberService, TeamInvitationService],
 })

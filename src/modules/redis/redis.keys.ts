@@ -224,8 +224,7 @@ export namespace TeamKeys {
   export const Detail = (teamId: string) => `team:detail:${teamId}`;
 
   /** team:invitations:{teamId} — cached pending invitations for a team */
-  export const Invitations = (teamId: string) =>
-    `team:invitations:${teamId}`;
+  export const Invitations = (teamId: string) => `team:invitations:${teamId}`;
 
   /** team:user-invitations:{email} — cached pending invitations for a user email */
   export const UserInvitations = (email: string) =>

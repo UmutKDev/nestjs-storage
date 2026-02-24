@@ -7,7 +7,12 @@ import {
   Post,
   Put,
 } from '@nestjs/common';
-import { ApiCookieAuth, ApiHeader, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiCookieAuth,
+  ApiHeader,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
 import { TEAM_ID_HEADER } from './guards/team-context.guard';
 import {
   ApiSuccessArrayResponse,
@@ -89,9 +94,7 @@ export class TeamMemberController {
     return this.teamMemberService.Leave(User.TeamId, User);
   }
 
-  @CheckPolicies((Ability) =>
-    Ability.can(CaslAction.Manage, CaslSubject.Team),
-  )
+  @CheckPolicies((Ability) => Ability.can(CaslAction.Manage, CaslSubject.Team))
   @Post('TransferOwnership')
   @ApiSuccessResponse('boolean')
   @ApiOperation({ summary: 'Transfer team ownership' })
@@ -99,10 +102,6 @@ export class TeamMemberController {
     @User() User: UserContext,
     @Body() Model: TeamTransferOwnershipRequestModel,
   ): Promise<boolean> {
-    return this.teamMemberService.TransferOwnership(
-      User.TeamId,
-      Model,
-      User,
-    );
+    return this.teamMemberService.TransferOwnership(User.TeamId, Model, User);
   }
 }

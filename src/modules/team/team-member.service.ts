@@ -108,10 +108,7 @@ export class TeamMemberService {
     }
 
     if (targetMembership.User.Id === User.Id) {
-      throw new HttpException(
-        'Use the leave endpoint to remove yourself',
-        400,
-      );
+      throw new HttpException('Use the leave endpoint to remove yourself', 400);
     }
 
     if (targetMembership.Role === TeamRole.OWNER) {
@@ -167,10 +164,7 @@ export class TeamMemberService {
       where: { Team: { Id: TeamId }, User: { Id: Model.UserId } },
     });
     if (!newOwner) {
-      throw new HttpException(
-        'Target user is not a member of this team',
-        404,
-      );
+      throw new HttpException('Target user is not a member of this team', 404);
     }
 
     if (newOwner.User.Id === User.Id) {

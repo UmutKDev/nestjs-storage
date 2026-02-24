@@ -40,7 +40,7 @@ export class CloudObjectService {
       const command = await this.CloudS3Service.Send(
         new HeadObjectCommand({
           Bucket: this.CloudS3Service.GetBuckets().Storage,
-          Key: KeyBuilder([GetStorageOwnerId(User),Key]),
+          Key: KeyBuilder([GetStorageOwnerId(User), Key]),
         }),
       );
 
@@ -78,13 +78,13 @@ export class CloudObjectService {
       await this.CloudS3Service.Send(
         new HeadObjectCommand({
           Bucket: this.CloudS3Service.GetBuckets().Storage,
-          Key: KeyBuilder([GetStorageOwnerId(User),Key]),
+          Key: KeyBuilder([GetStorageOwnerId(User), Key]),
         }),
       );
 
       const command = new GetObjectCommand({
         Bucket: this.CloudS3Service.GetBuckets().Storage,
-        Key: KeyBuilder([GetStorageOwnerId(User),Key]),
+        Key: KeyBuilder([GetStorageOwnerId(User), Key]),
       });
 
       const url = await getSignedUrl(this.CloudS3Service.GetClient(), command, {
@@ -108,7 +108,7 @@ export class CloudObjectService {
       const command = await this.CloudS3Service.Send(
         new GetObjectCommand({
           Bucket: this.CloudS3Service.GetBuckets().Storage,
-          Key: KeyBuilder([GetStorageOwnerId(User),Key]),
+          Key: KeyBuilder([GetStorageOwnerId(User), Key]),
         }),
       );
       return command.Body.transformToWebStream();
@@ -128,7 +128,7 @@ export class CloudObjectService {
       const command = await this.CloudS3Service.Send(
         new GetObjectCommand({
           Bucket: this.CloudS3Service.GetBuckets().Storage,
-          Key: KeyBuilder([GetStorageOwnerId(User),Key]),
+          Key: KeyBuilder([GetStorageOwnerId(User), Key]),
         }),
       );
 
@@ -148,7 +148,7 @@ export class CloudObjectService {
   ): Promise<boolean> {
     try {
       for await (const sourceKey of SourceKeys) {
-        const sourceFullKey = KeyBuilder([GetStorageOwnerId(User),sourceKey]);
+        const sourceFullKey = KeyBuilder([GetStorageOwnerId(User), sourceKey]);
 
         const targetFullKey = KeyBuilder([
           GetStorageOwnerId(User),
@@ -193,7 +193,7 @@ export class CloudObjectService {
         await this.CloudS3Service.Send(
           new DeleteObjectCommand({
             Bucket: this.CloudS3Service.GetBuckets().Storage,
-            Key: KeyBuilder([GetStorageOwnerId(User),item.Key]),
+            Key: KeyBuilder([GetStorageOwnerId(User), item.Key]),
           }),
         );
       }
@@ -213,7 +213,7 @@ export class CloudObjectService {
     try {
       const bucket = this.CloudS3Service.GetBuckets().Storage;
 
-      const sourceKey = KeyBuilder([GetStorageOwnerId(User),Key]);
+      const sourceKey = KeyBuilder([GetStorageOwnerId(User), Key]);
 
       let targetRelative = Key;
       let targetKey = sourceKey;
@@ -222,7 +222,7 @@ export class CloudObjectService {
         const parts = Key.split('/');
         parts[parts.length - 1] = Name;
         targetRelative = parts.join('/');
-        targetKey = KeyBuilder([GetStorageOwnerId(User),targetRelative]);
+        targetKey = KeyBuilder([GetStorageOwnerId(User), targetRelative]);
       }
 
       const sanitizedProvidedMetadata =
