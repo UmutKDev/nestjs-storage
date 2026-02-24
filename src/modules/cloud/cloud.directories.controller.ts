@@ -29,6 +29,8 @@ import {
   FOLDER_SESSION_HEADER,
   FOLDER_PASSPHRASE_HEADER,
 } from './cloud.constants';
+import { CheckPolicies } from '@modules/authentication/casl/check-policies.decorator';
+import { CaslAction, CaslSubject } from '@common/enums';
 
 @Controller('Cloud/Directories')
 @ApiTags('Cloud / Directories')
@@ -36,6 +38,9 @@ import {
 export class CloudDirectoriesController {
   constructor(private readonly cloudService: CloudService) {}
 
+  @CheckPolicies((Ability) =>
+    Ability.can(CaslAction.Create, CaslSubject.CloudDirectory),
+  )
   @ApiOperation({
     summary: 'Create a directory',
     description:
@@ -67,6 +72,9 @@ export class CloudDirectoriesController {
     );
   }
 
+  @CheckPolicies((Ability) =>
+    Ability.can(CaslAction.Update, CaslSubject.CloudDirectory),
+  )
   @ApiOperation({
     summary: 'Rename a directory',
     description:
@@ -98,6 +106,9 @@ export class CloudDirectoriesController {
     );
   }
 
+  @CheckPolicies((Ability) =>
+    Ability.can(CaslAction.Delete, CaslSubject.CloudDirectory),
+  )
   @ApiOperation({
     summary: 'Delete a directory',
     description:
@@ -133,6 +144,9 @@ export class CloudDirectoriesController {
     );
   }
 
+  @CheckPolicies((Ability) =>
+    Ability.can(CaslAction.Execute, CaslSubject.CloudDirectory),
+  )
   @ApiOperation({
     summary: 'Unlock an encrypted directory',
     description:
@@ -153,6 +167,9 @@ export class CloudDirectoriesController {
     return this.cloudService.DirectoryUnlock(model, passphrase, user);
   }
 
+  @CheckPolicies((Ability) =>
+    Ability.can(CaslAction.Execute, CaslSubject.CloudDirectory),
+  )
   @ApiOperation({
     summary: 'Lock an encrypted directory',
     description: 'Invalidates the session token for an encrypted directory.',
@@ -170,6 +187,9 @@ export class CloudDirectoriesController {
     return this.cloudService.DirectoryLock(model, user);
   }
 
+  @CheckPolicies((Ability) =>
+    Ability.can(CaslAction.Execute, CaslSubject.CloudDirectory),
+  )
   @ApiOperation({
     summary: 'Convert a directory to encrypted',
     description:
@@ -201,6 +221,9 @@ export class CloudDirectoriesController {
     );
   }
 
+  @CheckPolicies((Ability) =>
+    Ability.can(CaslAction.Execute, CaslSubject.CloudDirectory),
+  )
   @ApiOperation({
     summary: 'Remove encryption from a directory',
     description:
@@ -236,6 +259,9 @@ export class CloudDirectoriesController {
   // HIDDEN DIRECTORIES API
   // ============================================================================
 
+  @CheckPolicies((Ability) =>
+    Ability.can(CaslAction.Execute, CaslSubject.CloudDirectory),
+  )
   @ApiOperation({
     summary: 'Hide a directory',
     description:
@@ -256,6 +282,9 @@ export class CloudDirectoriesController {
     return this.cloudService.DirectoryHide(model, passphrase, user);
   }
 
+  @CheckPolicies((Ability) =>
+    Ability.can(CaslAction.Execute, CaslSubject.CloudDirectory),
+  )
   @ApiOperation({
     summary: 'Unhide a directory',
     description:
@@ -276,6 +305,9 @@ export class CloudDirectoriesController {
     return this.cloudService.DirectoryUnhide(model, passphrase, user);
   }
 
+  @CheckPolicies((Ability) =>
+    Ability.can(CaslAction.Execute, CaslSubject.CloudDirectory),
+  )
   @ApiOperation({
     summary: 'Reveal hidden directories',
     description:
@@ -296,6 +328,9 @@ export class CloudDirectoriesController {
     return this.cloudService.DirectoryReveal(model, passphrase, user);
   }
 
+  @CheckPolicies((Ability) =>
+    Ability.can(CaslAction.Execute, CaslSubject.CloudDirectory),
+  )
   @ApiOperation({
     summary: 'Conceal hidden directories',
     description:

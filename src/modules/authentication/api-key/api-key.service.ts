@@ -380,6 +380,7 @@ export class ApiKeyService {
 
     const apiKey = await this.apiKeyRepository.findOne({
       where: { PublicKey: publicKey, IsRevoked: false },
+      relations: ['User'],
     });
 
     if (apiKey) {

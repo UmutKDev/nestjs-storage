@@ -25,13 +25,21 @@ import {
 import { ApiSuccessResponse } from '@common/decorators/response.decorator';
 import { User } from '@common/decorators/user.decorator';
 import { FOLDER_SESSION_HEADER } from './cloud.constants';
+import { CheckPolicies } from '@modules/authentication/casl/check-policies.decorator';
+import { CaslAction, CaslSubject } from '@common/enums';
 
 @Controller('Cloud/Archive')
 @ApiTags('Cloud / Archive')
 @ApiCookieAuth()
+@CheckPolicies((Ability) =>
+  Ability.can(CaslAction.Read, CaslSubject.CloudArchive),
+)
 export class CloudArchiveController {
   constructor(private readonly cloudService: CloudService) {}
 
+  @CheckPolicies((Ability) =>
+    Ability.can(CaslAction.Extract, CaslSubject.CloudArchive),
+  )
   @ApiOperation({
     summary: 'Start archive extraction',
     description:
@@ -66,6 +74,9 @@ export class CloudArchiveController {
     return this.cloudService.ArchiveExtractStatus(model, user);
   }
 
+  @CheckPolicies((Ability) =>
+    Ability.can(CaslAction.Extract, CaslSubject.CloudArchive),
+  )
   @ApiOperation({
     summary: 'Cancel archive extraction',
     description:
@@ -100,6 +111,9 @@ export class CloudArchiveController {
     return this.cloudService.ArchivePreview(model, user, sessionToken);
   }
 
+  @CheckPolicies((Ability) =>
+    Ability.can(CaslAction.Archive, CaslSubject.CloudArchive),
+  )
   @ApiOperation({
     summary: 'Start archive creation',
     description:
@@ -128,6 +142,9 @@ export class CloudArchiveController {
     return this.cloudService.ArchiveCreateStatus(model, user);
   }
 
+  @CheckPolicies((Ability) =>
+    Ability.can(CaslAction.Archive, CaslSubject.CloudArchive),
+  )
   @ApiOperation({
     summary: 'Cancel archive creation',
     description: 'Cancels an archive creation job if it is pending or running.',

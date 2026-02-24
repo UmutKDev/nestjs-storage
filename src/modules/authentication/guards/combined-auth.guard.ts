@@ -15,7 +15,9 @@ import {
   ApiKeyScope,
   AuthenticationType,
 } from '@common/enums/authentication.enum';
+import { Role, Status } from '@common/enums';
 import { SessionData } from '../session/session.interface';
+import { ApiKeyEntity } from '@entities/api-key.entity';
 
 @Injectable()
 export class CombinedAuthGuard implements CanActivate {
@@ -73,7 +75,7 @@ export class CombinedAuthGuard implements CanActivate {
   ): Promise<boolean> {
     const ipAddress = request.ip || request.socket?.remoteAddress;
 
-    const { ApiKey, UserId } = await this.apiKeyService.validateSimpleApiKey(
+    const { ApiKey } = await this.apiKeyService.validateSimpleApiKey(
       publicKey,
       secretKey,
       ipAddress,
@@ -96,7 +98,7 @@ export class CombinedAuthGuard implements CanActivate {
     }
 
     request.apiKey = ApiKey;
-    request.user = { id: UserId };
+    request.user = this.apiKeyUserToContext(ApiKey);
     request.authenticationType = AuthenticationType.API_KEY;
 
     return true;
@@ -163,6 +165,17 @@ export class CombinedAuthGuard implements CanActivate {
       Role: session.Role,
       Status: session.Status,
       Image: session.Image,
+    };
+  }
+
+  private apiKeyUserToContext(apiKey: ApiKeyEntity): UserContext {
+    return {
+      Id: apiKey.User.Id,
+      Email: apiKey.User.Email,
+      FullName: apiKey.User.FullName,
+      Role: apiKey.User.Role as Role,
+      Status: apiKey.User.Status as Status,
+      Image: apiKey.User.Image,
     };
   }
 }

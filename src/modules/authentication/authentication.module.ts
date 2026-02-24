@@ -11,7 +11,8 @@ import { TwoFactorService } from './two-factor/two-factor.service';
 import { ApiKeyService } from './api-key/api-key.service';
 
 import { CombinedAuthGuard } from './guards/combined-auth.guard';
-import { RoleGuard } from './guards/role.guard';
+import { PoliciesGuard } from './guards/policies.guard';
+import { CaslAbilityFactory } from './casl/casl-ability.factory';
 
 import { UserEntity } from '@entities/user.entity';
 import { PasskeyEntity } from '@entities/passkey.entity';
@@ -39,13 +40,14 @@ import { RedisModule } from '../redis/redis.module';
     PasskeyService,
     TwoFactorService,
     ApiKeyService,
+    CaslAbilityFactory,
     {
       provide: APP_GUARD,
       useClass: CombinedAuthGuard,
     },
     {
       provide: APP_GUARD,
-      useClass: RoleGuard,
+      useClass: PoliciesGuard,
     },
   ],
   exports: [
@@ -54,6 +56,7 @@ import { RedisModule } from '../redis/redis.module';
     PasskeyService,
     TwoFactorService,
     ApiKeyService,
+    CaslAbilityFactory,
   ],
 })
 export class AuthenticationModule {}

@@ -6,6 +6,8 @@ import {
   UserSubscriptionResponseModel,
 } from './subscription.model';
 import { User } from '@common/decorators/user.decorator';
+import { CheckPolicies } from '@modules/authentication/casl/check-policies.decorator';
+import { CaslAction, CaslSubject } from '@common/enums';
 
 @Controller('Subscription')
 @ApiTags('Subscription')
@@ -13,6 +15,9 @@ import { User } from '@common/decorators/user.decorator';
 export class SubscriptionUserController {
   constructor(private readonly subscriptionService: SubscriptionService) {}
 
+  @CheckPolicies((Ability) =>
+    Ability.can(CaslAction.Read, CaslSubject.MySubscription),
+  )
   @Get('My')
   async My(
     @User() user: UserContext,
@@ -22,6 +27,9 @@ export class SubscriptionUserController {
     });
   }
 
+  @CheckPolicies((Ability) =>
+    Ability.can(CaslAction.Create, CaslSubject.MySubscription),
+  )
   @Post('My/Subscribe')
   async Subscribe(
     @User() user: UserContext,
@@ -34,6 +42,9 @@ export class SubscriptionUserController {
     });
   }
 
+  @CheckPolicies((Ability) =>
+    Ability.can(CaslAction.Delete, CaslSubject.MySubscription),
+  )
   @Delete('My/Unsubscribe')
   async Unsubscribe(@User() user: UserContext): Promise<boolean> {
     return await this.subscriptionService.UnsubscribeByUser({

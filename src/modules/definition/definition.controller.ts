@@ -7,10 +7,15 @@ import {
 } from './definition.model';
 import { PaginationRequestModel } from '@common/models/pagination.model';
 import { ApiSuccessArrayResponse } from '@common/decorators/response.decorator';
+import { CheckPolicies } from '@modules/authentication/casl/check-policies.decorator';
+import { CaslAction, CaslSubject } from '@common/enums';
 
 @Controller('Definition')
 @ApiTags('Definition')
 @ApiCookieAuth()
+@CheckPolicies((Ability) =>
+  Ability.can(CaslAction.Read, CaslSubject.Definition),
+)
 export class DefinitionController {
   constructor(private readonly definitionService: DefinitionService) {}
 

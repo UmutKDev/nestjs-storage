@@ -21,13 +21,15 @@ import {
   ApiSuccessResponse,
 } from '@common/decorators/response.decorator';
 import { BaseIdRequestModel } from '@common/models/base.model';
-import { Roles } from '@common/decorators/roles.decorator';
-import { Role } from '@common/enums';
+import { CheckPolicies } from '@modules/authentication/casl/check-policies.decorator';
+import { CaslAction, CaslSubject } from '@common/enums';
 
 @Controller('Subscription')
 @ApiTags('Subscription')
 @ApiCookieAuth()
-@Roles(Role.ADMIN)
+@CheckPolicies((Ability) =>
+  Ability.can(CaslAction.Manage, CaslSubject.Subscription),
+)
 export class SubscriptionController {
   constructor(private readonly subscriptionService: SubscriptionService) {}
 

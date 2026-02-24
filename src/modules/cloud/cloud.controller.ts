@@ -53,10 +53,13 @@ import {
   HIDDEN_SESSION_HEADER,
   CLOUD_DOWNLOAD_THROTTLE,
 } from './cloud.constants';
+import { CheckPolicies } from '@modules/authentication/casl/check-policies.decorator';
+import { CaslAction, CaslSubject } from '@common/enums';
 
 @Controller('Cloud')
 @ApiTags('Cloud')
 @ApiCookieAuth()
+@CheckPolicies((Ability) => Ability.can(CaslAction.Read, CaslSubject.Cloud))
 export class CloudController {
   constructor(private readonly cloudService: CloudService) {}
 
@@ -238,6 +241,7 @@ export class CloudController {
     return this.cloudService.GetPresignedUrl(model, user);
   }
 
+  @CheckPolicies((Ability) => Ability.can(CaslAction.Update, CaslSubject.Cloud))
   @ApiOperation({
     summary: 'Move/rename an object',
     description:
@@ -257,6 +261,7 @@ export class CloudController {
     return this.cloudService.Move(model, user, idempotencyKey);
   }
 
+  @CheckPolicies((Ability) => Ability.can(CaslAction.Delete, CaslSubject.Cloud))
   @ApiOperation({
     summary: 'Delete objects',
     description:
@@ -276,6 +281,7 @@ export class CloudController {
     return this.cloudService.Delete(model, user, undefined, idempotencyKey);
   }
 
+  @CheckPolicies((Ability) => Ability.can(CaslAction.Update, CaslSubject.Cloud))
   @ApiOperation({
     summary: 'Update object metadata or rename',
     description:
@@ -290,6 +296,9 @@ export class CloudController {
     return this.cloudService.Update(model, user);
   }
 
+  @CheckPolicies((Ability) =>
+    Ability.can(CaslAction.Download, CaslSubject.Cloud),
+  )
   @Get('Download')
   @Throttle(CLOUD_DOWNLOAD_THROTTLE)
   @ApiOperation({

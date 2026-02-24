@@ -40,10 +40,15 @@ import {
   FOLDER_SESSION_HEADER,
   CLOUD_UPLOAD_THROTTLE,
 } from './cloud.constants';
+import { CheckPolicies } from '@modules/authentication/casl/check-policies.decorator';
+import { CaslAction, CaslSubject } from '@common/enums';
 
 @Controller('Cloud/Upload')
 @ApiTags('Cloud / Upload')
 @ApiCookieAuth()
+@CheckPolicies((Ability) =>
+  Ability.can(CaslAction.Upload, CaslSubject.CloudUpload),
+)
 export class CloudUploadController {
   constructor(private readonly cloudService: CloudService) {}
 
@@ -214,5 +219,4 @@ export class CloudUploadController {
   ): Promise<void> {
     return this.cloudService.UploadAbortMultipartUpload(model, user);
   }
-
 }

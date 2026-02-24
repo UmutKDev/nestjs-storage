@@ -8,6 +8,8 @@ import {
   AccountPutBodyRequestModel,
 } from './account.model';
 import { User } from '@common/decorators/user.decorator';
+import { CheckPolicies } from '@modules/authentication/casl/check-policies.decorator';
+import { CaslAction, CaslSubject } from '@common/enums';
 
 @Controller('Account')
 @ApiTags('Account')
@@ -15,6 +17,7 @@ import { User } from '@common/decorators/user.decorator';
 export class AccountController {
   constructor(private readonly accountService: AccountService) {}
 
+  @CheckPolicies((Ability) => Ability.can(CaslAction.Read, CaslSubject.Account))
   @Get('Profile')
   @ApiSuccessResponse(AccountProfileResponseModel)
   async Profile(
@@ -23,6 +26,9 @@ export class AccountController {
     return await this.accountService.Profile({ user });
   }
 
+  @CheckPolicies((Ability) =>
+    Ability.can(CaslAction.Update, CaslSubject.Account),
+  )
   @Put('Edit')
   @ApiSuccessResponse('boolean')
   async Edit(
@@ -32,6 +38,9 @@ export class AccountController {
     return await this.accountService.Edit({ user, model });
   }
 
+  @CheckPolicies((Ability) =>
+    Ability.can(CaslAction.Update, CaslSubject.Account),
+  )
   @Put('ChangePassword')
   @ApiSuccessResponse('boolean')
   async ChangePassword(

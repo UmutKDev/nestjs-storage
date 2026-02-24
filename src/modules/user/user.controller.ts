@@ -22,14 +22,14 @@ import {
 } from '@common/decorators/response.decorator';
 import { BaseIdRequestModel } from '@common/models/base.model';
 import { PaginationRequestModel } from '@common/models/pagination.model';
-import { Roles } from '@common/decorators/roles.decorator';
-import { Role } from '@common/enums';
+import { CheckPolicies } from '@modules/authentication/casl/check-policies.decorator';
+import { CaslAction, CaslSubject } from '@common/enums';
 import { User } from '@common/decorators/user.decorator';
 
 @Controller('User')
 @ApiTags('User')
 @ApiCookieAuth()
-@Roles(Role.ADMIN)
+@CheckPolicies((Ability) => Ability.can(CaslAction.Manage, CaslSubject.User))
 export class UserController {
   constructor(private readonly userService: UserService) {}
 
