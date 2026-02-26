@@ -19,6 +19,8 @@ import {
   TeamInvitationResponseModel,
   TeamMemberResponseModel,
 } from './team.model';
+import { NotificationService } from '@modules/notification/notification.service';
+import { NotificationType } from '@common/enums';
 
 @Injectable()
 export class TeamInvitationService {
@@ -29,7 +31,10 @@ export class TeamInvitationService {
     private readonly teamMemberRepository: Repository<TeamMemberEntity>,
     @InjectRepository(TeamEntity)
     private readonly teamRepository: Repository<TeamEntity>,
+    @InjectRepository(UserEntity)
+    private readonly userRepository: Repository<UserEntity>,
     private readonly RedisService: RedisService,
+    private readonly NotificationService: NotificationService,
   ) {}
 
   async Create(
@@ -78,6 +83,26 @@ export class TeamInvitationService {
 
     await this.RedisService.Delete(TeamKeys.Invitations(TeamId));
     await this.RedisService.Delete(TeamKeys.UserInvitations(Model.Email));
+
+    // Notify the invited user if they exist in the system
+    const invitedUser = await this.userRepository.findOne({
+      where: { Email: Model.Email },
+      select: ['Id'],
+    });
+    if (invitedUser) {
+      this.NotificationService.EmitToUser(
+        invitedUser.Id,
+        NotificationType.TEAM_INVITATION_RECEIVED,
+        'Team Invitation',
+        `${User.FullName} invited you to join "${team.Name}".`,
+        {
+          TeamId,
+          TeamName: team.Name,
+          InvitedBy: User.FullName,
+          Role: invitation.Role,
+        },
+      );
+    }
 
     return plainToInstance(TeamInvitationResponseModel, {
       Id: invitation.Id,
@@ -200,6 +225,31 @@ export class TeamInvitationService {
       TEAM_MEMBERSHIP_CACHE_TTL,
     );
 
+    // Notify team owner/admins about accepted invitation
+    const teamAdmins = await this.teamMemberRepository.find({
+      where: [
+        { Team: { Id: invitation.Team.Id }, Role: TeamRole.OWNER },
+        { Team: { Id: invitation.Team.Id }, Role: TeamRole.ADMIN },
+      ],
+      relations: ['User'],
+    });
+    for (const admin of teamAdmins) {
+      if (admin.User?.Id && admin.User.Id !== User.Id) {
+        this.NotificationService.EmitToUser(
+          admin.User.Id,
+          NotificationType.TEAM_INVITATION_ACCEPTED,
+          'Invitation Accepted',
+          `${User.FullName} accepted the invitation to join "${invitation.Team.Name}".`,
+          {
+            TeamId: invitation.Team.Id,
+            TeamName: invitation.Team.Name,
+            UserId: User.Id,
+            UserName: User.FullName,
+          },
+        );
+      }
+    }
+
     return plainToInstance(TeamMemberResponseModel, {
       Id: member.Id,
       UserId: User.Id,
@@ -233,6 +283,30 @@ export class TeamInvitationService {
 
     await this.RedisService.Delete(TeamKeys.Invitations(invitation.Team.Id));
     await this.RedisService.Delete(TeamKeys.UserInvitations(User.Email));
+
+    // Notify team owner/admins about declined invitation
+    const teamAdmins = await this.teamMemberRepository.find({
+      where: [
+        { Team: { Id: invitation.Team.Id }, Role: TeamRole.OWNER },
+        { Team: { Id: invitation.Team.Id }, Role: TeamRole.ADMIN },
+      ],
+      relations: ['User'],
+    });
+    for (const admin of teamAdmins) {
+      if (admin.User?.Id) {
+        this.NotificationService.EmitToUser(
+          admin.User.Id,
+          NotificationType.TEAM_INVITATION_DECLINED,
+          'Invitation Declined',
+          `${User.FullName} declined the invitation to join "${invitation.Team.Name}".`,
+          {
+            TeamId: invitation.Team.Id,
+            TeamName: invitation.Team.Name,
+            UserEmail: User.Email,
+          },
+        );
+      }
+    }
 
     return true;
   }

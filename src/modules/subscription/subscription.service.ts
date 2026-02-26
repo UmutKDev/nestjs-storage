@@ -19,6 +19,8 @@ import {
   SUBSCRIPTION_LIST_CACHE_TTL,
   USER_SUBSCRIPTION_CACHE_TTL,
 } from '@modules/redis/redis.ttl';
+import { NotificationService } from '@modules/notification/notification.service';
+import { NotificationType } from '@common/enums';
 
 @Injectable()
 export class SubscriptionService {
@@ -30,6 +32,7 @@ export class SubscriptionService {
     @InjectRepository(UserEntity)
     private userRepository: Repository<UserEntity>,
     private readonly RedisService: RedisService,
+    private readonly NotificationService: NotificationService,
   ) {}
 
   async List(): Promise<SubscriptionListResponseModel[]> {
@@ -158,6 +161,19 @@ export class SubscriptionService {
     // Invalidate user subscription cache
     await this.RedisService.Delete(SubscriptionKeys.UserSubscription(userId));
 
+    // Notify user about subscription change
+    this.NotificationService.EmitToUser(
+      userId,
+      NotificationType.SUBSCRIPTION_CHANGED,
+      'Subscription Updated',
+      `Your subscription has been changed to "${subscription.Name}".`,
+      {
+        SubscriptionId: subscriptionId,
+        SubscriptionName: subscription.Name,
+        IsTrial: isTrial ?? false,
+      },
+    );
+
     return true;
   }
 
@@ -208,6 +224,19 @@ export class SubscriptionService {
     // Invalidate user subscription cache
     await this.RedisService.Delete(SubscriptionKeys.UserSubscription(userId));
 
+    // Notify user about self-subscription
+    this.NotificationService.EmitToUser(
+      userId,
+      NotificationType.SUBSCRIPTION_CHANGED,
+      'Subscription Activated',
+      `You have subscribed to "${subscription.Name}".`,
+      {
+        SubscriptionId: subscriptionId,
+        SubscriptionName: subscription.Name,
+        IsTrial: isTrial ?? false,
+      },
+    );
+
     return true;
   }
 
@@ -249,6 +278,14 @@ export class SubscriptionService {
     await this.userSubscriptionRepository.remove(entity);
     if (userId) {
       await this.RedisService.Delete(SubscriptionKeys.UserSubscription(userId));
+
+      // Notify user about cancellation
+      this.NotificationService.EmitToUser(
+        userId,
+        NotificationType.SUBSCRIPTION_CANCELLED,
+        'Subscription Cancelled',
+        'Your subscription has been cancelled.',
+      );
     }
     return true;
   }
@@ -266,6 +303,15 @@ export class SubscriptionService {
     // Aboneliği tamamen sil
     await this.userSubscriptionRepository.remove(entity);
     await this.RedisService.Delete(SubscriptionKeys.UserSubscription(userId));
+
+    // Notify user about self-cancellation
+    this.NotificationService.EmitToUser(
+      userId,
+      NotificationType.SUBSCRIPTION_CANCELLED,
+      'Subscription Cancelled',
+      'Your subscription has been cancelled.',
+    );
+
     return true;
   }
 }

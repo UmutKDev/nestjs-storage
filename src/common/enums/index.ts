@@ -5,3 +5,4 @@ export * from './subscription.enum';
 export * from './authentication.enum';
 export * from './casl.enum';
 export * from './team.enum';
+export * from './notification.enum';

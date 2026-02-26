@@ -72,6 +72,8 @@ import { SizeFormatter } from '@common/helpers/cast.helper';
 import { RedisService } from '@modules/redis/redis.service';
 import { CloudKeys } from '@modules/redis/redis.keys';
 import { CLOUD_IDEMPOTENCY_TTL } from '@modules/redis/redis.ttl';
+import { NotificationService } from '@modules/notification/notification.service';
+import { NotificationType } from '@common/enums';
 
 @Injectable()
 export class CloudService {
@@ -87,6 +89,7 @@ export class CloudService {
     private readonly CloudUsageService: CloudUsageService,
     private readonly CloudScanService: CloudScanService,
     private readonly RedisService: RedisService,
+    private readonly NotificationService: NotificationService,
   ) {}
 
   //#region List
@@ -430,6 +433,17 @@ export class CloudService {
       result,
     );
     await this.CloudListService.InvalidateListCache(GetStorageOwnerId(User));
+
+    // Notify user about file move
+    const movedNames = SourceKeys.map((k) => k.split('/').pop() || k);
+    this.NotificationService.EmitToUser(
+      User.Id,
+      NotificationType.FILE_MOVED,
+      'Files Moved',
+      `${movedNames.length} item(s) moved to "${DestinationKey || 'root'}".`,
+      { SourceKeys, DestinationKey, Count: SourceKeys.length },
+    );
+
     return result;
   }
 
@@ -507,6 +521,17 @@ export class CloudService {
         deleted,
       );
       await this.CloudListService.InvalidateListCache(GetStorageOwnerId(User));
+
+      // Notify user about file deletion
+      const deletedNames = files.map((f) => f.Key.split('/').pop() || f.Key);
+      this.NotificationService.EmitToUser(
+        User.Id,
+        NotificationType.FILE_DELETED,
+        'Files Deleted',
+        `${deletedNames.length} file(s) deleted successfully.`,
+        { Keys: files.map((f) => f.Key), Count: files.length },
+      );
+
       return deleted;
     }
     await this.SetIdempotentResult(
@@ -727,6 +752,18 @@ export class CloudService {
       result,
     );
     await this.CloudListService.InvalidateListCache(GetStorageOwnerId(User));
+
+    // Notify user about upload completion
+    const fileName = Key.split('/').pop() || Key;
+    console.log('first');
+    this.NotificationService.EmitToUser(
+      User.Id,
+      NotificationType.UPLOAD_COMPLETE,
+      'Upload Complete',
+      `"${fileName}" has been uploaded successfully.`,
+      { Key, Size: uploadedSize },
+    );
+
     return result;
   }
 

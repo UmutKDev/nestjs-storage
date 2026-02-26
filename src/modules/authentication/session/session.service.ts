@@ -151,7 +151,11 @@ export class SessionService {
   }
 
   async revokeSession(sessionId: string): Promise<void> {
-    const session = await this.getSession(sessionId);
+    // Read session directly from Redis without going through getSession
+    // to avoid infinite recursion (getSession → expired → revokeSession → getSession → ...)
+    const session = await this.redisService.Get<SessionData>(
+      SessionKeys.Session(sessionId),
+    );
     if (session) {
       await this.redisService.Delete(
         SessionKeys.UserSession(session.UserId, sessionId),

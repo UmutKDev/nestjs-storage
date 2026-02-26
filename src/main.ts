@@ -26,7 +26,7 @@ dayjs.extend(timezone);
 
 const corsOrigins =
   process.env.NODE_ENV === 'development'
-    ? ['*', 'http://localhost:3000']
+    ? ['*', 'http://localhost:3001']
     : ['https://api.storage.umutk.me', 'https://storage.umutk.me'];
 
 async function bootstrap() {
@@ -35,7 +35,7 @@ async function bootstrap() {
       origin: corsOrigins,
       credentials: true,
     },
-    logger: ['error', 'warn', 'log', 'fatal'],
+    logger: ['error', 'warn', 'log', 'fatal', 'debug'],
   });
   app.set('query parser', 'extended');
 
@@ -117,6 +117,7 @@ const SwaggerConfig = new DocumentBuilder()
   .addTag('Team')
   .addTag('Team / Members')
   .addTag('Team / Invitations')
+  .addTag('Notification')
   .addCookieAuth('session_id')
   .build();
 

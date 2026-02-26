@@ -10,7 +10,7 @@ export function RequestContextMiddleware(
   asyncLocalStorage.run(new Map(), () => {
     asyncLocalStorage.getStore()?.set('request', req);
     // Global olarak da sakla
-    (globalThis as any).currentRequest = req;
+    globalThis.currentRequest = req;
     next();
   });
 }
