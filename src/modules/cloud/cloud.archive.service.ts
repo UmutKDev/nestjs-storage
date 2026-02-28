@@ -21,16 +21,12 @@ import { randomUUID } from 'crypto';
 import {
   CloudArchiveExtractStartRequestModel,
   CloudArchiveExtractStartResponseModel,
-  CloudArchiveExtractStatusRequestModel,
-  CloudArchiveExtractStatusResponseModel,
   CloudArchiveExtractCancelRequestModel,
   CloudArchiveExtractCancelResponseModel,
   CloudArchivePreviewRequestModel,
   CloudArchivePreviewResponseModel,
   CloudArchiveCreateStartRequestModel,
   CloudArchiveCreateStartResponseModel,
-  CloudArchiveCreateStatusRequestModel,
-  CloudArchiveCreateStatusResponseModel,
   CloudArchiveCreateCancelRequestModel,
   CloudArchiveCreateCancelResponseModel,
 } from './cloud.model';
@@ -47,15 +43,16 @@ import {
 } from './cloud.utils';
 import { RedisService } from '@modules/redis/redis.service';
 import { CloudKeys } from '@modules/redis/redis.keys';
-import { ARCHIVE_CREATE_RESULT_TTL } from '@modules/redis/redis.ttl';
 import { CloudUsageService } from './cloud.usage.service';
 import { CloudListService } from './cloud.list.service';
 import { ArchiveHandlerRegistry } from './archive/archive-handler.registry';
+import { NotificationService } from '@modules/notification/notification.service';
 import {
   ArchiveJobState,
   ArchivePhase,
   ArchiveEntryType,
   ArchiveFormat,
+  NotificationType,
 } from '@common/enums';
 import type {
   ArchiveExtractProgress,
@@ -84,6 +81,7 @@ type ArchiveCreateJobData = {
   keys: string[];
   outputFormat: ArchiveFormat;
   outputKey: string;
+  commonParent: string;
 };
 
 type ArchiveCreateJobResult = {
@@ -197,9 +195,6 @@ export class CloudArchiveService implements OnModuleInit, OnModuleDestroy {
       10,
     ),
   );
-  private readonly CreateTempPrefix =
-    process.env.ARCHIVE_CREATE_TEMP_PREFIX ?? '.tmp/archives';
-
   // ── Preview configuration ─────────────────────────────────────────────────
   private readonly PreviewMaxBytes = Math.max(
     1,
@@ -230,6 +225,7 @@ export class CloudArchiveService implements OnModuleInit, OnModuleDestroy {
     private readonly CloudUsageService: CloudUsageService,
     private readonly CloudListService: CloudListService,
     private readonly ArchiveHandlerRegistry: ArchiveHandlerRegistry,
+    private readonly NotificationService: NotificationService,
   ) {}
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -370,34 +366,6 @@ export class CloudArchiveService implements OnModuleInit, OnModuleDestroy {
     return plainToInstance(CloudArchiveExtractStartResponseModel, {
       JobId: job.id?.toString() ?? '',
       Format: format,
-    });
-  }
-
-  async ArchiveExtractStatus(
-    { JobId }: CloudArchiveExtractStatusRequestModel,
-    User: UserContext,
-  ): Promise<CloudArchiveExtractStatusResponseModel> {
-    this.EnsureExtractQueue();
-
-    const job = await this.ExtractQueue!.getJob(JobId);
-    if (!job) {
-      throw new HttpException('Job not found.', HttpStatus.NOT_FOUND);
-    }
-    if (job.data.userId !== User.Id) {
-      throw new HttpException('Access denied.', HttpStatus.FORBIDDEN);
-    }
-
-    const state = await job.getState();
-    const progress = job.progress as ArchiveExtractProgress | undefined;
-    const result = job.returnvalue as ArchiveExtractJobResult | undefined;
-
-    return plainToInstance(CloudArchiveExtractStatusResponseModel, {
-      JobId: job.id?.toString() ?? JobId,
-      State: state,
-      Format: job.data.format,
-      Progress: progress,
-      ExtractedPath: result?.extractedPath,
-      FailedReason: job.failedReason || undefined,
     });
   }
 
@@ -548,8 +516,9 @@ export class CloudArchiveService implements OnModuleInit, OnModuleDestroy {
 
     const extension = ArchiveFormatExtension(outputFormat);
     const baseName = OutputName?.trim() || 'archive';
+    const commonParent = this.GetCommonParentDirectory(Keys);
     const outputKey = JoinKey(
-      this.CreateTempPrefix,
+      commonParent,
       `${baseName}-${randomUUID()}${extension}`,
     );
 
@@ -559,6 +528,7 @@ export class CloudArchiveService implements OnModuleInit, OnModuleDestroy {
       keys: Keys,
       outputFormat,
       outputKey,
+      commonParent,
     };
 
     const job = await this.CreateQueue!.add('create', jobData);
@@ -567,44 +537,6 @@ export class CloudArchiveService implements OnModuleInit, OnModuleDestroy {
       JobId: job.id?.toString() ?? '',
       Format: outputFormat,
       OutputKey: outputKey,
-    });
-  }
-
-  async ArchiveCreateStatus(
-    { JobId }: CloudArchiveCreateStatusRequestModel,
-    User: UserContext,
-  ): Promise<CloudArchiveCreateStatusResponseModel> {
-    this.EnsureCreateQueue();
-
-    const job = await this.CreateQueue!.getJob(JobId);
-    if (!job) {
-      throw new HttpException('Job not found.', HttpStatus.NOT_FOUND);
-    }
-    if (job.data.userId !== User.Id) {
-      throw new HttpException('Access denied.', HttpStatus.FORBIDDEN);
-    }
-
-    const state = await job.getState();
-    const progress = job.progress as ArchiveCreateProgress | undefined;
-
-    // For completed jobs the result is in Redis (since BullMQ can evict returnvalue)
-    let result = job.returnvalue as ArchiveCreateJobResult | undefined;
-    if (!result && state === ArchiveJobState.COMPLETED) {
-      const cached = await this.RedisService.Get<ArchiveCreateJobResult>(
-        CloudKeys.ArchiveCreateResult(JobId),
-      );
-      if (cached) {
-        result = cached;
-      }
-    }
-
-    return plainToInstance(CloudArchiveCreateStatusResponseModel, {
-      JobId: job.id?.toString() ?? JobId,
-      State: state,
-      Progress: progress,
-      ArchiveKey: result?.archiveKey,
-      ArchiveSize: result?.archiveSize,
-      FailedReason: job.failedReason || undefined,
     });
   }
 
@@ -765,6 +697,13 @@ export class CloudArchiveService implements OnModuleInit, OnModuleDestroy {
                 lastProgressEntries = progress.EntriesProcessed;
                 lastProgressBytes = progress.BytesRead;
                 await job.updateProgress(progress);
+                this.NotificationService.EmitToUser(
+                  job.data.userId,
+                  NotificationType.ARCHIVE_EXTRACT_PROGRESS,
+                  'Extraction Progress',
+                  `Extracting… ${progress.EntriesProcessed} entries`,
+                  { JobId: jobId, ...progress },
+                );
               }
             },
             ShouldCancel: async () => {
@@ -806,12 +745,32 @@ export class CloudArchiveService implements OnModuleInit, OnModuleDestroy {
       );
       await this.CloudListService.InvalidateListCache(user.Id);
 
+      // Notify user
+      const archiveName = key.split('/').pop() || key;
+      this.NotificationService.EmitToUser(
+        job.data.userId,
+        NotificationType.ARCHIVE_EXTRACT_COMPLETE,
+        'Archive Extracted',
+        `"${archiveName}" has been extracted successfully.`,
+        { JobId: jobId, Key: key, ExtractedPath: extractPrefix, Format: format },
+      );
+
       return { extractedPath: extractPrefix };
     } catch (error) {
       this.Logger.error(
         `Failed to extract archive for key ${key} (format=${format})`,
         error,
       );
+
+      const archiveName = key.split('/').pop() || key;
+      this.NotificationService.EmitToUser(
+        job.data.userId,
+        NotificationType.ARCHIVE_EXTRACT_FAILED,
+        'Archive Extraction Failed',
+        `Failed to extract "${archiveName}".`,
+        { JobId: jobId, Key: key, Format: format },
+      );
+
       throw error;
     } finally {
       await this.RedisService.Delete(cancelKey);
@@ -827,7 +786,7 @@ export class CloudArchiveService implements OnModuleInit, OnModuleDestroy {
   ): Promise<ArchiveCreateJobResult> {
     const jobId = job.id?.toString() ?? '';
     const cancelKey = CloudKeys.ArchiveCreateCancel(jobId);
-    const { ownerId, keys, outputFormat, outputKey } = job.data;
+    const { userId, ownerId, keys, outputFormat, outputKey, commonParent } = job.data;
 
     const handler =
       this.ArchiveHandlerRegistry.GetHandlerByFormat(outputFormat);
@@ -839,7 +798,7 @@ export class CloudArchiveService implements OnModuleInit, OnModuleDestroy {
 
     try {
       // Resolve all entries (expand directories)
-      const entries = await this.ResolveCreateEntries(ownerId, keys);
+      const entries = await this.ResolveCreateEntries(ownerId, keys, commonParent);
 
       if (entries.length === 0) {
         throw new Error('No files found to include in the archive.');
@@ -865,6 +824,7 @@ export class CloudArchiveService implements OnModuleInit, OnModuleDestroy {
       const uploadPromise = this.StreamToS3(s3Key, output, outputFormat);
 
       // Start archive creation (pipes data into `output`)
+      let lastProgressEmit = 0;
       const createPromise = handler.Create(
         entries,
         async (entryKey: string) => {
@@ -880,6 +840,17 @@ export class CloudArchiveService implements OnModuleInit, OnModuleDestroy {
         {
           OnProgress: async (progress: ArchiveCreateProgress) => {
             await job.updateProgress(progress);
+            const now = Date.now();
+            if (now - lastProgressEmit >= 500) {
+              lastProgressEmit = now;
+              this.NotificationService.EmitToUser(
+                userId,
+                NotificationType.ARCHIVE_CREATE_PROGRESS,
+                'Archive Progress',
+                `Creating archive… ${progress.EntriesProcessed}/${progress.TotalEntries}`,
+                { JobId: jobId, ...progress },
+              );
+            }
           },
           ShouldCancel: async () => {
             const cancelled = await this.RedisService.Get<boolean>(cancelKey);
@@ -900,15 +871,18 @@ export class CloudArchiveService implements OnModuleInit, OnModuleDestroy {
         archiveSize,
       };
 
-      // Cache result in Redis (in case BullMQ evicts returnvalue)
-      await this.RedisService.Set(
-        CloudKeys.ArchiveCreateResult(jobId),
-        result,
-        ARCHIVE_CREATE_RESULT_TTL,
-      );
-
       // Invalidate listing caches
       await this.CloudListService.InvalidateListCache(ownerId);
+
+      // Notify user
+      const archiveName = outputKey.split('/').pop() || outputKey;
+      this.NotificationService.EmitToUser(
+        userId,
+        NotificationType.ARCHIVE_CREATE_COMPLETE,
+        'Archive Created',
+        `"${archiveName}" has been created successfully.`,
+        { JobId: jobId, Key: outputKey, Size: archiveSize, Format: outputFormat },
+      );
 
       return result;
     } catch (error) {
@@ -916,6 +890,16 @@ export class CloudArchiveService implements OnModuleInit, OnModuleDestroy {
         `Failed to create archive (format=${outputFormat}, outputKey=${outputKey})`,
         error,
       );
+
+      const archiveName = outputKey.split('/').pop() || outputKey;
+      this.NotificationService.EmitToUser(
+        userId,
+        NotificationType.ARCHIVE_CREATE_FAILED,
+        'Archive Creation Failed',
+        `Failed to create "${archiveName}".`,
+        { JobId: jobId, Format: outputFormat },
+      );
+
       throw error;
     } finally {
       await this.RedisService.Delete(cancelKey);
@@ -982,6 +966,7 @@ export class CloudArchiveService implements OnModuleInit, OnModuleDestroy {
   private async ResolveCreateEntries(
     ownerId: string,
     keys: string[],
+    commonParent: string,
   ): Promise<ArchiveCreateEntry[]> {
     const entries: ArchiveCreateEntry[] = [];
 
@@ -1008,14 +993,17 @@ export class CloudArchiveService implements OnModuleInit, OnModuleDestroy {
               continue;
             }
 
-            // Name relative to the owner root
+            // Name relative to the common parent directory
             const relativeName = obj.Key.startsWith(`${ownerId}/`)
               ? obj.Key.slice(ownerId.length + 1)
               : obj.Key;
+            const entryName = relativeName.startsWith(commonParent)
+              ? relativeName.slice(commonParent.length)
+              : relativeName;
 
             entries.push({
               Key: obj.Key,
-              Name: relativeName,
+              Name: entryName,
               Size: Number(obj.Size ?? 0),
             });
           }
@@ -1033,9 +1021,12 @@ export class CloudArchiveService implements OnModuleInit, OnModuleDestroy {
               Key: s3Prefix,
             }),
           );
+          const entryName = key.startsWith(commonParent)
+            ? key.slice(commonParent.length)
+            : key;
           entries.push({
             Key: s3Prefix,
-            Name: key,
+            Name: entryName,
             Size: Number(head.ContentLength ?? 0),
           });
         } catch (error) {
@@ -1135,5 +1126,26 @@ export class CloudArchiveService implements OnModuleInit, OnModuleDestroy {
         HttpStatus.SERVICE_UNAVAILABLE,
       );
     }
+  }
+
+  private GetCommonParentDirectory(keys: string[]): string {
+    if (keys.length === 0) return '';
+
+    const parents = keys.map((key) => {
+      const normalized = key.endsWith('/') ? key.slice(0, -1) : key;
+      const lastSlash = normalized.lastIndexOf('/');
+      return lastSlash >= 0 ? normalized.slice(0, lastSlash + 1) : '';
+    });
+
+    let common = parents[0];
+    for (let i = 1; i < parents.length; i++) {
+      while (common && !parents[i].startsWith(common)) {
+        const trimmed = common.slice(0, -1);
+        const lastSlash = trimmed.lastIndexOf('/');
+        common = lastSlash >= 0 ? trimmed.slice(0, lastSlash + 1) : '';
+      }
+    }
+
+    return common;
   }
 }

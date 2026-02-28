@@ -8,16 +8,12 @@ import {
   CloudCompleteMultipartUploadResponseModel,
   CloudArchiveExtractStartRequestModel,
   CloudArchiveExtractStartResponseModel,
-  CloudArchiveExtractStatusRequestModel,
-  CloudArchiveExtractStatusResponseModel,
   CloudArchiveExtractCancelRequestModel,
   CloudArchiveExtractCancelResponseModel,
   CloudArchivePreviewRequestModel,
   CloudArchivePreviewResponseModel,
   CloudArchiveCreateStartRequestModel,
   CloudArchiveCreateStartResponseModel,
-  CloudArchiveCreateStatusRequestModel,
-  CloudArchiveCreateStatusResponseModel,
   CloudArchiveCreateCancelRequestModel,
   CloudArchiveCreateCancelResponseModel,
   CloudCreateMultipartUploadRequestModel,
@@ -791,13 +787,6 @@ export class CloudService {
     return this.CloudArchiveService.ArchiveExtractStart(model, User);
   }
 
-  async ArchiveExtractStatus(
-    model: CloudArchiveExtractStatusRequestModel,
-    User: UserContext,
-  ): Promise<CloudArchiveExtractStatusResponseModel> {
-    return this.CloudArchiveService.ArchiveExtractStatus(model, User);
-  }
-
   async ArchiveExtractCancel(
     model: CloudArchiveExtractCancelRequestModel,
     User: UserContext,
@@ -831,13 +820,6 @@ export class CloudService {
     User: UserContext,
   ): Promise<CloudArchiveCreateStartResponseModel> {
     return this.CloudArchiveService.ArchiveCreateStart(model, User);
-  }
-
-  async ArchiveCreateStatus(
-    model: CloudArchiveCreateStatusRequestModel,
-    User: UserContext,
-  ): Promise<CloudArchiveCreateStatusResponseModel> {
-    return this.CloudArchiveService.ArchiveCreateStatus(model, User);
   }
 
   async ArchiveCreateCancel(

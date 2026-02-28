@@ -1,8 +1,6 @@
 import {
   ArchiveEntryType,
   ArchiveFormat,
-  ArchiveJobState,
-  ArchivePhase,
   CloudBreadcrumbLevelType,
   ScanStatus,
 } from '@common/enums';
@@ -440,66 +438,6 @@ export class CloudArchiveExtractStartResponseModel {
   Format: string;
 }
 
-export class CloudArchiveExtractStatusRequestModel {
-  @ApiProperty()
-  @IsString()
-  @IsNotEmpty()
-  JobId: string;
-}
-
-export class CloudArchiveExtractProgressModel {
-  @Expose()
-  @ApiProperty({ enum: ArchivePhase })
-  Phase: string;
-
-  @Expose()
-  @ApiProperty()
-  EntriesProcessed: number;
-
-  @Expose()
-  @ApiProperty({ required: false })
-  TotalEntries?: number;
-
-  @Expose()
-  @ApiProperty()
-  BytesRead: number;
-
-  @Expose()
-  @ApiProperty()
-  TotalBytes: number;
-
-  @Expose()
-  @ApiProperty({ required: false })
-  CurrentEntry?: string;
-}
-
-export class CloudArchiveExtractStatusResponseModel {
-  @Expose()
-  @ApiProperty()
-  JobId: string;
-
-  @Expose()
-  @ApiProperty({ enum: ArchiveJobState })
-  State: string;
-
-  @Expose()
-  @ApiProperty({ required: false, enum: ArchiveFormat })
-  Format?: string;
-
-  @Expose()
-  @Type(() => CloudArchiveExtractProgressModel)
-  @ApiProperty({ required: false, type: CloudArchiveExtractProgressModel })
-  Progress?: CloudArchiveExtractProgressModel;
-
-  @Expose()
-  @ApiProperty({ required: false })
-  ExtractedPath?: string;
-
-  @Expose()
-  @ApiProperty({ required: false })
-  FailedReason?: string;
-}
-
 export class CloudArchiveExtractCancelRequestModel {
   @ApiProperty()
   @IsString()
@@ -604,39 +542,6 @@ export class CloudArchiveCreateStartResponseModel {
   @Expose()
   @ApiProperty({ description: 'S3 key where the archive will be created' })
   OutputKey: string;
-}
-
-export class CloudArchiveCreateStatusRequestModel {
-  @ApiProperty()
-  @IsString()
-  @IsNotEmpty()
-  JobId: string;
-}
-
-export class CloudArchiveCreateStatusResponseModel {
-  @Expose()
-  @ApiProperty()
-  JobId: string;
-
-  @Expose()
-  @ApiProperty({ enum: ArchiveJobState })
-  State: string;
-
-  @Expose()
-  @ApiProperty({ required: false, type: Object })
-  Progress?: Record<string, unknown>;
-
-  @Expose()
-  @ApiProperty({ required: false })
-  ArchiveKey?: string;
-
-  @Expose()
-  @ApiProperty({ required: false })
-  ArchiveSize?: number;
-
-  @Expose()
-  @ApiProperty({ required: false })
-  FailedReason?: string;
 }
 
 export class CloudArchiveCreateCancelRequestModel {

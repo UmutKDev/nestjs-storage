@@ -9,16 +9,12 @@ import { CloudService } from './cloud.service';
 import {
   CloudArchiveExtractStartRequestModel,
   CloudArchiveExtractStartResponseModel,
-  CloudArchiveExtractStatusRequestModel,
-  CloudArchiveExtractStatusResponseModel,
   CloudArchiveExtractCancelRequestModel,
   CloudArchiveExtractCancelResponseModel,
   CloudArchivePreviewRequestModel,
   CloudArchivePreviewResponseModel,
   CloudArchiveCreateStartRequestModel,
   CloudArchiveCreateStartResponseModel,
-  CloudArchiveCreateStatusRequestModel,
-  CloudArchiveCreateStatusResponseModel,
   CloudArchiveCreateCancelRequestModel,
   CloudArchiveCreateCancelResponseModel,
 } from './cloud.model';
@@ -50,7 +46,7 @@ export class CloudArchiveController {
   @ApiOperation({
     summary: 'Start archive extraction',
     description:
-      'Starts an async job to extract a .zip, .tar, .tar.gz, or .rar archive. Optionally provide SelectedEntries for selective extraction.',
+      'Starts an async job to extract a .zip, .tar, .tar.gz, or .rar archive. Optionally provide SelectedEntries for selective extraction. Progress and completion are pushed via WebSocket notifications.',
   })
   @Post('Extract/Start')
   @ApiHeader({
@@ -65,20 +61,6 @@ export class CloudArchiveController {
     @Headers(FOLDER_SESSION_HEADER) sessionToken?: string,
   ): Promise<CloudArchiveExtractStartResponseModel> {
     return this.cloudService.ArchiveExtractStart(model, user, sessionToken);
-  }
-
-  @ApiOperation({
-    summary: 'Get archive extraction status',
-    description:
-      'Returns the current status/progress of an archive extraction job.',
-  })
-  @Get('Extract/Status')
-  @ApiSuccessResponse(CloudArchiveExtractStatusResponseModel)
-  async ArchiveExtractStatus(
-    @Query() model: CloudArchiveExtractStatusRequestModel,
-    @User() user: UserContext,
-  ): Promise<CloudArchiveExtractStatusResponseModel> {
-    return this.cloudService.ArchiveExtractStatus(model, user);
   }
 
   @CheckPolicies((Ability) =>
@@ -124,7 +106,7 @@ export class CloudArchiveController {
   @ApiOperation({
     summary: 'Start archive creation',
     description:
-      'Creates a .zip, .tar, or .tar.gz archive from the given keys (files and/or directories). Returns a job ID to track progress.',
+      'Creates a .zip, .tar, or .tar.gz archive from the given keys (files and/or directories). Returns a job ID. Progress and completion are pushed via WebSocket notifications.',
   })
   @Post('Create/Start')
   @ApiSuccessResponse(CloudArchiveCreateStartResponseModel)
@@ -133,20 +115,6 @@ export class CloudArchiveController {
     @User() user: UserContext,
   ): Promise<CloudArchiveCreateStartResponseModel> {
     return this.cloudService.ArchiveCreateStart(model, user);
-  }
-
-  @ApiOperation({
-    summary: 'Get archive creation status',
-    description:
-      'Returns the current status/progress of an archive creation job.',
-  })
-  @Get('Create/Status')
-  @ApiSuccessResponse(CloudArchiveCreateStatusResponseModel)
-  async ArchiveCreateStatus(
-    @Query() model: CloudArchiveCreateStatusRequestModel,
-    @User() user: UserContext,
-  ): Promise<CloudArchiveCreateStatusResponseModel> {
-    return this.cloudService.ArchiveCreateStatus(model, user);
   }
 
   @CheckPolicies((Ability) =>

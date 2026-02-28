@@ -26,7 +26,7 @@ dayjs.extend(timezone);
 
 const corsOrigins =
   process.env.NODE_ENV === 'development'
-    ? ['*', 'http://localhost:3001']
+    ? ['*', 'http://localhost:3000']
     : ['https://api.storage.umutk.me', 'https://storage.umutk.me'];
 
 async function bootstrap() {
