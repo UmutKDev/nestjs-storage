@@ -752,7 +752,12 @@ export class CloudArchiveService implements OnModuleInit, OnModuleDestroy {
         NotificationType.ARCHIVE_EXTRACT_COMPLETE,
         'Archive Extracted',
         `"${archiveName}" has been extracted successfully.`,
-        { JobId: jobId, Key: key, ExtractedPath: extractPrefix, Format: format },
+        {
+          JobId: jobId,
+          Key: key,
+          ExtractedPath: extractPrefix,
+          Format: format,
+        },
       );
 
       return { extractedPath: extractPrefix };
@@ -786,7 +791,8 @@ export class CloudArchiveService implements OnModuleInit, OnModuleDestroy {
   ): Promise<ArchiveCreateJobResult> {
     const jobId = job.id?.toString() ?? '';
     const cancelKey = CloudKeys.ArchiveCreateCancel(jobId);
-    const { userId, ownerId, keys, outputFormat, outputKey, commonParent } = job.data;
+    const { userId, ownerId, keys, outputFormat, outputKey, commonParent } =
+      job.data;
 
     const handler =
       this.ArchiveHandlerRegistry.GetHandlerByFormat(outputFormat);
@@ -798,7 +804,11 @@ export class CloudArchiveService implements OnModuleInit, OnModuleDestroy {
 
     try {
       // Resolve all entries (expand directories)
-      const entries = await this.ResolveCreateEntries(ownerId, keys, commonParent);
+      const entries = await this.ResolveCreateEntries(
+        ownerId,
+        keys,
+        commonParent,
+      );
 
       if (entries.length === 0) {
         throw new Error('No files found to include in the archive.');
@@ -881,7 +891,12 @@ export class CloudArchiveService implements OnModuleInit, OnModuleDestroy {
         NotificationType.ARCHIVE_CREATE_COMPLETE,
         'Archive Created',
         `"${archiveName}" has been created successfully.`,
-        { JobId: jobId, Key: outputKey, Size: archiveSize, Format: outputFormat },
+        {
+          JobId: jobId,
+          Key: outputKey,
+          Size: archiveSize,
+          Format: outputFormat,
+        },
       );
 
       return result;
