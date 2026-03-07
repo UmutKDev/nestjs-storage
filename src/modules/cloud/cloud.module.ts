@@ -34,7 +34,7 @@ import { CloudScanService } from './cloud.scan.service';
           secretAccessKey: process.env.S3_PROTOCOL_ACCESS_KEY_SECRET,
         },
         requestHandler: {
-          httpsAgent: new Agent({ keepAlive: true }),
+          httpsAgent: new Agent({ keepAlive: false }),
         },
       }),
     }),
