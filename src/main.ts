@@ -118,7 +118,32 @@ const SwaggerConfig = new DocumentBuilder()
   .addTag('Team / Members')
   .addTag('Team / Invitations')
   .addTag('Notification')
+  .addTag('API / Storage')
+  .addTag('API / Upload')
+  .addTag('API / Download')
+  .addTag('API / Directories')
+  .addTag('API / Archive')
+  .addTag('API / Webhooks')
+  .addTag('API / Usage')
   .addCookieAuth('session_id')
+  .addApiKey(
+    {
+      type: 'apiKey',
+      name: 'x-api-key',
+      in: 'header',
+      description: 'API Public Key',
+    },
+    'api-key',
+  )
+  .addApiKey(
+    {
+      type: 'apiKey',
+      name: 'x-api-secret',
+      in: 'header',
+      description: 'API Secret Key',
+    },
+    'api-secret',
+  )
   .build();
 
 bootstrap();

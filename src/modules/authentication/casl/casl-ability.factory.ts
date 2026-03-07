@@ -64,6 +64,12 @@ export class CaslAbilityFactory {
     can(CaslAction.Manage, CaslSubject.TwoFactor);
     can(CaslAction.Manage, CaslSubject.ApiKey);
 
+    // Webhooks
+    can(CaslAction.Create, CaslSubject.Webhook);
+    can(CaslAction.Read, CaslSubject.Webhook);
+    can(CaslAction.Update, CaslSubject.Webhook);
+    can(CaslAction.Delete, CaslSubject.Webhook);
+
     // Definitions: read-only
     can(CaslAction.Read, CaslSubject.Definition);
 

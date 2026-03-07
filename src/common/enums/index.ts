@@ -6,3 +6,4 @@ export * from './authentication.enum';
 export * from './casl.enum';
 export * from './team.enum';
 export * from './notification.enum';
+export * from './api.enum';

@@ -22,6 +22,13 @@ export const CLOUD_UPLOAD_THROTTLE = {
   },
 };
 
+export const CLOUD_UPLOAD_PART_THROTTLE = {
+  default: {
+    ttl: Number(process.env.CLOUD_UPLOAD_PART_RATE_TTL ?? 60000),
+    limit: Number(process.env.CLOUD_UPLOAD_PART_RATE_LIMIT ?? 600),
+  },
+};
+
 export const CLOUD_DOWNLOAD_THROTTLE = {
   default: {
     ttl: Number(process.env.CLOUD_DOWNLOAD_RATE_TTL ?? 60000),

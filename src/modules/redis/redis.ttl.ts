@@ -114,3 +114,45 @@ export const TEAM_DETAIL_CACHE_TTL = 600;
 
 /** Team invitation expiry — 7 days */
 export const TEAM_INVITATION_EXPIRY = 60 * 60 * 24 * 7;
+
+// ─── API Usage ──────────────────────────────────────────────────────────────
+
+/** Monthly usage counter TTL — 35 days (outlives the billing month) */
+export const API_USAGE_MONTHLY_TTL = 60 * 60 * 24 * 35;
+
+/** Daily usage counter TTL — 48 hours */
+export const API_USAGE_DAILY_TTL = 60 * 60 * 48;
+
+/** Usage log buffer entry TTL — 1 hour (flushed every 5 minutes) */
+export const API_USAGE_BUFFER_TTL = 3600;
+
+// ─── API Rate Limiting ──────────────────────────────────────────────────────
+
+/** Sliding window counter TTL — 120 seconds (2× the 60-second window) */
+export const API_RATE_LIMIT_WINDOW_TTL = 120;
+
+/** Burst counter TTL — 2 seconds */
+export const API_RATE_LIMIT_BURST_TTL = 2;
+
+// ─── API Idempotency ────────────────────────────────────────────────────────
+
+/** API idempotency result cache — 24 hours (env-overridable) */
+export const API_IDEMPOTENCY_TTL = envInt('API_IDEMPOTENCY_TTL_SECONDS', 86400);
+
+// ─── API Signature ──────────────────────────────────────────────────────────
+
+/** Nonce TTL for replay prevention — 5 minutes (matches timestamp window) */
+export const API_SIGNATURE_NONCE_TTL = 300;
+
+// ─── Webhook ────────────────────────────────────────────────────────────────
+
+/** Cached user webhooks — 5 minutes */
+export const WEBHOOK_USER_CACHE_TTL = 300;
+
+/** Webhook delivery context TTL — 1 hour */
+export const WEBHOOK_DISPATCH_TTL = 3600;
+
+// ─── Geolocation ────────────────────────────────────────────────────────────
+
+/** IP geolocation cache — 24 hours */
+export const API_GEO_CACHE_TTL = 86400;

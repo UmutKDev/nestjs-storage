@@ -33,4 +33,5 @@ export enum CaslSubject {
   TeamCloudDirectory = 'TeamCloudDirectory',
   TeamCloudUpload = 'TeamCloudUpload',
   TeamCloudArchive = 'TeamCloudArchive',
+  Webhook = 'Webhook',
 }

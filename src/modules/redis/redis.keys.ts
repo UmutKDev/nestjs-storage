@@ -230,3 +230,71 @@ export namespace TeamKeys {
   export const UserInvitations = (email: string) =>
     `team:user-invitations:${email}`;
 }
+
+// ─── API Usage Keys ──────────────────────────────────────────────────────────
+
+export namespace ApiUsageKeys {
+  /** api:usage:monthly:{userId}:{YYYY-MM} — monthly request counter */
+  export const MonthlyCounter = (userId: string, yearMonth: string) =>
+    `api:usage:monthly:${userId}:${yearMonth}`;
+
+  /** api:usage:daily:{userId}:{YYYY-MM-DD} — daily request counter */
+  export const DailyCounter = (userId: string, date: string) =>
+    `api:usage:daily:${userId}:${date}`;
+
+  /** api:usage:buffer:pending — Redis list of buffered usage log entries awaiting DB flush */
+  export const FlushBuffer = `api:usage:buffer:pending`;
+
+  /** api:usage:endpoint:{userId}:{YYYY-MM}:{endpoint} — per-endpoint counter */
+  export const EndpointCounter = (
+    userId: string,
+    yearMonth: string,
+    endpoint: string,
+  ) =>
+    `api:usage:endpoint:${userId}:${yearMonth}:${encodeURIComponent(endpoint)}`;
+}
+
+// ─── API Rate Limit Keys ────────────────────────────────────────────────────
+
+export namespace ApiRateLimitKeys {
+  /** api:rate:{apiKeyId}:{windowStart} — sliding window counter */
+  export const Window = (apiKeyId: string, windowStart: number) =>
+    `api:rate:${apiKeyId}:${windowStart}`;
+
+  /** api:rate:burst:{apiKeyId} — burst counter (per-second) */
+  export const Burst = (apiKeyId: string) => `api:rate:burst:${apiKeyId}`;
+}
+
+// ─── API Idempotency Keys ───────────────────────────────────────────────────
+
+export namespace ApiIdempotencyKeys {
+  /** api:idempotency:{userId}:{idempotencyKey} — cached result */
+  export const Result = (userId: string, idempotencyKey: string) =>
+    `api:idempotency:${userId}:${idempotencyKey}`;
+}
+
+// ─── API Signature Keys ─────────────────────────────────────────────────────
+
+export namespace ApiSignatureKeys {
+  /** api:nonce:{apiKeyId}:{nonce} — replay prevention */
+  export const Nonce = (apiKeyId: string, nonce: string) =>
+    `api:nonce:${apiKeyId}:${nonce}`;
+}
+
+// ─── Webhook Keys ───────────────────────────────────────────────────────────
+
+export namespace WebhookKeys {
+  /** webhook:user:{userId} — cached list of user's active webhooks */
+  export const UserWebhooks = (userId: string) => `webhook:user:${userId}`;
+
+  /** webhook:dispatch:{deliveryId} — pending delivery context */
+  export const Dispatch = (deliveryId: string) =>
+    `webhook:dispatch:${deliveryId}`;
+}
+
+// ─── API Geolocation Keys ───────────────────────────────────────────────────
+
+export namespace ApiGeoKeys {
+  /** api:geo:{ipAddress} — cached geo lookup result */
+  export const IpGeo = (ipAddress: string) => `api:geo:${ipAddress}`;
+}

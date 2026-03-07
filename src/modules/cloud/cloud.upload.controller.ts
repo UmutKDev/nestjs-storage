@@ -39,6 +39,7 @@ import { SizeFormatter } from '@common/helpers/cast.helper';
 import {
   FOLDER_SESSION_HEADER,
   CLOUD_UPLOAD_THROTTLE,
+  CLOUD_UPLOAD_PART_THROTTLE,
 } from './cloud.constants';
 import { TEAM_ID_HEADER } from '@modules/team/guards/team-context.guard';
 import { CheckPolicies } from '@modules/authentication/casl/check-policies.decorator';
@@ -147,7 +148,7 @@ export class CloudUploadController {
       'Accepts a single file part for a multipart upload. The request must be multipart/form-data.',
   })
   @Post('UploadPart')
-  @Throttle(CLOUD_UPLOAD_THROTTLE)
+  @Throttle(CLOUD_UPLOAD_PART_THROTTLE)
   @ApiConsumes('multipart/form-data')
   @ApiBody({
     type: CloudUploadPartRequestModel,

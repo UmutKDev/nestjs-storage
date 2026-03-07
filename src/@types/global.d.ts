@@ -119,6 +119,15 @@ export declare global {
       APP_NAME?: string;
       CLIENT_APP_URL: string;
       API_APP_URL: string;
+
+      // API Access System
+      API_IDEMPOTENCY_TTL_SECONDS?: string;
+      GEOIP_DB_PATH?: string;
+
+      // MongoDB Configuration
+      MONGO_URI?: string;
+      MONGO_DATABASE?: string;
+      MONGO_ENABLED?: string;
     }
   }
 
@@ -131,6 +140,7 @@ export declare global {
     Image?: string;
     TeamId?: string;
     TeamRole?: TeamRole;
+    ApiKeyId?: string;
   }
 
   interface TeamContext {
@@ -193,6 +203,52 @@ export declare global {
 
       const enum Subscription {
         NOT_FOUND = 'SU-001',
+      }
+
+      const enum Api {
+        // Authentication (AP-1xx)
+        INVALID_API_KEY = 'AP-101',
+        API_KEY_EXPIRED = 'AP-102',
+        API_KEY_REVOKED = 'AP-103',
+        INSUFFICIENT_SCOPES = 'AP-104',
+        IP_NOT_WHITELISTED = 'AP-105',
+
+        // Signature (AP-2xx)
+        SIGNATURE_REQUIRED = 'AP-201',
+        SIGNATURE_INVALID = 'AP-202',
+        TIMESTAMP_EXPIRED = 'AP-203',
+        NONCE_REUSED = 'AP-204',
+        SIGNATURE_MALFORMED = 'AP-205',
+
+        // Rate Limiting (AP-3xx)
+        RATE_LIMIT_EXCEEDED = 'AP-301',
+        BURST_LIMIT_EXCEEDED = 'AP-302',
+        MONTHLY_QUOTA_EXCEEDED = 'AP-303',
+        DAILY_QUOTA_EXCEEDED = 'AP-304',
+
+        // Idempotency (AP-4xx)
+        IDEMPOTENCY_KEY_REQUIRED = 'AP-401',
+        IDEMPOTENCY_KEY_CONFLICT = 'AP-402',
+        IDEMPOTENCY_KEY_TOO_LONG = 'AP-403',
+
+        // Webhook (AP-5xx)
+        WEBHOOK_NOT_FOUND = 'AP-501',
+        WEBHOOK_URL_INVALID = 'AP-502',
+        WEBHOOK_LIMIT_EXCEEDED = 'AP-503',
+        WEBHOOK_DELIVERY_NOT_FOUND = 'AP-504',
+        WEBHOOK_DISABLED = 'AP-505',
+
+        // Usage (AP-6xx)
+        USAGE_DATA_NOT_AVAILABLE = 'AP-601',
+
+        // Version (AP-7xx)
+        VERSION_NOT_SUPPORTED = 'AP-701',
+        VERSION_DEPRECATED = 'AP-702',
+
+        // General (AP-9xx)
+        SUBSCRIPTION_REQUIRED = 'AP-901',
+        TIER_UPGRADE_REQUIRED = 'AP-902',
+        FEATURE_NOT_AVAILABLE = 'AP-903',
       }
     }
   }
