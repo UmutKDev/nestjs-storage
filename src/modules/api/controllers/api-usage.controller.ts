@@ -1,15 +1,8 @@
-import {
-  Controller,
-  Get,
-  Query,
-  UseGuards,
-  UseInterceptors,
-} from '@nestjs/common';
+import { Controller, Get, UseGuards, UseInterceptors } from '@nestjs/common';
 import { ApiHeader, ApiTags } from '@nestjs/swagger';
 import { Public } from '@common/decorators/public.decorator';
 import { User } from '@common/decorators/user.decorator';
 import { ApiKeyScope } from '@common/enums/authentication.enum';
-import { PaginationRequestModel } from '@common/models/pagination.model';
 import { plainToInstance } from 'class-transformer';
 import dayjs from 'dayjs';
 import { ApiAuthGuard } from '../guards/api-auth.guard';
@@ -22,11 +15,7 @@ import { ApiUsageTrackingInterceptor } from '../interceptors/api-usage-tracking.
 import { ApiScopes } from '../decorators/api-scopes.decorator';
 import { ApiUsageService } from '../services/api-usage.service';
 import { ApiQuotaService } from '../services/api-quota.service';
-import {
-  ApiUsageCurrentResponseModel,
-  ApiUsageHistoryItemModel,
-  ApiEndpointUsageItemModel,
-} from '../api.model';
+import { ApiUsageCurrentResponseModel } from '../api.model';
 
 @Controller({ path: 'Usage', version: '1' })
 @ApiTags('API / Usage')
@@ -75,40 +64,5 @@ export class ApiUsageController {
       },
       { excludeExtraneousValues: true },
     );
-  }
-
-  @Get('History')
-  @ApiScopes(ApiKeyScope.READ)
-  async History(
-    @Query() query: PaginationRequestModel,
-    @User() user: UserContext,
-  ): Promise<ApiUsageHistoryItemModel[]> {
-    const result = await this.ApiUsageService.GetUsageHistory(
-      user.Id,
-      query.Skip,
-      query.Take,
-    );
-
-    return plainToInstance(ApiUsageHistoryItemModel, result.Items, {
-      excludeExtraneousValues: true,
-    });
-  }
-
-  @Get('Endpoints')
-  @ApiScopes(ApiKeyScope.READ)
-  async Endpoints(
-    @Query() query: PaginationRequestModel,
-    @User() user: UserContext,
-  ): Promise<ApiEndpointUsageItemModel[]> {
-    const yearMonth = dayjs().format('YYYY-MM');
-
-    const items = await this.ApiUsageService.GetEndpointBreakdown(
-      user.Id,
-      yearMonth,
-    );
-
-    return plainToInstance(ApiEndpointUsageItemModel, items, {
-      excludeExtraneousValues: true,
-    });
   }
 }

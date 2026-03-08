@@ -37,7 +37,6 @@ import { ApiStorageController } from './controllers/api-storage.controller';
 import { ApiUploadController } from './controllers/api-upload.controller';
 import { ApiDownloadController } from './controllers/api-download.controller';
 import { ApiDirectoryController } from './controllers/api-directory.controller';
-import { ApiArchiveController } from './controllers/api-archive.controller';
 import { ApiWebhookController } from './controllers/api-webhook.controller';
 import { ApiUsageController } from './controllers/api-usage.controller';
 
@@ -58,7 +57,6 @@ import { ApiUsageController } from './controllers/api-usage.controller';
     ApiUploadController,
     ApiDownloadController,
     ApiDirectoryController,
-    ApiArchiveController,
     ApiWebhookController,
     ApiUsageController,
   ],

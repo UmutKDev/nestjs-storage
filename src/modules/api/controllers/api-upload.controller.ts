@@ -17,6 +17,8 @@ import {
   CloudCreateMultipartUploadResponseModel,
   CloudGetMultipartPartUrlRequestModel,
   CloudGetMultipartPartUrlResponseModel,
+  CloudGetMultipartPartUrlsBatchRequestModel,
+  CloudGetMultipartPartUrlsBatchResponseModel,
   CloudCompleteMultipartUploadRequestModel,
   CloudCompleteMultipartUploadResponseModel,
   CloudAbortMultipartUploadRequestModel,
@@ -63,6 +65,15 @@ export class ApiUploadController {
     @User() user: UserContext,
   ): Promise<CloudGetMultipartPartUrlResponseModel> {
     return this.CloudService.UploadGetMultipartPartUrl(model, user);
+  }
+
+  @Post('GetMultipartPartUrls')
+  @ApiScopes(ApiKeyScope.WRITE)
+  async GetMultipartPartUrls(
+    @Body() model: CloudGetMultipartPartUrlsBatchRequestModel,
+    @User() user: UserContext,
+  ): Promise<CloudGetMultipartPartUrlsBatchResponseModel> {
+    return this.CloudService.UploadGetMultipartPartUrlsBatch(model, user);
   }
 
   @Post('CompleteMultipartUpload')

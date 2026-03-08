@@ -19,6 +19,10 @@ import {
   MinLength,
   ValidateIf,
   Matches,
+  Min,
+  Max,
+  ArrayMinSize,
+  ArrayMaxSize,
 } from 'class-validator';
 
 export class CloudBreadCrumbModel {
@@ -332,6 +336,59 @@ export class CloudGetMultipartPartUrlResponseModel {
   @Expose()
   @ApiProperty()
   Expires: number;
+}
+
+export class CloudGetMultipartPartUrlsBatchRequestModel {
+  @Expose()
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  @Transform(({ value }) => S3KeyConverter(value))
+  Key: string;
+
+  @Expose()
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  UploadId: string;
+
+  @Expose()
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  @Max(10000)
+  TotalParts?: number;
+
+  @Expose()
+  @ApiProperty({ required: false, type: [Number] })
+  @IsOptional()
+  @IsArray()
+  @IsNumber({}, { each: true })
+  @ArrayMinSize(1)
+  @ArrayMaxSize(10000)
+  PartNumbers?: number[];
+}
+
+export class CloudMultipartPartUrlModel {
+  @Expose()
+  @ApiProperty()
+  PartNumber: number;
+
+  @Expose()
+  @ApiProperty()
+  Url: string;
+
+  @Expose()
+  @ApiProperty()
+  Expires: number;
+}
+
+export class CloudGetMultipartPartUrlsBatchResponseModel {
+  @Expose()
+  @ApiProperty({ type: CloudMultipartPartUrlModel, isArray: true })
+  @Type(() => CloudMultipartPartUrlModel)
+  Parts: CloudMultipartPartUrlModel[];
 }
 
 export class CloudUploadPartRequestModel {

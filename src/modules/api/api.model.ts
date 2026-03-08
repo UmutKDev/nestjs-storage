@@ -47,38 +47,6 @@ export class ApiUsageCurrentResponseModel {
   BillingPeriod: string;
 }
 
-export class ApiUsageHistoryItemModel {
-  @Expose()
-  @ApiProperty()
-  Date: string;
-
-  @Expose()
-  @ApiProperty()
-  RequestCount: number;
-
-  @Expose()
-  @ApiProperty()
-  AvgResponseTimeMs: number;
-}
-
-export class ApiEndpointUsageItemModel {
-  @Expose()
-  @ApiProperty()
-  Endpoint: string;
-
-  @Expose()
-  @ApiProperty()
-  Method: string;
-
-  @Expose()
-  @ApiProperty()
-  RequestCount: number;
-
-  @Expose()
-  @ApiProperty()
-  AvgResponseTimeMs: number;
-}
-
 // ============================================================================
 // WEBHOOK REQUEST MODELS
 // ============================================================================

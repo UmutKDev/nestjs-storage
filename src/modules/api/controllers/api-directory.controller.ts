@@ -3,7 +3,6 @@ import {
   Controller,
   Delete,
   Post,
-  Put,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
@@ -14,7 +13,6 @@ import { ApiKeyScope } from '@common/enums/authentication.enum';
 import { CloudService } from '@modules/cloud/cloud.service';
 import {
   DirectoryCreateRequestModel,
-  DirectoryRenameRequestModel,
   DirectoryDeleteRequestModel,
   DirectoryResponseModel,
 } from '@modules/cloud/cloud.model';
@@ -50,16 +48,6 @@ export class ApiDirectoryController {
     @User() user: UserContext,
   ): Promise<DirectoryResponseModel> {
     return this.CloudService.DirectoryCreate(model, undefined, user);
-  }
-
-  @Put('Rename')
-  @ApiScopes(ApiKeyScope.WRITE)
-  @Idempotent()
-  async Rename(
-    @Body() model: DirectoryRenameRequestModel,
-    @User() user: UserContext,
-  ): Promise<DirectoryResponseModel> {
-    return this.CloudService.DirectoryRename(model, undefined, user);
   }
 
   @Delete()

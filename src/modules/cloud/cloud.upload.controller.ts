@@ -28,6 +28,8 @@ import {
   CloudCreateMultipartUploadResponseModel,
   CloudGetMultipartPartUrlRequestModel,
   CloudGetMultipartPartUrlResponseModel,
+  CloudGetMultipartPartUrlsBatchRequestModel,
+  CloudGetMultipartPartUrlsBatchResponseModel,
   CloudUploadPartRequestModel,
   CloudUploadPartResponseModel,
 } from './cloud.model';
@@ -136,6 +138,31 @@ export class CloudUploadController {
     @Headers(FOLDER_SESSION_HEADER) sessionToken?: string,
   ): Promise<CloudGetMultipartPartUrlResponseModel> {
     return this.cloudService.UploadGetMultipartPartUrl(
+      model,
+      user,
+      sessionToken,
+    );
+  }
+
+  @ApiOperation({
+    summary: 'Get multipart upload part URLs in batch',
+    description:
+      'Returns expiring URLs for multiple parts at once. Accepts either TotalParts or specific PartNumbers.',
+  })
+  @Post('GetMultipartPartUrls')
+  @Throttle(CLOUD_UPLOAD_THROTTLE)
+  @ApiHeader({
+    name: FOLDER_SESSION_HEADER,
+    required: false,
+    description: 'Session token for encrypted folder access',
+  })
+  @ApiSuccessResponse(CloudGetMultipartPartUrlsBatchResponseModel)
+  async UploadGetMultipartPartUrlsBatch(
+    @Body() model: CloudGetMultipartPartUrlsBatchRequestModel,
+    @User() user: UserContext,
+    @Headers(FOLDER_SESSION_HEADER) sessionToken?: string,
+  ): Promise<CloudGetMultipartPartUrlsBatchResponseModel> {
+    return this.cloudService.UploadGetMultipartPartUrlsBatch(
       model,
       user,
       sessionToken,

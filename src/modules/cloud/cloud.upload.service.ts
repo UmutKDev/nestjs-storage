@@ -5,6 +5,7 @@ import {
   UploadPartCommand,
 } from '@aws-sdk/client-s3';
 import { Injectable } from '@nestjs/common';
+import { HttpException, HttpStatus } from '@nestjs/common';
 import { plainToInstance } from 'class-transformer';
 import {
   CloudAbortMultipartUploadRequestModel,
@@ -14,6 +15,8 @@ import {
   CloudCreateMultipartUploadResponseModel,
   CloudGetMultipartPartUrlRequestModel,
   CloudGetMultipartPartUrlResponseModel,
+  CloudGetMultipartPartUrlsBatchRequestModel,
+  CloudGetMultipartPartUrlsBatchResponseModel,
   CloudUploadPartRequestModel,
   CloudUploadPartResponseModel,
 } from './cloud.model';
@@ -69,6 +72,60 @@ export class CloudUploadService {
     return plainToInstance(CloudGetMultipartPartUrlResponseModel, {
       Url: url,
       Expires: this.PresignedUrlExpirySeconds,
+    });
+  }
+
+  async UploadGetMultipartPartUrlsBatch(
+    {
+      Key,
+      UploadId,
+      TotalParts,
+      PartNumbers,
+    }: CloudGetMultipartPartUrlsBatchRequestModel,
+    User: UserContext,
+  ): Promise<CloudGetMultipartPartUrlsBatchResponseModel> {
+    if (!TotalParts && (!PartNumbers || PartNumbers.length === 0)) {
+      throw new HttpException(
+        'Either TotalParts or PartNumbers must be provided.',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+    if (TotalParts && PartNumbers && PartNumbers.length > 0) {
+      throw new HttpException(
+        'TotalParts and PartNumbers are mutually exclusive. Provide only one.',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const resolvedPartNumbers: number[] = PartNumbers
+      ? PartNumbers
+      : Array.from({ length: TotalParts }, (_, i) => i + 1);
+
+    const parts = await Promise.all(
+      resolvedPartNumbers.map(async (partNumber) => {
+        const command = new UploadPartCommand({
+          Bucket: this.CloudS3Service.GetBuckets().Storage,
+          Key: KeyBuilder([GetStorageOwnerId(User), Key]),
+          UploadId: UploadId,
+          PartNumber: partNumber,
+        });
+
+        const url = await getSignedUrl(
+          this.CloudS3Service.GetClient(),
+          command,
+          { expiresIn: this.PresignedUrlExpirySeconds },
+        );
+
+        return {
+          PartNumber: partNumber,
+          Url: url,
+          Expires: this.PresignedUrlExpirySeconds,
+        };
+      }),
+    );
+
+    return plainToInstance(CloudGetMultipartPartUrlsBatchResponseModel, {
+      Parts: parts,
     });
   }
 

@@ -22,6 +22,8 @@ import {
   CloudRenameDirectoryRequestModel,
   CloudGetMultipartPartUrlRequestModel,
   CloudGetMultipartPartUrlResponseModel,
+  CloudGetMultipartPartUrlsBatchRequestModel,
+  CloudGetMultipartPartUrlsBatchResponseModel,
   CloudListRequestModel,
   CloudListResponseModel,
   CloudObjectModel,
@@ -676,6 +678,19 @@ export class CloudService {
       { Key, UploadId, PartNumber },
       User,
     );
+  }
+
+  async UploadGetMultipartPartUrlsBatch(
+    model: CloudGetMultipartPartUrlsBatchRequestModel,
+    User: UserContext,
+    sessionToken?: string,
+  ): Promise<CloudGetMultipartPartUrlsBatchResponseModel> {
+    await this.EnsureUploadAccess(
+      model.Key,
+      GetStorageOwnerId(User),
+      sessionToken,
+    );
+    return this.CloudUploadService.UploadGetMultipartPartUrlsBatch(model, User);
   }
 
   //#endregion
