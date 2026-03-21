@@ -156,3 +156,20 @@ export const WEBHOOK_DISPATCH_TTL = 3600;
 
 /** IP geolocation cache — 24 hours */
 export const API_GEO_CACHE_TTL = 86400;
+
+// ─── Document ──────────────────────────────────────────────────────────────
+
+/** Document edit lock TTL — 5 minutes */
+export const DOCUMENT_LOCK_TTL = 5 * 60;
+
+/** Document draft TTL — 1 hour */
+export const DOCUMENT_DRAFT_TTL = 60 * 60;
+
+/** Document save throttle — 30 seconds */
+export const DOCUMENT_SAVE_THROTTLE_TTL = 30;
+
+/** Document auto-save throttle — 10 seconds */
+export const DOCUMENT_AUTOSAVE_THROTTLE_TTL = 10;
+
+/** Document draft counter TTL — 1 hour (same as draft) */
+export const DOCUMENT_DRAFT_COUNTER_TTL = 60 * 60;

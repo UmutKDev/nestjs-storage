@@ -54,6 +54,12 @@ export class CaslAbilityFactory {
     can(CaslAction.Extract, CaslSubject.CloudArchive);
     can(CaslAction.Archive, CaslSubject.CloudArchive);
 
+    // Documents
+    can(CaslAction.Read, CaslSubject.Document);
+    can(CaslAction.Create, CaslSubject.Document);
+    can(CaslAction.Update, CaslSubject.Document);
+    can(CaslAction.Delete, CaslSubject.Document);
+
     // Account
     can(CaslAction.Read, CaslSubject.Account);
     can(CaslAction.Update, CaslSubject.Account);
@@ -93,6 +99,7 @@ export class CaslAbilityFactory {
         can(CaslAction.Manage, CaslSubject.TeamCloudDirectory);
         can(CaslAction.Manage, CaslSubject.TeamCloudUpload);
         can(CaslAction.Manage, CaslSubject.TeamCloudArchive);
+        can(CaslAction.Manage, CaslSubject.TeamDocument);
         break;
 
       case TeamRole.ADMIN:
@@ -104,6 +111,7 @@ export class CaslAbilityFactory {
         can(CaslAction.Manage, CaslSubject.TeamCloudDirectory);
         can(CaslAction.Manage, CaslSubject.TeamCloudUpload);
         can(CaslAction.Manage, CaslSubject.TeamCloudArchive);
+        can(CaslAction.Manage, CaslSubject.TeamDocument);
         break;
 
       case TeamRole.MEMBER:
@@ -121,6 +129,10 @@ export class CaslAbilityFactory {
         can(CaslAction.Read, CaslSubject.TeamCloudArchive);
         can(CaslAction.Extract, CaslSubject.TeamCloudArchive);
         can(CaslAction.Archive, CaslSubject.TeamCloudArchive);
+        can(CaslAction.Read, CaslSubject.TeamDocument);
+        can(CaslAction.Create, CaslSubject.TeamDocument);
+        can(CaslAction.Update, CaslSubject.TeamDocument);
+        can(CaslAction.Delete, CaslSubject.TeamDocument);
         break;
 
       case TeamRole.VIEWER:
@@ -129,6 +141,7 @@ export class CaslAbilityFactory {
         can(CaslAction.Read, CaslSubject.TeamCloud);
         can(CaslAction.Download, CaslSubject.TeamCloud);
         can(CaslAction.Read, CaslSubject.TeamCloudArchive);
+        can(CaslAction.Read, CaslSubject.TeamDocument);
         break;
     }
   }

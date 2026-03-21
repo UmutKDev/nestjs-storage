@@ -26,6 +26,7 @@ const URI = MONGO_ENABLED
       process.env.MONGO_PASSWORD,
     )}@${process.env.MONGO_HOSTNAME}:${process.env.MONGO_PORT}`
   : null;
+
 @Global()
 @Module({
   imports: [

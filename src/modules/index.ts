@@ -11,6 +11,7 @@ import { TeamModule } from './team/team.module';
 import { NotificationModule } from './notification/notification.module';
 import { DefinitionModule } from './definition/definition.module';
 import { ApiModule } from './api/api.module';
+import { DocumentModule } from './document/document.module';
 
 export default [
   DatabaseModule,
@@ -26,4 +27,5 @@ export default [
   HealthModule,
   DefinitionModule,
   ApiModule,
+  DocumentModule,
 ];

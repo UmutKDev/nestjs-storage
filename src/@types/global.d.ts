@@ -212,6 +212,17 @@ export declare global {
         NOT_FOUND = 'SU-001',
       }
 
+      const enum Document {
+        NOT_FOUND = 'DC-001',
+        LOCKED_BY_OTHER = 'DC-002',
+        CONTENT_TOO_LARGE = 'DC-003',
+        UNSUPPORTED_EXTENSION = 'DC-004',
+        CONTENT_HASH_MISMATCH = 'DC-005',
+        SAVE_THROTTLED = 'DC-006',
+        DRAFT_NOT_FOUND = 'DC-007',
+        LOCK_NOT_OWNED = 'DC-008',
+      }
+
       const enum Api {
         // Authentication (AP-1xx)
         INVALID_API_KEY = 'AP-101',

@@ -298,3 +298,34 @@ export namespace ApiGeoKeys {
   /** api:geo:{ipAddress} — cached geo lookup result */
   export const IpGeo = (ipAddress: string) => `api:geo:${ipAddress}`;
 }
+
+// ─── Document Keys ─────────────────────────────────────────────────────────
+
+export namespace DocumentKeys {
+  /** document:lock:{ownerId}:{encodedKey} — edit lock */
+  export const Lock = (ownerId: string, key: string) =>
+    `document:lock:${ownerId}:${encodeURIComponent(key)}`;
+
+  /** document:lock:{ownerId}:* — pattern to find all locks for an owner */
+  export const LockPattern = (ownerId: string) => `document:lock:${ownerId}:*`;
+
+  /** document:draft:{ownerId}:{encodedKey} — draft content */
+  export const Draft = (ownerId: string, key: string) =>
+    `document:draft:${ownerId}:${encodeURIComponent(key)}`;
+
+  /** document:draft:{ownerId}:* — pattern to find all drafts */
+  export const DraftPattern = (ownerId: string) =>
+    `document:draft:${ownerId}:*`;
+
+  /** document:draft-counter:{ownerId}:{encodedKey} — auto-save counter for S3 persistence trigger */
+  export const DraftCounter = (ownerId: string, key: string) =>
+    `document:draft-counter:${ownerId}:${encodeURIComponent(key)}`;
+
+  /** document:save-throttle:{ownerId}:{encodedKey} — last save timestamp for throttle */
+  export const SaveThrottle = (ownerId: string, key: string) =>
+    `document:save-throttle:${ownerId}:${encodeURIComponent(key)}`;
+
+  /** document:autosave-throttle:{ownerId}:{encodedKey} — last auto-save timestamp */
+  export const AutoSaveThrottle = (ownerId: string, key: string) =>
+    `document:autosave-throttle:${ownerId}:${encodeURIComponent(key)}`;
+}
