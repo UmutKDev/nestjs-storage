@@ -595,6 +595,8 @@ export class CloudArchiveService implements OnModuleInit, OnModuleDestroy {
     const jobId = job.id?.toString() ?? '';
     const cancelKey = CloudKeys.ArchiveExtractCancel(jobId);
     const { key, format, selectedEntries } = job.data;
+    // ownerId is the pre-resolved storage-owner from enqueue (GetStorageOwnerId already applied).
+    // Use user.Id directly with KeyBuilder here; do NOT call GetStorageOwnerId again.
     const user = { Id: job.data.ownerId } as UserContext;
 
     const handler = this.ArchiveHandlerRegistry.GetHandlerByFormat(format);

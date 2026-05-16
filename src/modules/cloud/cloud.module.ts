@@ -8,6 +8,7 @@ import { CloudDirectoryController } from './cloud.directory.controller';
 import { CloudArchiveController } from './cloud.archive.controller';
 import { CloudService } from './cloud.service';
 import { UserSubscriptionEntity } from '@entities/user-subscription.entity';
+import { TeamEntity } from '@entities/team.entity';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { RedisModule } from '@modules/redis/redis.module';
 import { CloudS3Service } from './cloud.s3.service';
@@ -41,7 +42,7 @@ import { CloudDuplicateService } from './cloud.duplicate.service';
         },
       }),
     }),
-    TypeOrmModule.forFeature([UserSubscriptionEntity]),
+    TypeOrmModule.forFeature([UserSubscriptionEntity, TeamEntity]),
   ],
   controllers: [
     CloudController,

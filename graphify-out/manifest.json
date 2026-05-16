@@ -1,0 +1,1117 @@
+{
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/nest-cli.json": {
+    "mtime": 1769191991.0595965,
+    "ast_hash": "a3783a8966e474645dd84f0c49bfe667",
+    "semantic_hash": "a3783a8966e474645dd84f0c49bfe667"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/jest.config.js": {
+    "mtime": 1769191991.0595238,
+    "ast_hash": "cdcf87971f067dd519488007decddfaa",
+    "semantic_hash": "cdcf87971f067dd519488007decddfaa"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/package.json": {
+    "mtime": 1775850568.022044,
+    "ast_hash": "c89d60496870519b380088079caae0ab",
+    "semantic_hash": "c89d60496870519b380088079caae0ab"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/tsconfig.build.json": {
+    "mtime": 1769191991.0707624,
+    "ast_hash": "f73d0f011ee462dcdf7f02bbdcde284b",
+    "semantic_hash": "f73d0f011ee462dcdf7f02bbdcde284b"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/.eslintrc.js": {
+    "mtime": 1769191991.0589018,
+    "ast_hash": "54d54faa70c721e817c3880dbe313c0a",
+    "semantic_hash": "54d54faa70c721e817c3880dbe313c0a"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/tsconfig.json": {
+    "mtime": 1769191991.0708456,
+    "ast_hash": "ad716ebe277192cc9ca64dd12e96a6ce",
+    "semantic_hash": "ad716ebe277192cc9ca64dd12e96a6ce"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/eslint.config.mjs": {
+    "mtime": 1769191991.0594523,
+    "ast_hash": "f2d67322c72defb356eb4cb9e73dc4d2",
+    "semantic_hash": "f2d67322c72defb356eb4cb9e73dc4d2"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/test/jest.setup.js": {
+    "mtime": 1769191991.070583,
+    "ast_hash": "46ef8145dc2ebc9ef8c45a4e1b9a994d",
+    "semantic_hash": "46ef8145dc2ebc9ef8c45a4e1b9a994d"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/test/jest-e2e.setup.js": {
+    "mtime": 1769191991.070511,
+    "ast_hash": "b05deea5fe15af47b943076974486eb9",
+    "semantic_hash": "b05deea5fe15af47b943076974486eb9"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/test/test-utils.ts": {
+    "mtime": 1769191991.0706685,
+    "ast_hash": "7a90c01351534466785823c4e394b9e3",
+    "semantic_hash": "7a90c01351534466785823c4e394b9e3"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/test/jest-e2e.json": {
+    "mtime": 1769191991.0704238,
+    "ast_hash": "81a216b5cc1d4fb84e702a27a201c33e",
+    "semantic_hash": "81a216b5cc1d4fb84e702a27a201c33e"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/.github/hooks/code-quality.json": {
+    "mtime": 1775852168.3350487,
+    "ast_hash": "7ba9262783c3906514a49d6caf0d85d5",
+    "semantic_hash": "7ba9262783c3906514a49d6caf0d85d5"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/instrument.ts": {
+    "mtime": 1769971151.1467698,
+    "ast_hash": "ec226b5385c4960f7be03523b789c06f",
+    "semantic_hash": "ec226b5385c4960f7be03523b789c06f"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/main.ts": {
+    "mtime": 1775850662.651433,
+    "ast_hash": "3c893a33cbdbeacd05958ecfd0094f65",
+    "semantic_hash": "3c893a33cbdbeacd05958ecfd0094f65"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/@types/global.d.ts": {
+    "mtime": 1774115155.9597943,
+    "ast_hash": "197a129c8543e541085cfd455da53257",
+    "semantic_hash": "197a129c8543e541085cfd455da53257"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/database/seeds/init.sql": {
+    "mtime": 1769191991.0626335,
+    "ast_hash": "595094a32f5a8222b1f77b5c7ce87704",
+    "semantic_hash": "595094a32f5a8222b1f77b5c7ce87704"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/schemas/api-usage-log.schema.ts": {
+    "mtime": 1772894230.403273,
+    "ast_hash": "3b8f3abbcb08c3dbf25e639126e0ab5d",
+    "semantic_hash": "3b8f3abbcb08c3dbf25e639126e0ab5d"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/schemas/audit-log.schema.ts": {
+    "mtime": 1772894230.3995755,
+    "ast_hash": "86b7cc07ee55798b8d3b026e7b638c2d",
+    "semantic_hash": "86b7cc07ee55798b8d3b026e7b638c2d"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/schemas/index.ts": {
+    "mtime": 1772894230.4109206,
+    "ast_hash": "8ff731d913b2c58b0569894ac854da0d",
+    "semantic_hash": "8ff731d913b2c58b0569894ac854da0d"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/schemas/notification-history.schema.ts": {
+    "mtime": 1772894230.403309,
+    "ast_hash": "28bf6721a6c2e1a0e613fe37e1834d84",
+    "semantic_hash": "28bf6721a6c2e1a0e613fe37e1834d84"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/common/filters/http-exception.filter.ts": {
+    "mtime": 1774040865.295634,
+    "ast_hash": "5b3e87ce83b417da35b7d951c288c0d6",
+    "semantic_hash": "5b3e87ce83b417da35b7d951c288c0d6"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/common/interceptors/transform.interceptor.ts": {
+    "mtime": 1772100853.9771,
+    "ast_hash": "1ad91ce22f7fcece44ae4ee5a076d99c",
+    "semantic_hash": "1ad91ce22f7fcece44ae4ee5a076d99c"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/common/context/context.middleware.ts": {
+    "mtime": 1772100857.3493311,
+    "ast_hash": "b23990a801d09e7ea70cf401b2ba1a99",
+    "semantic_hash": "b23990a801d09e7ea70cf401b2ba1a99"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/common/context/context.service.ts": {
+    "mtime": 1769971151.1604004,
+    "ast_hash": "d8052743dfa4d0933398eff0bc5dc549",
+    "semantic_hash": "d8052743dfa4d0933398eff0bc5dc549"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/common/decorators/match.decorator.ts": {
+    "mtime": 1769971151.1623447,
+    "ast_hash": "2c6d735a96eb264d8f99439a8ad3bc2b",
+    "semantic_hash": "2c6d735a96eb264d8f99439a8ad3bc2b"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/common/decorators/user.decorator.ts": {
+    "mtime": 1769971151.1640158,
+    "ast_hash": "2fcd5d43161b2bc8b2b458cd772eac36",
+    "semantic_hash": "2fcd5d43161b2bc8b2b458cd772eac36"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/common/decorators/role-field.decorator.ts": {
+    "mtime": 1769971151.165817,
+    "ast_hash": "e1ec6e9088bd7feb9f36d52a8d2b3002",
+    "semantic_hash": "e1ec6e9088bd7feb9f36d52a8d2b3002"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/common/decorators/response.decorator.ts": {
+    "mtime": 1769972150.4636,
+    "ast_hash": "6f95d47c5b301a77666820b278fe8da0",
+    "semantic_hash": "6f95d47c5b301a77666820b278fe8da0"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/common/decorators/modules.decorator.ts": {
+    "mtime": 1769971151.1729078,
+    "ast_hash": "26bc059f3ef90f5023035a880efea33d",
+    "semantic_hash": "26bc059f3ef90f5023035a880efea33d"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/common/decorators/public.decorator.ts": {
+    "mtime": 1769971151.1762507,
+    "ast_hash": "44d88756c06c44d29273e2a3a96f3871",
+    "semantic_hash": "44d88756c06c44d29273e2a3a96f3871"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/common/enums/casl.enum.ts": {
+    "mtime": 1774116604.0756576,
+    "ast_hash": "e47e306d9062a01860e77f1918bb6067",
+    "semantic_hash": "e47e306d9062a01860e77f1918bb6067"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/common/enums/authentication.enum.ts": {
+    "mtime": 1769971151.1789572,
+    "ast_hash": "e052ac7e0d3a979b3898f3a5ade4a899",
+    "semantic_hash": "e052ac7e0d3a979b3898f3a5ade4a899"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/common/enums/api.enum.ts": {
+    "mtime": 1772894230.5390582,
+    "ast_hash": "5e47e993c0642cebff99aa72a07bb399",
+    "semantic_hash": "5e47e993c0642cebff99aa72a07bb399"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/common/enums/team.enum.ts": {
+    "mtime": 1771963475.2924106,
+    "ast_hash": "ad3fe41cfea5bc7b884f9a03f10b962c",
+    "semantic_hash": "ad3fe41cfea5bc7b884f9a03f10b962c"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/common/enums/cloud.enum.ts": {
+    "mtime": 1774295513.1366134,
+    "ast_hash": "f3555880a5cf5c218a308de78feec8a5",
+    "semantic_hash": "f3555880a5cf5c218a308de78feec8a5"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/common/enums/notification.enum.ts": {
+    "mtime": 1774117254.487905,
+    "ast_hash": "08e0a824aa11f41f8c9ae88cdf9ee47d",
+    "semantic_hash": "08e0a824aa11f41f8c9ae88cdf9ee47d"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/common/enums/paths.enum.ts": {
+    "mtime": 1769971151.184524,
+    "ast_hash": "f91eeecd9e53bc5cd0ff1d19d765981f",
+    "semantic_hash": "f91eeecd9e53bc5cd0ff1d19d765981f"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/common/enums/document.enum.ts": {
+    "mtime": 1774115156.0166395,
+    "ast_hash": "35b018fae68d6ccee4085fe22881e7d1",
+    "semantic_hash": "35b018fae68d6ccee4085fe22881e7d1"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/common/enums/mime-types-groups.enum.ts": {
+    "mtime": 1769971151.1871202,
+    "ast_hash": "7d68ad518fa649519f671fcfa7f8df35",
+    "semantic_hash": "7d68ad518fa649519f671fcfa7f8df35"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/common/enums/index.ts": {
+    "mtime": 1774115156.029882,
+    "ast_hash": "0cc4cc884741d81ad13cbdf616ea22db",
+    "semantic_hash": "0cc4cc884741d81ad13cbdf616ea22db"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/common/enums/subscription.enum.ts": {
+    "mtime": 1769971151.1911824,
+    "ast_hash": "0521cc8f96cca8d016483dd989d3ef14",
+    "semantic_hash": "0521cc8f96cca8d016483dd989d3ef14"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/common/enums/definition.enum.ts": {
+    "mtime": 1769971151.1944199,
+    "ast_hash": "4aa8e96e047a40996e4f61a716d659ee",
+    "semantic_hash": "4aa8e96e047a40996e4f61a716d659ee"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/common/models/pagination.model.ts": {
+    "mtime": 1769971450.721438,
+    "ast_hash": "06c46f21ebda5935f3c2892bf3534a52",
+    "semantic_hash": "06c46f21ebda5935f3c2892bf3534a52"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/common/models/base.model.ts": {
+    "mtime": 1769971450.7276795,
+    "ast_hash": "8c51134f75781cac711a4a90ac183efe",
+    "semantic_hash": "8c51134f75781cac711a4a90ac183efe"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/common/templates/mail/index.ts": {
+    "mtime": 1769971151.2032735,
+    "ast_hash": "cb0df312e572852b4a47f06d2f25dd72",
+    "semantic_hash": "cb0df312e572852b4a47f06d2f25dd72"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/common/templates/mail/tr/welcome/index.ts": {
+    "mtime": 1769971151.2068577,
+    "ast_hash": "2584324a5de53d5f24f5eb5a196ed710",
+    "semantic_hash": "2584324a5de53d5f24f5eb5a196ed710"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/common/helpers/cast.helper.ts": {
+    "mtime": 1771766229.481645,
+    "ast_hash": "a56e3980e59b1eef9100c4b51bb64d19",
+    "semantic_hash": "a56e3980e59b1eef9100c4b51bb64d19"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/common/helpers/throttle.transform.ts": {
+    "mtime": 1769971151.2210147,
+    "ast_hash": "75a8c280fb6cad126a8b430a8cf8adb7",
+    "semantic_hash": "75a8c280fb6cad126a8b430a8cf8adb7"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/subscribers/user.subscriber.ts": {
+    "mtime": 1769971450.631968,
+    "ast_hash": "f08457d44e135e9887b933769cee9e7a",
+    "semantic_hash": "f08457d44e135e9887b933769cee9e7a"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/index.ts": {
+    "mtime": 1774115155.9597116,
+    "ast_hash": "2f1f0a7dd82983ccc9b5440bf3699369",
+    "semantic_hash": "2f1f0a7dd82983ccc9b5440bf3699369"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/database/database.module.ts": {
+    "mtime": 1769971151.2264266,
+    "ast_hash": "ffe51f0149e2a14ef28599a84b0e20a3",
+    "semantic_hash": "ffe51f0149e2a14ef28599a84b0e20a3"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/database/database.datasource.ts": {
+    "mtime": 1769971151.228554,
+    "ast_hash": "4f691063800cb45a97cac80560d57845",
+    "semantic_hash": "4f691063800cb45a97cac80560d57845"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/core/core.service.ts": {
+    "mtime": 1769971151.2313766,
+    "ast_hash": "da6c7140f431ca0c839d58649a6ee646",
+    "semantic_hash": "da6c7140f431ca0c839d58649a6ee646"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/core/core.module.ts": {
+    "mtime": 1772114679.310487,
+    "ast_hash": "cee02f2bba054140ac29bcb0faa9d292",
+    "semantic_hash": "cee02f2bba054140ac29bcb0faa9d292"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/core/core.controller.ts": {
+    "mtime": 1769971151.2447731,
+    "ast_hash": "d963ef7e90898b4959da05735a53b8e2",
+    "semantic_hash": "d963ef7e90898b4959da05735a53b8e2"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/redis/redis.keys.ts": {
+    "mtime": 1774117271.9324439,
+    "ast_hash": "7794b2b1900902736c1de5acc9455b39",
+    "semantic_hash": "7794b2b1900902736c1de5acc9455b39"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/redis/redis.module.ts": {
+    "mtime": 1771684972.9980392,
+    "ast_hash": "02190b118b5978bf4917540522c8be23",
+    "semantic_hash": "02190b118b5978bf4917540522c8be23"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/redis/redis.ttl.ts": {
+    "mtime": 1774117279.7407653,
+    "ast_hash": "237312c7490ddd92d3b92897dc2a63a2",
+    "semantic_hash": "237312c7490ddd92d3b92897dc2a63a2"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/redis/index.ts": {
+    "mtime": 1771680335.3628058,
+    "ast_hash": "0918fccd67bb96decc49dcfc2aa732c4",
+    "semantic_hash": "0918fccd67bb96decc49dcfc2aa732c4"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/redis/redis.service.ts": {
+    "mtime": 1771684839.4906375,
+    "ast_hash": "bad7112767d6729741d8f0aba18b5b50",
+    "semantic_hash": "bad7112767d6729741d8f0aba18b5b50"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/notification/notification.model.ts": {
+    "mtime": 1772114679.2410345,
+    "ast_hash": "1be391cef4b26f4616974331dfe922a3",
+    "semantic_hash": "1be391cef4b26f4616974331dfe922a3"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/notification/notification.controller.ts": {
+    "mtime": 1772894230.5391598,
+    "ast_hash": "8100b68940fd8fcf2f9ff5acc2432d3c",
+    "semantic_hash": "8100b68940fd8fcf2f9ff5acc2432d3c"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/notification/notification.gateway.ts": {
+    "mtime": 1774046231.5348055,
+    "ast_hash": "bd3041944fc42693b026e47fb9d8cc1c",
+    "semantic_hash": "bd3041944fc42693b026e47fb9d8cc1c"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/notification/notification.service.ts": {
+    "mtime": 1774041560.329938,
+    "ast_hash": "0657214ac5c64a8aac1a52f3b1dc82f9",
+    "semantic_hash": "0657214ac5c64a8aac1a52f3b1dc82f9"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/notification/notification.module.ts": {
+    "mtime": 1772894230.539209,
+    "ast_hash": "731c678b978082f9ed4136d90eefb81a",
+    "semantic_hash": "731c678b978082f9ed4136d90eefb81a"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/mail/mail.module.ts": {
+    "mtime": 1769971151.2549353,
+    "ast_hash": "4a4f4096cbe2fbf51ab3ee55b276640c",
+    "semantic_hash": "4a4f4096cbe2fbf51ab3ee55b276640c"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/mail/mail.service.ts": {
+    "mtime": 1769971151.2569914,
+    "ast_hash": "bb044421bcab99623fedcf0cbc8585ab",
+    "semantic_hash": "bb044421bcab99623fedcf0cbc8585ab"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/health/health.module.ts": {
+    "mtime": 1769971151.2600808,
+    "ast_hash": "cc2fd525b068a96cb5e868966a6cdaa8",
+    "semantic_hash": "cc2fd525b068a96cb5e868966a6cdaa8"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/health/health.controller.ts": {
+    "mtime": 1769971151.2623017,
+    "ast_hash": "427ee2dc4c28b758184135fe7b3971b6",
+    "semantic_hash": "427ee2dc4c28b758184135fe7b3971b6"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/user/user.model.ts": {
+    "mtime": 1769971450.666218,
+    "ast_hash": "16a958ac8281714326782f268eaec172",
+    "semantic_hash": "16a958ac8281714326782f268eaec172"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/user/user.module.ts": {
+    "mtime": 1769971151.2667916,
+    "ast_hash": "ad0ae305dd442edc46360c5bd6705f0f",
+    "semantic_hash": "ad0ae305dd442edc46360c5bd6705f0f"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/user/user.e2e-spec.ts": {
+    "mtime": 1769971151.2699072,
+    "ast_hash": "169f5620b5b8144dee4296dee837350e",
+    "semantic_hash": "169f5620b5b8144dee4296dee837350e"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/user/user.controller.ts": {
+    "mtime": 1771954659.72471,
+    "ast_hash": "f359823100d9293700ebb459e28d74da",
+    "semantic_hash": "f359823100d9293700ebb459e28d74da"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/user/user.service.ts": {
+    "mtime": 1771105777.4387841,
+    "ast_hash": "f4c09e885847627de80b58222a8fb99e",
+    "semantic_hash": "f4c09e885847627de80b58222a8fb99e"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/document/document.service.ts": {
+    "mtime": 1774115156.0404603,
+    "ast_hash": "a2d7ba9b0b0f7653a621d8ee7f307ac1",
+    "semantic_hash": "a2d7ba9b0b0f7653a621d8ee7f307ac1"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/document/document.constants.ts": {
+    "mtime": 1774115156.0165658,
+    "ast_hash": "8b90b471a340b20118b5966fd8ed7d96",
+    "semantic_hash": "8b90b471a340b20118b5966fd8ed7d96"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/document/document.lock.service.ts": {
+    "mtime": 1774115156.0688174,
+    "ast_hash": "1496ae691d89153007a91d339a9cadc4",
+    "semantic_hash": "1496ae691d89153007a91d339a9cadc4"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/document/document.model.ts": {
+    "mtime": 1774115156.040392,
+    "ast_hash": "b5cf5c1e95deaf23314187886828fb1d",
+    "semantic_hash": "b5cf5c1e95deaf23314187886828fb1d"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/document/document.draft.service.ts": {
+    "mtime": 1774115156.040456,
+    "ast_hash": "5c96aa2bd348cb9178741010b0099555",
+    "semantic_hash": "5c96aa2bd348cb9178741010b0099555"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/document/document.diff.service.ts": {
+    "mtime": 1774115156.016683,
+    "ast_hash": "6c1d5f600be6b2789ce30caa1ee28a8f",
+    "semantic_hash": "6c1d5f600be6b2789ce30caa1ee28a8f"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/document/document.content.service.ts": {
+    "mtime": 1774115156.0729978,
+    "ast_hash": "21e8718ef1d82905866c741c5c7c0019",
+    "semantic_hash": "21e8718ef1d82905866c741c5c7c0019"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/document/document.module.ts": {
+    "mtime": 1774115156.0487723,
+    "ast_hash": "eafb123a0758fbe797b65e32def586b3",
+    "semantic_hash": "eafb123a0758fbe797b65e32def586b3"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/document/document.controller.ts": {
+    "mtime": 1774115156.0404336,
+    "ast_hash": "d2488521dfe029fa95adf731a34e059d",
+    "semantic_hash": "d2488521dfe029fa95adf731a34e059d"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/subscription/subscription.controller.ts": {
+    "mtime": 1771954659.7433393,
+    "ast_hash": "4a7c64fd0856fccc932e3776ceb0f2d4",
+    "semantic_hash": "4a7c64fd0856fccc932e3776ceb0f2d4"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/subscription/subscription.service.ts": {
+    "mtime": 1775850837.1326869,
+    "ast_hash": "4aae0f9c70700f312f387f8580833cbb",
+    "semantic_hash": "4aae0f9c70700f312f387f8580833cbb"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/subscription/subscription.model.ts": {
+    "mtime": 1769971450.752975,
+    "ast_hash": "977b229456283eacf33ee29e3e6e4853",
+    "semantic_hash": "977b229456283eacf33ee29e3e6e4853"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/subscription/subscription.user.controller.ts": {
+    "mtime": 1771954659.7433593,
+    "ast_hash": "01d5a8bc378a4505a8e47648f89bdfd9",
+    "semantic_hash": "01d5a8bc378a4505a8e47648f89bdfd9"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/subscription/subscription.module.ts": {
+    "mtime": 1771714748.7731977,
+    "ast_hash": "5c0832df855576b6b7e55c1c303b2479",
+    "semantic_hash": "5c0832df855576b6b7e55c1c303b2479"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/team/team.model.ts": {
+    "mtime": 1771963475.2881625,
+    "ast_hash": "c681c5cb1a27d15f196f09a8ed538cda",
+    "semantic_hash": "c681c5cb1a27d15f196f09a8ed538cda"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/team/team-invitation.controller.ts": {
+    "mtime": 1771963475.3853035,
+    "ast_hash": "54f627951b365a040c38093a2a17aae8",
+    "semantic_hash": "54f627951b365a040c38093a2a17aae8"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/team/team.controller.ts": {
+    "mtime": 1771963475.434445,
+    "ast_hash": "addd016495c4815e42a35dddf7d23751",
+    "semantic_hash": "addd016495c4815e42a35dddf7d23751"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/team/team-member.controller.ts": {
+    "mtime": 1771963475.3146663,
+    "ast_hash": "2406609e0d617160249599733c8379b1",
+    "semantic_hash": "2406609e0d617160249599733c8379b1"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/team/team-member.service.ts": {
+    "mtime": 1771963475.2565413,
+    "ast_hash": "fc524ff113512dcf0f04d7f6901ebf49",
+    "semantic_hash": "fc524ff113512dcf0f04d7f6901ebf49"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/team/team.module.ts": {
+    "mtime": 1771963475.3754475,
+    "ast_hash": "0ed9316c9bebf2b926d24db40e5c6079",
+    "semantic_hash": "0ed9316c9bebf2b926d24db40e5c6079"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/team/team-invitation.service.ts": {
+    "mtime": 1772114680.344549,
+    "ast_hash": "41f86281c24459467e9c308a5c79d2b0",
+    "semantic_hash": "41f86281c24459467e9c308a5c79d2b0"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/team/team.service.ts": {
+    "mtime": 1775850800.097611,
+    "ast_hash": "29b05beb9de6715b8f6ab55b562c3b33",
+    "semantic_hash": "29b05beb9de6715b8f6ab55b562c3b33"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/team/guards/team-context.guard.ts": {
+    "mtime": 1772100853.978949,
+    "ast_hash": "c0500f32735ff76a35630a427b320eb0",
+    "semantic_hash": "c0500f32735ff76a35630a427b320eb0"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/definition/definition.service.ts": {
+    "mtime": 1771715214.833003,
+    "ast_hash": "d37394fd1e61b64be02f182306b4f02f",
+    "semantic_hash": "d37394fd1e61b64be02f182306b4f02f"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/definition/definition.model.ts": {
+    "mtime": 1769971450.746288,
+    "ast_hash": "d1d2d483a5a37048b8929bac830a37e8",
+    "semantic_hash": "d1d2d483a5a37048b8929bac830a37e8"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/definition/definition.controller.ts": {
+    "mtime": 1771954659.743369,
+    "ast_hash": "9b0583914f1b490eb147f3e1608888aa",
+    "semantic_hash": "9b0583914f1b490eb147f3e1608888aa"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/definition/definition.module.ts": {
+    "mtime": 1771714748.7731702,
+    "ast_hash": "643968b1ebbec3d0463947d1ed9528d0",
+    "semantic_hash": "643968b1ebbec3d0463947d1ed9528d0"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/cloud/cloud.context.ts": {
+    "mtime": 1771963475.3591723,
+    "ast_hash": "bb0f40eae20b17607b9916a207180de4",
+    "semantic_hash": "bb0f40eae20b17607b9916a207180de4"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/cloud/cloud.directory.controller.ts": {
+    "mtime": 1775849705.961581,
+    "ast_hash": "fba8038244fd3c015c21b8a8a37901f0",
+    "semantic_hash": "fba8038244fd3c015c21b8a8a37901f0"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/cloud/cloud.usage.service.ts": {
+    "mtime": 1772114679.3044364,
+    "ast_hash": "7246699f64b8827b4cd7d719f862f2df",
+    "semantic_hash": "7246699f64b8827b4cd7d719f862f2df"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/cloud/cloud.archive.controller.ts": {
+    "mtime": 1772304865.1240048,
+    "ast_hash": "199edbb78f58540bd7536c99a75a30d8",
+    "semantic_hash": "199edbb78f58540bd7536c99a75a30d8"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/cloud/cloud.list.service.spec.ts": {
+    "mtime": 1771684840.490644,
+    "ast_hash": "7efa8422e5ee09638e58bdd5768278d5",
+    "semantic_hash": "7efa8422e5ee09638e58bdd5768278d5"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/cloud/cloud.directory.service.ts": {
+    "mtime": 1774295513.1377473,
+    "ast_hash": "0eeb0b30c8b7ca14d6f9b7db988102eb",
+    "semantic_hash": "0eeb0b30c8b7ca14d6f9b7db988102eb"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/cloud/cloud.model.ts": {
+    "mtime": 1774295513.1382127,
+    "ast_hash": "36119648377ca654ca8e71d508876056",
+    "semantic_hash": "36119648377ca654ca8e71d508876056"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/cloud/cloud.constants.ts": {
+    "mtime": 1772901643.6442392,
+    "ast_hash": "e084a2e2b485e419580845e65ed29bbe",
+    "semantic_hash": "e084a2e2b485e419580845e65ed29bbe"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/cloud/cloud.s3.service.ts": {
+    "mtime": 1774124688.2150958,
+    "ast_hash": "840c4d2a4b95942c35c775fd2864de70",
+    "semantic_hash": "840c4d2a4b95942c35c775fd2864de70"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/cloud/cloud.utils.ts": {
+    "mtime": 1774122647.178275,
+    "ast_hash": "601c49a3bc19222753932c84a911affb",
+    "semantic_hash": "601c49a3bc19222753932c84a911affb"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/cloud/cloud.metadata.service.ts": {
+    "mtime": 1771789330.550607,
+    "ast_hash": "d1adad107a5d9549aa5bb3390cd55c7d",
+    "semantic_hash": "d1adad107a5d9549aa5bb3390cd55c7d"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/cloud/cloud.service.ts": {
+    "mtime": 1774295513.139428,
+    "ast_hash": "af1c1d89b589b076e45fb31568d26be2",
+    "semantic_hash": "af1c1d89b589b076e45fb31568d26be2"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/cloud/cloud.controller.ts": {
+    "mtime": 1774295513.137235,
+    "ast_hash": "4a3c3afb1089e7a4345cb0b79935182e",
+    "semantic_hash": "4a3c3afb1089e7a4345cb0b79935182e"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/cloud/cloud.upload.service.ts": {
+    "mtime": 1775850730.9131453,
+    "ast_hash": "dfa7b08fd1667fb3fa6d6c717227deeb",
+    "semantic_hash": "dfa7b08fd1667fb3fa6d6c717227deeb"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/cloud/cloud.archive.service.ts": {
+    "mtime": 1772304865.035698,
+    "ast_hash": "96a386ef9811a15df76ddbd4491359ff",
+    "semantic_hash": "96a386ef9811a15df76ddbd4491359ff"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/cloud/cloud.upload.controller.ts": {
+    "mtime": 1774295480.0777276,
+    "ast_hash": "76dd5ac5cc674b3c69dad2d32fd80d20",
+    "semantic_hash": "76dd5ac5cc674b3c69dad2d32fd80d20"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/cloud/cloud.version.service.ts": {
+    "mtime": 1774047654.6495464,
+    "ast_hash": "e1fd238a919c5d5142a65f39eb122f6e",
+    "semantic_hash": "e1fd238a919c5d5142a65f39eb122f6e"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/cloud/cloud.object.service.ts": {
+    "mtime": 1775850713.0265903,
+    "ast_hash": "b9bb4818e3d5342249f1baad1ad22fb6",
+    "semantic_hash": "b9bb4818e3d5342249f1baad1ad22fb6"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/cloud/cloud.duplicate.service.ts": {
+    "mtime": 1774124673.4617095,
+    "ast_hash": "020511d72af4bb6c68f5aa64e0da02ff",
+    "semantic_hash": "020511d72af4bb6c68f5aa64e0da02ff"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/cloud/cloud.module.ts": {
+    "mtime": 1775849820.006073,
+    "ast_hash": "c05be6c21fc92445b24546318d311a0b",
+    "semantic_hash": "c05be6c21fc92445b24546318d311a0b"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/cloud/cloud.conflict.service.ts": {
+    "mtime": 1774295474.6880312,
+    "ast_hash": "4f721059ce2d4ad0ab89e6048b66d976",
+    "semantic_hash": "4f721059ce2d4ad0ab89e6048b66d976"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/cloud/cloud.list.service.ts": {
+    "mtime": 1775850868.2751486,
+    "ast_hash": "1e636ab6beb02418468778bba6e946c6",
+    "semantic_hash": "1e636ab6beb02418468778bba6e946c6"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/cloud/cloud.scan.service.ts": {
+    "mtime": 1771772734.342056,
+    "ast_hash": "a28e1dbfc16239472f52baa2aac79e10",
+    "semantic_hash": "a28e1dbfc16239472f52baa2aac79e10"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/cloud/archive/archive-handler.registry.ts": {
+    "mtime": 1771772734.4260209,
+    "ast_hash": "c1910d5a52681f9815adfec8ef2fface",
+    "semantic_hash": "c1910d5a52681f9815adfec8ef2fface"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/cloud/archive/archive-handler.interface.ts": {
+    "mtime": 1771772734.4305418,
+    "ast_hash": "fd9c4604359aa8ef4e35b8d62b0dd296",
+    "semantic_hash": "fd9c4604359aa8ef4e35b8d62b0dd296"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/cloud/archive/handlers/rar.handler.ts": {
+    "mtime": 1771772734.459985,
+    "ast_hash": "f3652d1a21c617a7ef65ba4b9be10e19",
+    "semantic_hash": "f3652d1a21c617a7ef65ba4b9be10e19"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/cloud/archive/handlers/tar.handler.ts": {
+    "mtime": 1771772734.435157,
+    "ast_hash": "e27829c1895e8944a49f832cfc8856c8",
+    "semantic_hash": "e27829c1895e8944a49f832cfc8856c8"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/cloud/archive/handlers/zip.handler.ts": {
+    "mtime": 1771772734.449918,
+    "ast_hash": "92dc8e953f5095e7ed9478c09fc4eeaa",
+    "semantic_hash": "92dc8e953f5095e7ed9478c09fc4eeaa"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/cloud/decorators/requires-encrypted-access.decorator.ts": {
+    "mtime": 1769971151.34123,
+    "ast_hash": "2569fd2d7425ec154da6f3db334c90cd",
+    "semantic_hash": "2569fd2d7425ec154da6f3db334c90cd"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/api/api.module.ts": {
+    "mtime": 1772976075.3237028,
+    "ast_hash": "8d95986e0061519a1ab2cb9a375d7b53",
+    "semantic_hash": "8d95986e0061519a1ab2cb9a375d7b53"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/api/api.constants.ts": {
+    "mtime": 1772894230.524564,
+    "ast_hash": "0cc6b0c62b3148525eb3634763a5dd97",
+    "semantic_hash": "0cc6b0c62b3148525eb3634763a5dd97"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/api/api.model.ts": {
+    "mtime": 1772976075.3125951,
+    "ast_hash": "d20baac0fe599ac45a108a853578c13e",
+    "semantic_hash": "d20baac0fe599ac45a108a853578c13e"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/api/interceptors/api-idempotency.interceptor.ts": {
+    "mtime": 1772894230.65413,
+    "ast_hash": "ec5250a85c241baf0f4903073e0b3609",
+    "semantic_hash": "ec5250a85c241baf0f4903073e0b3609"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/api/interceptors/api-usage-tracking.interceptor.ts": {
+    "mtime": 1772894230.6888974,
+    "ast_hash": "7febc8fe5f81d0daabd893a12c722692",
+    "semantic_hash": "7febc8fe5f81d0daabd893a12c722692"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/api/interceptors/api-geolocation.interceptor.ts": {
+    "mtime": 1772894230.6888373,
+    "ast_hash": "ef72ce472b55247c8befafa572a05687",
+    "semantic_hash": "ef72ce472b55247c8befafa572a05687"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/api/decorators/api-idempotent.decorator.ts": {
+    "mtime": 1772894230.654127,
+    "ast_hash": "8c2d8bb8a0b586643b84049843bea753",
+    "semantic_hash": "8c2d8bb8a0b586643b84049843bea753"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/api/decorators/api-scopes.decorator.ts": {
+    "mtime": 1772894230.6540878,
+    "ast_hash": "94106c5e9b2d0b215b907d89e5c51747",
+    "semantic_hash": "94106c5e9b2d0b215b907d89e5c51747"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/api/controllers/api-upload.controller.ts": {
+    "mtime": 1772976075.4042428,
+    "ast_hash": "1ac2c1b7d12513988cc988d86813fbf2",
+    "semantic_hash": "1ac2c1b7d12513988cc988d86813fbf2"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/api/controllers/api-storage.controller.ts": {
+    "mtime": 1772976075.396294,
+    "ast_hash": "c3fa181acd1e0e5d26a89a3da96b1b33",
+    "semantic_hash": "c3fa181acd1e0e5d26a89a3da96b1b33"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/api/controllers/api-download.controller.ts": {
+    "mtime": 1772894230.6925507,
+    "ast_hash": "5daa6befefff9671da1e6f2ecef7c3e5",
+    "semantic_hash": "5daa6befefff9671da1e6f2ecef7c3e5"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/api/controllers/api-webhook.controller.ts": {
+    "mtime": 1772894230.6925585,
+    "ast_hash": "fedddec14a7a3c6f7f54d727953f6261",
+    "semantic_hash": "fedddec14a7a3c6f7f54d727953f6261"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/api/controllers/api-usage.controller.ts": {
+    "mtime": 1772976075.395938,
+    "ast_hash": "c9b63c7940568b7c72f31f20dd72dd01",
+    "semantic_hash": "c9b63c7940568b7c72f31f20dd72dd01"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/api/controllers/api-directory.controller.ts": {
+    "mtime": 1775849833.542567,
+    "ast_hash": "4106f58e48e3575fddc1032a0aa34d60",
+    "semantic_hash": "4106f58e48e3575fddc1032a0aa34d60"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/api/services/api-geolocation.service.ts": {
+    "mtime": 1772894230.6456115,
+    "ast_hash": "c4da5ef9226ce23de3233d4c861f83a5",
+    "semantic_hash": "c4da5ef9226ce23de3233d4c861f83a5"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/api/services/api-usage.service.ts": {
+    "mtime": 1772894230.6503372,
+    "ast_hash": "6b7cd0e1891a0f6134a16d2642da7402",
+    "semantic_hash": "6b7cd0e1891a0f6134a16d2642da7402"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/api/services/api-quota.service.ts": {
+    "mtime": 1772894230.640036,
+    "ast_hash": "bd8bf5913330f2ed7dab6e9dce010c4d",
+    "semantic_hash": "bd8bf5913330f2ed7dab6e9dce010c4d"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/api/services/api-webhook-dispatcher.service.ts": {
+    "mtime": 1772894230.654088,
+    "ast_hash": "d2a4fab9dab52e5a3ae083a16969b1ec",
+    "semantic_hash": "d2a4fab9dab52e5a3ae083a16969b1ec"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/api/services/api-rate-limit.service.ts": {
+    "mtime": 1772894230.6455863,
+    "ast_hash": "4efca984fdd717277ffdce1edcb3bc74",
+    "semantic_hash": "4efca984fdd717277ffdce1edcb3bc74"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/api/services/api-webhook.service.ts": {
+    "mtime": 1772894230.6455817,
+    "ast_hash": "8b65957639f9c12475654b02d835731f",
+    "semantic_hash": "8b65957639f9c12475654b02d835731f"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/api/services/api-signature.service.ts": {
+    "mtime": 1772894230.640047,
+    "ast_hash": "5a871f03ba6f7c5d42364664d7dbc75e",
+    "semantic_hash": "5a871f03ba6f7c5d42364664d7dbc75e"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/api/guards/api-auth.guard.ts": {
+    "mtime": 1772894230.6539888,
+    "ast_hash": "150cf070162f6804f379e03e3225b8fd",
+    "semantic_hash": "150cf070162f6804f379e03e3225b8fd"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/api/guards/api-quota.guard.ts": {
+    "mtime": 1772894230.6540363,
+    "ast_hash": "ce94832f4dcb249df128d7b1bc826030",
+    "semantic_hash": "ce94832f4dcb249df128d7b1bc826030"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/api/guards/api-rate-limit.guard.ts": {
+    "mtime": 1772894230.6539967,
+    "ast_hash": "808359e2a108e55a6b136880ea19306f",
+    "semantic_hash": "808359e2a108e55a6b136880ea19306f"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/api/guards/api-scope.guard.ts": {
+    "mtime": 1772894230.6540368,
+    "ast_hash": "ebb2b57c82b3fdc7d2a848cb974adf0c",
+    "semantic_hash": "ebb2b57c82b3fdc7d2a848cb974adf0c"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/mongo/audit-log.constants.ts": {
+    "mtime": 1772894230.5245728,
+    "ast_hash": "134cfbc0dee4b9b180b279b604715fa2",
+    "semantic_hash": "134cfbc0dee4b9b180b279b604715fa2"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/mongo/mongo.module.ts": {
+    "mtime": 1774115185.5630188,
+    "ast_hash": "aa2998bd34c62e78591088df2c702360",
+    "semantic_hash": "aa2998bd34c62e78591088df2c702360"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/mongo/audit-log.service.ts": {
+    "mtime": 1772894230.5248897,
+    "ast_hash": "031c346e5d5412fc73215e0a09f8a9b4",
+    "semantic_hash": "031c346e5d5412fc73215e0a09f8a9b4"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/account/account.controller.ts": {
+    "mtime": 1771954659.7433884,
+    "ast_hash": "9cbc5dfc7697d2d8e6e773f7fdc329e5",
+    "semantic_hash": "9cbc5dfc7697d2d8e6e773f7fdc329e5"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/account/account.service.ts": {
+    "mtime": 1771715214.7857761,
+    "ast_hash": "8d191a0520e2cecf889d9f0c468099a9",
+    "semantic_hash": "8d191a0520e2cecf889d9f0c468099a9"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/account/account.model.ts": {
+    "mtime": 1769971450.716024,
+    "ast_hash": "1cc8cdf1fe47e3cff7ca003d5d3d6067",
+    "semantic_hash": "1cc8cdf1fe47e3cff7ca003d5d3d6067"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/account/account.module.ts": {
+    "mtime": 1772100853.9774666,
+    "ast_hash": "f777fed181f42dc416a10354b70e3f4c",
+    "semantic_hash": "f777fed181f42dc416a10354b70e3f4c"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/account/security/security.controller.ts": {
+    "mtime": 1771954659.899656,
+    "ast_hash": "db198b0ff7b871586711755c13db0312",
+    "semantic_hash": "db198b0ff7b871586711755c13db0312"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/account/security/security.module.ts": {
+    "mtime": 1770280985.6484544,
+    "ast_hash": "cdd08b4c9b3f9ca888acba22e00db106",
+    "semantic_hash": "cdd08b4c9b3f9ca888acba22e00db106"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/account/security/security.model.ts": {
+    "mtime": 1770280985.640862,
+    "ast_hash": "5e1518ab4f5bbce83d35ccd475c79928",
+    "semantic_hash": "5e1518ab4f5bbce83d35ccd475c79928"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/authentication/authentication.service.ts": {
+    "mtime": 1771715214.8235211,
+    "ast_hash": "3be2c1ade07d3322713f4ece02769b65",
+    "semantic_hash": "3be2c1ade07d3322713f4ece02769b65"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/authentication/authentication.model.ts": {
+    "mtime": 1771105777.4390137,
+    "ast_hash": "f1635a03a1c6e06ad2dc0f1b49ff0dc6",
+    "semantic_hash": "f1635a03a1c6e06ad2dc0f1b49ff0dc6"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/authentication/authentication.controller.ts": {
+    "mtime": 1770280985.582683,
+    "ast_hash": "dc1068e93ca1bfbcc486ae40625a1e50",
+    "semantic_hash": "dc1068e93ca1bfbcc486ae40625a1e50"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/authentication/authentication.module.ts": {
+    "mtime": 1771956106.279731,
+    "ast_hash": "ac2d67c66d9e023fc0183a085a97e943",
+    "semantic_hash": "ac2d67c66d9e023fc0183a085a97e943"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/authentication/api-key/api-key.service.ts": {
+    "mtime": 1771954659.8031218,
+    "ast_hash": "b86b8e2a5e2c5aca88cd20d9a5180610",
+    "semantic_hash": "b86b8e2a5e2c5aca88cd20d9a5180610"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/authentication/passkey/passkey.service.ts": {
+    "mtime": 1775850692.8098786,
+    "ast_hash": "19dc78f774a1520c4c37b409dc29e390",
+    "semantic_hash": "19dc78f774a1520c4c37b409dc29e390"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/authentication/decorators/scopes.decorator.ts": {
+    "mtime": 1769971151.4406846,
+    "ast_hash": "f339f09b95731807839682f7330de6d7",
+    "semantic_hash": "f339f09b95731807839682f7330de6d7"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/authentication/decorators/require-2fa.decorator.ts": {
+    "mtime": 1769971151.4442797,
+    "ast_hash": "6bedeb7803ebe6c5fad84eea2cd453d3",
+    "semantic_hash": "6bedeb7803ebe6c5fad84eea2cd453d3"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/authentication/decorators/index.ts": {
+    "mtime": 1769971151.446849,
+    "ast_hash": "0269ce46815ce8575527aa967d29f466",
+    "semantic_hash": "0269ce46815ce8575527aa967d29f466"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/authentication/casl/casl.types.ts": {
+    "mtime": 1771954659.798088,
+    "ast_hash": "3544e303e3a6015985e5e8c26cc131f4",
+    "semantic_hash": "3544e303e3a6015985e5e8c26cc131f4"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/authentication/casl/casl-ability.factory.ts": {
+    "mtime": 1774115156.1080706,
+    "ast_hash": "f19bb829245b08022f0ebc68736f7aea",
+    "semantic_hash": "f19bb829245b08022f0ebc68736f7aea"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/authentication/casl/index.ts": {
+    "mtime": 1771954659.7503917,
+    "ast_hash": "e7ad6325d326a5f6f97a7d3e6e710278",
+    "semantic_hash": "e7ad6325d326a5f6f97a7d3e6e710278"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/authentication/casl/check-policies.decorator.ts": {
+    "mtime": 1771954659.7433836,
+    "ast_hash": "6bb9dd24082f95f5c99bc0c99d511ce6",
+    "semantic_hash": "6bb9dd24082f95f5c99bc0c99d511ce6"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/authentication/two-factor/two-factor.service.ts": {
+    "mtime": 1771715214.857036,
+    "ast_hash": "9ecbf696e5f3b553772ba3eb30b96b2e",
+    "semantic_hash": "9ecbf696e5f3b553772ba3eb30b96b2e"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/authentication/guards/policies.guard.ts": {
+    "mtime": 1772100853.9781475,
+    "ast_hash": "a1732d14ea08fddfab75ea1e5dd51da5",
+    "semantic_hash": "a1732d14ea08fddfab75ea1e5dd51da5"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/authentication/guards/session.guard.ts": {
+    "mtime": 1770058132.006797,
+    "ast_hash": "f8056c30a0f8dbd7395e47181db961db",
+    "semantic_hash": "f8056c30a0f8dbd7395e47181db961db"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/authentication/guards/api-key.guard.ts": {
+    "mtime": 1769971151.4625576,
+    "ast_hash": "264e8be5a901d93cbac2796b811bd4ca",
+    "semantic_hash": "264e8be5a901d93cbac2796b811bd4ca"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/authentication/guards/two-factor.guard.ts": {
+    "mtime": 1769971151.4673312,
+    "ast_hash": "9310d1c91375ebf2a0d1ff5147d04298",
+    "semantic_hash": "9310d1c91375ebf2a0d1ff5147d04298"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/authentication/guards/index.ts": {
+    "mtime": 1771954659.7505305,
+    "ast_hash": "0a7a13704057226e6fdc1871a8807727",
+    "semantic_hash": "0a7a13704057226e6fdc1871a8807727"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/authentication/guards/combined-auth.guard.ts": {
+    "mtime": 1772100853.9778433,
+    "ast_hash": "1a6e3f32b36bcbbb05d5ff60649191fc",
+    "semantic_hash": "1a6e3f32b36bcbbb05d5ff60649191fc"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/authentication/session/session.interface.ts": {
+    "mtime": 1769971151.4774532,
+    "ast_hash": "c525bab30ba78226d2520089bdec13cd",
+    "semantic_hash": "c525bab30ba78226d2520089bdec13cd"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/modules/authentication/session/session.service.ts": {
+    "mtime": 1772114679.382361,
+    "ast_hash": "b65e6bd7fbdab72af72423d9463faefd",
+    "semantic_hash": "b65e6bd7fbdab72af72423d9463faefd"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/entities/webhook.entity.ts": {
+    "mtime": 1772894230.3863537,
+    "ast_hash": "5a369322a808f8c88036a0f56cc9d31e",
+    "semantic_hash": "5a369322a808f8c88036a0f56cc9d31e"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/entities/user-subscription.entity.ts": {
+    "mtime": 1769971574.948218,
+    "ast_hash": "c38f3ac7cfa6dedac59eeb1822ad38f0",
+    "semantic_hash": "c38f3ac7cfa6dedac59eeb1822ad38f0"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/entities/passkey.entity.ts": {
+    "mtime": 1769974553.935851,
+    "ast_hash": "d17472ab0845c6cb7d53da1af8ea3632",
+    "semantic_hash": "d17472ab0845c6cb7d53da1af8ea3632"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/entities/api-usage-log.entity.ts": {
+    "mtime": 1772894230.386427,
+    "ast_hash": "1518780aa69a131f746dc72285694adc",
+    "semantic_hash": "1518780aa69a131f746dc72285694adc"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/entities/webhook-delivery.entity.ts": {
+    "mtime": 1772894230.399098,
+    "ast_hash": "d291eb1f41155e8ca893eb30da255f1f",
+    "semantic_hash": "d291eb1f41155e8ca893eb30da255f1f"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/entities/user.entity.ts": {
+    "mtime": 1769971481.524414,
+    "ast_hash": "98697083b42d366503827080d7e9d4cc",
+    "semantic_hash": "98697083b42d366503827080d7e9d4cc"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/entities/api-key.entity.ts": {
+    "mtime": 1769971845.044542,
+    "ast_hash": "4427dff4b1c7e0efbc7ee056d665b55b",
+    "semantic_hash": "4427dff4b1c7e0efbc7ee056d665b55b"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/entities/definition.entity.ts": {
+    "mtime": 1769971780.267282,
+    "ast_hash": "111fdcd259ea6f7680091792d9a0ad3d",
+    "semantic_hash": "111fdcd259ea6f7680091792d9a0ad3d"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/entities/two-factor.entity.ts": {
+    "mtime": 1769971554.396257,
+    "ast_hash": "17ba0ba09a6f3d50f37fcfc95612df57",
+    "semantic_hash": "17ba0ba09a6f3d50f37fcfc95612df57"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/entities/definition-group.entity.ts": {
+    "mtime": 1769971801.788125,
+    "ast_hash": "335c6990107cec78ac5f906d344ce75f",
+    "semantic_hash": "335c6990107cec78ac5f906d344ce75f"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/entities/team-invitation.entity.ts": {
+    "mtime": 1771963475.2075574,
+    "ast_hash": "3f417a67c026aa83c9ffedba137bb197",
+    "semantic_hash": "3f417a67c026aa83c9ffedba137bb197"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/entities/team.entity.ts": {
+    "mtime": 1771963475.2323976,
+    "ast_hash": "145855c4b79c19533e370a1af19b96c0",
+    "semantic_hash": "145855c4b79c19533e370a1af19b96c0"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/entities/subscription.entity.ts": {
+    "mtime": 1769971614.072849,
+    "ast_hash": "bbe152598b5324d90c58e5d1c880ed47",
+    "semantic_hash": "bbe152598b5324d90c58e5d1c880ed47"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/entities/team-member.entity.ts": {
+    "mtime": 1771963475.2075572,
+    "ast_hash": "f3e7d8b141c76498738c1286aa7dc3be",
+    "semantic_hash": "f3e7d8b141c76498738c1286aa7dc3be"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/docker-compose.yaml": {
+    "mtime": 1770390423.4166136,
+    "ast_hash": "f6f97182555afa36deef0cfc1a340952",
+    "semantic_hash": "f6f97182555afa36deef0cfc1a340952"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/README.md": {
+    "mtime": 1769191991.0592916,
+    "ast_hash": "f49e37f1bf212ce4acd80b4c9d2ea8d9",
+    "semantic_hash": "f49e37f1bf212ce4acd80b4c9d2ea8d9"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/CLAUDE.md": {
+    "mtime": 1775852225.3321776,
+    "ast_hash": "f8bfd4b11f28ce3b4aa0daea3f7c5fec",
+    "semantic_hash": "f8bfd4b11f28ce3b4aa0daea3f7c5fec"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/.github/copilot-instructions.md": {
+    "mtime": 1775851765.0251553,
+    "ast_hash": "ec35fac51e54004e292011bc2539aacd",
+    "semantic_hash": "ec35fac51e54004e292011bc2539aacd"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/.github/instructions/controller.instructions.md": {
+    "mtime": 1775851791.6392643,
+    "ast_hash": "afc6def0d86c4911d55e449dd278e6b9",
+    "semantic_hash": "afc6def0d86c4911d55e449dd278e6b9"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/.github/instructions/service.instructions.md": {
+    "mtime": 1775851817.6531866,
+    "ast_hash": "590a9a2b988a4b678d993108fd8995c9",
+    "semantic_hash": "590a9a2b988a4b678d993108fd8995c9"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/.github/instructions/entity.instructions.md": {
+    "mtime": 1775851833.990176,
+    "ast_hash": "1b70f58b2eeed6766c5d18df92c89a33",
+    "semantic_hash": "1b70f58b2eeed6766c5d18df92c89a33"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/.github/instructions/schema.instructions.md": {
+    "mtime": 1775851867.3359232,
+    "ast_hash": "a9111abe9e9121b1667c9ff5492f6c74",
+    "semantic_hash": "a9111abe9e9121b1667c9ff5492f6c74"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/.github/instructions/model.instructions.md": {
+    "mtime": 1775851853.3489823,
+    "ast_hash": "4832f3fed6fe12b197cca6dbafd507a1",
+    "semantic_hash": "4832f3fed6fe12b197cca6dbafd507a1"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/.github/instructions/test.instructions.md": {
+    "mtime": 1775851889.929969,
+    "ast_hash": "6e4b800fce708a8dfa9676178a89bd04",
+    "semantic_hash": "6e4b800fce708a8dfa9676178a89bd04"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/.github/agents/security-reviewer.agent.md": {
+    "mtime": 1775852074.3542252,
+    "ast_hash": "8c87a084b14ec2bb0ab603ab1a173c8a",
+    "semantic_hash": "8c87a084b14ec2bb0ab603ab1a173c8a"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/.github/agents/backend-developer.agent.md": {
+    "mtime": 1775852047.4788456,
+    "ast_hash": "9520a868a096d7ba4228f512516ac836",
+    "semantic_hash": "9520a868a096d7ba4228f512516ac836"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/.github/agents/infrastructure-engineer.agent.md": {
+    "mtime": 1775852104.522087,
+    "ast_hash": "18e831fad7ee9208c49f804aad56ada9",
+    "semantic_hash": "18e831fad7ee9208c49f804aad56ada9"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/.github/prompts/add-casl-policy.prompt.md": {
+    "mtime": 1775851959.6868496,
+    "ast_hash": "59e0c182e20d63f0b25d62cacd0fb452",
+    "semantic_hash": "59e0c182e20d63f0b25d62cacd0fb452"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/.github/prompts/write-unit-test.prompt.md": {
+    "mtime": 1775851974.6495965,
+    "ast_hash": "89132eac97d673373b61af2df4bdc22f",
+    "semantic_hash": "89132eac97d673373b61af2df4bdc22f"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/.github/prompts/new-cloud-service.prompt.md": {
+    "mtime": 1775851936.894837,
+    "ast_hash": "befd576d15b16dc503e3810b8771a2ab",
+    "semantic_hash": "befd576d15b16dc503e3810b8771a2ab"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/.github/prompts/new-module.prompt.md": {
+    "mtime": 1775851921.0309389,
+    "ast_hash": "137b7b36f3e2ebf2b8e2806bb07dcaaa",
+    "semantic_hash": "137b7b36f3e2ebf2b8e2806bb07dcaaa"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/.github/prompts/add-redis-cache.prompt.md": {
+    "mtime": 1775851990.504842,
+    "ast_hash": "ecd2c056ae94f32be7337c807b7748a7",
+    "semantic_hash": "ecd2c056ae94f32be7337c807b7748a7"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/.github/prompts/new-bullmq-job.prompt.md": {
+    "mtime": 1775852013.593013,
+    "ast_hash": "d21c6e23775cb37eb405b7f183739ace",
+    "semantic_hash": "d21c6e23775cb37eb405b7f183739ace"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/.github/skills/migrate-typeorm/SKILL.md": {
+    "mtime": 1775852155.5614252,
+    "ast_hash": "36d4cfb7352a0df17268e8f466d1b137",
+    "semantic_hash": "36d4cfb7352a0df17268e8f466d1b137"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/.github/skills/scaffold-module/SKILL.md": {
+    "mtime": 1775852138.0035076,
+    "ast_hash": "1ba804507296fbc037f59885ae8fcd70",
+    "semantic_hash": "1ba804507296fbc037f59885ae8fcd70"
+  },
+  "/Users/umut.kiziloglu/Documents/Projects/Personal/nestjs-storage/src/common/templates/mail/tr/welcome/welcome.html": {
+    "mtime": 1769191991.0624757,
+    "ast_hash": "563f5d8189be89dbc1b15dc7523b2500",
+    "semantic_hash": "563f5d8189be89dbc1b15dc7523b2500"
+  }
+}

@@ -16,7 +16,7 @@ import { KeyBuilder } from '@common/helpers/cast.helper';
 import { ScanStatus } from '@common/enums';
 
 type ScanJobData = {
-  userId: string;
+  ownerId: string;
   key: string;
 };
 
@@ -109,16 +109,16 @@ export class CloudScanService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  async EnqueueScan(userId: string, key: string): Promise<void> {
+  async EnqueueScan(ownerId: string, key: string): Promise<void> {
     if (!this.IsScanEnabled || !this.Queue) {
       return;
     }
-    await this.SetStatus(userId, key, { status: ScanStatus.PENDING });
-    await this.Queue.add('scan', { userId, key });
+    await this.SetStatus(ownerId, key, { status: ScanStatus.PENDING });
+    await this.Queue.add('scan', { ownerId, key });
   }
 
-  async GetScanStatus(userId: string, key: string): Promise<ScanResult | null> {
-    const statusKey = CloudKeys.ScanStatus(userId, key);
+  async GetScanStatus(ownerId: string, key: string): Promise<ScanResult | null> {
+    const statusKey = CloudKeys.ScanStatus(ownerId, key);
     const raw = await this.RedisService.Get<string>(statusKey);
     if (!raw) {
       return null;
@@ -131,17 +131,17 @@ export class CloudScanService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async ProcessScanJob(job: Job<ScanJobData, void>): Promise<void> {
-    const { userId, key } = job.data;
+    const { ownerId, key } = job.data;
     try {
       const object = await this.CloudS3Service.Send(
         new GetObjectCommand({
           Bucket: this.CloudS3Service.GetBuckets().Storage,
-          Key: KeyBuilder([userId, key]),
+          Key: KeyBuilder([ownerId, key]),
         }),
       );
       const size = Number(object.ContentLength ?? 0);
       if (size > this.MaxScanBytes) {
-        await this.SetStatus(userId, key, {
+        await this.SetStatus(ownerId, key, {
           status: ScanStatus.SKIPPED,
           reason: 'size_limit',
           scannedAt: new Date().toISOString(),
@@ -151,13 +151,13 @@ export class CloudScanService implements OnModuleInit, OnModuleDestroy {
 
       const stream = object.Body as Readable;
       const result = await this.ScanStreamWithClamAV(stream);
-      await this.SetStatus(userId, key, {
+      await this.SetStatus(ownerId, key, {
         ...result,
         scannedAt: new Date().toISOString(),
       });
     } catch (error) {
       this.Logger.error(`AV scan failed for ${key}`, error as Error);
-      await this.SetStatus(userId, key, {
+      await this.SetStatus(ownerId, key, {
         status: ScanStatus.ERROR,
         reason: 'scan_failed',
         scannedAt: new Date().toISOString(),
@@ -182,11 +182,11 @@ export class CloudScanService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async SetStatus(
-    userId: string,
+    ownerId: string,
     key: string,
     result: ScanResult,
   ): Promise<void> {
-    const statusKey = CloudKeys.ScanStatus(userId, key);
+    const statusKey = CloudKeys.ScanStatus(ownerId, key);
     await this.RedisService.Set(statusKey, JSON.stringify(result));
   }
 

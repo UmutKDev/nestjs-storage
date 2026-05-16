@@ -5,12 +5,20 @@ import { Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { CloudUserStorageUsageResponseModel } from './cloud.model';
 import { UserSubscriptionEntity } from '@entities/user-subscription.entity';
+import { TeamEntity } from '@entities/team.entity';
 import { CloudS3Service } from './cloud.s3.service';
 import { KeyBuilder } from '@common/helpers/cast.helper';
 import { GetStorageOwnerId } from './cloud.context';
 import { RedisService } from '@modules/redis/redis.service';
 import { NotificationService } from '@modules/notification/notification.service';
 import { NotificationType } from '@common/enums';
+
+const TEAM_OWNER_PREFIX = 'team/';
+
+type QuotaContext = {
+  limit: number | null;
+  recipientUserIds: string[];
+};
 
 @Injectable()
 export class CloudUsageService {
@@ -27,6 +35,9 @@ export class CloudUsageService {
 
   @InjectRepository(UserSubscriptionEntity)
   private UserSubscriptionRepository: Repository<UserSubscriptionEntity>;
+
+  @InjectRepository(TeamEntity)
+  private TeamRepository: Repository<TeamEntity>;
 
   constructor(
     private readonly CloudS3Service: CloudS3Service,
@@ -102,46 +113,46 @@ export class CloudUsageService {
     });
   }
 
-  async IncrementUsage(userId: string, deltaBytes: number): Promise<number> {
+  async IncrementUsage(ownerId: string, deltaBytes: number): Promise<number> {
     if (!deltaBytes) {
-      const current = await this.GetOrSeedUsage(userId);
+      const current = await this.GetOrSeedUsage(ownerId);
       return current;
     }
-    const current = await this.GetOrSeedUsage(userId);
+    const current = await this.GetOrSeedUsage(ownerId);
     const next = Math.max(0, current + deltaBytes);
-    await this.SetUsage(userId, next);
+    await this.SetUsage(ownerId, next);
 
     // Check quota thresholds and emit warnings
-    await this.CheckAndEmitQuotaWarning(userId, current, next);
+    await this.CheckAndEmitQuotaWarning(ownerId, current, next);
 
     return next;
   }
 
-  async DecrementUsage(userId: string, deltaBytes: number): Promise<number> {
+  async DecrementUsage(ownerId: string, deltaBytes: number): Promise<number> {
     if (!deltaBytes) {
-      const current = await this.GetOrSeedUsage(userId);
+      const current = await this.GetOrSeedUsage(ownerId);
       return current;
     }
-    return this.IncrementUsage(userId, -Math.abs(deltaBytes));
+    return this.IncrementUsage(ownerId, -Math.abs(deltaBytes));
   }
 
-  private async GetOrSeedUsage(userId: string): Promise<number> {
-    const cached = await this.GetUsage(userId);
+  private async GetOrSeedUsage(ownerId: string): Promise<number> {
+    const cached = await this.GetUsage(ownerId);
     if (typeof cached === 'number') {
       return cached;
     }
 
-    const totalSize = await this.ComputeUsageFromS3(userId);
-    await this.SetUsage(userId, totalSize);
+    const totalSize = await this.ComputeUsageFromS3(ownerId);
+    await this.SetUsage(ownerId, totalSize);
     return totalSize;
   }
 
-  private BuildUsageKey(userId: string): string {
-    return `cloud:usage:${userId}`;
+  private BuildUsageKey(ownerId: string): string {
+    return `cloud:usage:${ownerId}`;
   }
 
-  private async GetUsage(userId: string): Promise<number | null> {
-    const raw = await this.RedisService.Get<string>(this.BuildUsageKey(userId));
+  private async GetUsage(ownerId: string): Promise<number | null> {
+    const raw = await this.RedisService.Get<string>(this.BuildUsageKey(ownerId));
     if (raw === undefined || raw === null) {
       return null;
     }
@@ -149,11 +160,11 @@ export class CloudUsageService {
     return Number.isNaN(parsed) ? null : parsed;
   }
 
-  private async SetUsage(userId: string, value: number): Promise<void> {
-    await this.RedisService.Set(this.BuildUsageKey(userId), String(value));
+  private async SetUsage(ownerId: string, value: number): Promise<void> {
+    await this.RedisService.Set(this.BuildUsageKey(ownerId), String(value));
   }
 
-  private async ComputeUsageFromS3(userId: string): Promise<number> {
+  private async ComputeUsageFromS3(ownerId: string): Promise<number> {
     let continuationToken: string | undefined = undefined;
     let totalSize = 0;
 
@@ -161,7 +172,7 @@ export class CloudUsageService {
       const command = await this.CloudS3Service.Send(
         new ListObjectsV2Command({
           Bucket: this.CloudS3Service.GetBuckets().Storage,
-          Prefix: KeyBuilder([userId, '']),
+          Prefix: KeyBuilder([ownerId, '']),
           ContinuationToken: continuationToken,
         }),
       );
@@ -184,21 +195,22 @@ export class CloudUsageService {
   /**
    * Emit quota warning notifications when usage crosses thresholds (80%, 90%, 100%).
    * Only emits when the threshold is newly crossed (previousUsage was below, currentUsage is above).
+   *
+   * ownerId may be either a personal user UUID or a team scope ("team/{teamId}").
+   * Routing and recipient resolution happen in ResolveQuotaContext — for team scopes
+   * the notification fans out to every team member.
    */
   private async CheckAndEmitQuotaWarning(
-    userId: string,
+    ownerId: string,
     previousUsage: number,
     currentUsage: number,
   ): Promise<void> {
     try {
-      const subscription = await this.UserSubscriptionRepository.findOne({
-        where: { User: { Id: userId } },
-        relations: ['Subscription'],
-      });
+      const { limit, recipientUserIds } =
+        await this.ResolveQuotaContext(ownerId);
 
-      if (!subscription?.Subscription?.StorageLimitBytes) return;
+      if (!limit || recipientUserIds.length === 0) return;
 
-      const limit = subscription.Subscription.StorageLimitBytes;
       const previousPct = (previousUsage / limit) * 100;
       const currentPct = (currentUsage / limit) * 100;
 
@@ -211,11 +223,11 @@ export class CloudUsageService {
       };
 
       if (currentPct >= 100 && previousPct < 100) {
-        this.NotificationService.EmitToUser(
-          userId,
+        this.NotificationService.EmitToUsers(
+          recipientUserIds,
           NotificationType.QUOTA_EXCEEDED,
           'Storage Limit Exceeded',
-          `You have exceeded your storage limit (${formatSize(currentUsage)} / ${formatSize(limit)}).`,
+          `Storage limit exceeded (${formatSize(currentUsage)} / ${formatSize(limit)}).`,
           {
             UsagePercentage: Math.round(currentPct),
             UsedBytes: currentUsage,
@@ -223,11 +235,11 @@ export class CloudUsageService {
           },
         );
       } else if (currentPct >= 90 && previousPct < 90) {
-        this.NotificationService.EmitToUser(
-          userId,
+        this.NotificationService.EmitToUsers(
+          recipientUserIds,
           NotificationType.QUOTA_WARNING,
           'Storage Almost Full',
-          `You are using ${Math.round(currentPct)}% of your storage (${formatSize(currentUsage)} / ${formatSize(limit)}).`,
+          `Using ${Math.round(currentPct)}% of storage (${formatSize(currentUsage)} / ${formatSize(limit)}).`,
           {
             UsagePercentage: Math.round(currentPct),
             UsedBytes: currentUsage,
@@ -235,11 +247,11 @@ export class CloudUsageService {
           },
         );
       } else if (currentPct >= 80 && previousPct < 80) {
-        this.NotificationService.EmitToUser(
-          userId,
+        this.NotificationService.EmitToUsers(
+          recipientUserIds,
           NotificationType.QUOTA_WARNING,
           'Storage Usage Warning',
-          `You are using ${Math.round(currentPct)}% of your storage (${formatSize(currentUsage)} / ${formatSize(limit)}).`,
+          `Using ${Math.round(currentPct)}% of storage (${formatSize(currentUsage)} / ${formatSize(limit)}).`,
           {
             UsagePercentage: Math.round(currentPct),
             UsedBytes: currentUsage,
@@ -249,8 +261,34 @@ export class CloudUsageService {
       }
     } catch (error) {
       this.Logger.warn(
-        `Failed to check quota thresholds for user ${userId}: ${error.message}`,
+        `Failed to check quota thresholds for owner ${ownerId}: ${(error as Error).message}`,
       );
     }
+  }
+
+  private async ResolveQuotaContext(ownerId: string): Promise<QuotaContext> {
+    if (ownerId.startsWith(TEAM_OWNER_PREFIX)) {
+      const teamId = ownerId.slice(TEAM_OWNER_PREFIX.length);
+      const team = await this.TeamRepository.findOne({
+        where: { Id: teamId },
+        relations: ['Members', 'Members.User'],
+      });
+      if (!team) return { limit: null, recipientUserIds: [] };
+      return {
+        limit: team.StorageLimitBytes ?? null,
+        recipientUserIds: (team.Members ?? [])
+          .map((m) => m.User?.Id)
+          .filter((id): id is string => !!id),
+      };
+    }
+
+    const subscription = await this.UserSubscriptionRepository.findOne({
+      where: { User: { Id: ownerId } },
+      relations: ['Subscription'],
+    });
+    return {
+      limit: subscription?.Subscription?.StorageLimitBytes ?? null,
+      recipientUserIds: subscription ? [ownerId] : [],
+    };
   }
 }

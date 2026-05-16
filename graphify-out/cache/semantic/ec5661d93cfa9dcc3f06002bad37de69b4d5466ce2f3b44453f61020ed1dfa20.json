@@ -1,0 +1,1 @@
+{"nodes": [{"id": "casl_casl_types_app_ability", "label": "AppAbility", "file_type": "code", "source_file": "src/modules/authentication/casl/casl.types.ts"}, {"id": "casl_casl_types_policy_handler", "label": "PolicyHandler", "file_type": "code", "source_file": "src/modules/authentication/casl/casl.types.ts"}], "edges": [], "hyperedges": []}
