@@ -68,7 +68,15 @@ export const SizeFormatter = ({
 };
 
 export const CDNPathResolver = (path: string): string => {
-  return path ? process.env.S3_PUBLIC_ENDPOINT + '/' + path : path;
+  if (!path) {
+    return path;
+  }
+  // Already an absolute URL (e.g. a presigned URL or one built via GetUrl):
+  // it is fully resolved, so prepending the endpoint again would duplicate it.
+  if (/^https?:\/\//i.test(path)) {
+    return path;
+  }
+  return process.env.S3_PUBLIC_ENDPOINT + '/' + path;
 };
 
 export const IsImageFile = (name: string): boolean => {

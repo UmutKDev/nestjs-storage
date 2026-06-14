@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { CloudListService } from './cloud.list.service';
 import { CloudS3Service } from './cloud.s3.service';
 import { CloudMetadataService } from './cloud.metadata.service';
+import { CloudObjectModelService } from './cloud.object-model.service';
 import { RedisService } from '@modules/redis/redis.service';
 
 // Ensure signed URL processing is disabled in tests (Bun auto-loads .env)
@@ -136,6 +137,7 @@ describe('CloudListService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         CloudListService,
+        CloudObjectModelService,
         { provide: CloudS3Service, useValue: mockCloudS3Service },
         { provide: CloudMetadataService, useValue: mockCloudMetadataService },
         { provide: RedisService, useValue: mockRedisService },

@@ -21,11 +21,16 @@ import {
 } from './cloud.model';
 import { CloudS3Service } from './cloud.s3.service';
 import { CloudMetadataService } from './cloud.metadata.service';
+import { CloudObjectModelService } from './cloud.object-model.service';
 import { CloudConflictService } from './cloud.conflict.service';
 import { CloudVersionService } from './cloud.version.service';
 import { KeyBuilder } from '@common/helpers/cast.helper';
 import { GetStorageOwnerId } from './cloud.context';
-import { EnsureTrailingSlash, NormalizeDirectoryPath } from './cloud.utils';
+import {
+  EnsureTrailingSlash,
+  NormalizeDirectoryPath,
+  GetFileName,
+} from './cloud.utils';
 import { ConflictResolutionStrategy } from '@common/enums';
 
 @Injectable()
@@ -35,6 +40,7 @@ export class CloudObjectService {
   constructor(
     private readonly CloudS3Service: CloudS3Service,
     private readonly CloudMetadataService: CloudMetadataService,
+    private readonly CloudObjectModelService: CloudObjectModelService,
     private readonly CloudConflictService: CloudConflictService,
     private readonly CloudVersionService: CloudVersionService,
   ) {}
@@ -44,31 +50,30 @@ export class CloudObjectService {
     User: UserContext,
   ): Promise<CloudObjectModel> {
     try {
-      const command = await this.CloudS3Service.Send(
+      const fullKey = KeyBuilder([GetStorageOwnerId(User), Key]);
+      const head = await this.CloudS3Service.Send(
         new HeadObjectCommand({
           Bucket: this.CloudS3Service.GetBuckets().Storage,
-          Key: KeyBuilder([GetStorageOwnerId(User), Key]),
+          Key: fullKey,
         }),
       );
 
-      return plainToInstance(CloudObjectModel, {
-        Name: Key?.split('/').pop(),
-        Extension: Key?.includes('.') ? Key.split('.').pop() : undefined,
-        MimeType: command.ContentType,
-        Path: {
-          Host: this.CloudS3Service.GetPublicHostname(),
-          Key: Key.replace('' + GetStorageOwnerId(User) + '/', ''),
-          Url: Key,
-        },
-        Metadata: this.CloudMetadataService.DecodeMetadataFromS3(
-          command.Metadata,
+      return plainToInstance(
+        CloudObjectModel,
+        await this.CloudObjectModelService.BuildObjectModel(
+          {
+            Key: fullKey,
+            Size: head.ContentLength,
+            ETag: head.ETag,
+            LastModified: head.LastModified,
+          },
+          User,
+          {
+            IsSignedUrlProcessing: true,
+            Head: head,
+          },
         ),
-        Size: command.ContentLength,
-        ETag: command.ETag,
-        LastModified: command.LastModified
-          ? command.LastModified.toISOString()
-          : '',
-      });
+      );
     } catch (error) {
       if (this.CloudS3Service.IsNotFoundError(error)) {
         throw new HttpException(Codes.Error.Cloud.FILE_NOT_FOUND, 404);
@@ -95,7 +100,8 @@ export class CloudObjectService {
       });
 
       const url = await getSignedUrl(this.CloudS3Service.GetClient(), command, {
-        expiresIn: ExpiresInSeconds || this.CloudS3Service.PresignedUrlExpirySeconds,
+        expiresIn:
+          ExpiresInSeconds || this.CloudS3Service.PresignedUrlExpirySeconds,
       });
 
       return url;
@@ -215,7 +221,7 @@ export class CloudObjectService {
             conflictedKeys.add(item.Key);
           }
         } else {
-          const fileName = item.Key.split('/').pop() || '';
+          const fileName = GetFileName(item.Key);
           const targetFullKey = KeyBuilder([ownerId, DestinationKey, fileName]);
           const targetInfo =
             await this.CloudConflictService.CheckFileExists(targetFullKey);
@@ -309,7 +315,7 @@ export class CloudObjectService {
           );
         } else {
           const sourceFullKey = KeyBuilder([ownerId, item.Key]);
-          const fileName = item.Key.split('/').pop() || '';
+          const fileName = GetFileName(item.Key);
           let targetFullKey = KeyBuilder([ownerId, DestinationKey, fileName]);
 
           if (
@@ -324,8 +330,7 @@ export class CloudObjectService {
             targetFullKey = resolvedKey;
 
             // Update originalfilename metadata to reflect the renamed file
-            const resolvedFileName =
-              targetFullKey.split('/').pop() || fileName;
+            const resolvedFileName = GetFileName(targetFullKey) || fileName;
             const head = await this.CloudS3Service.Send(
               new HeadObjectCommand({
                 Bucket: bucket,
@@ -515,7 +520,7 @@ export class CloudObjectService {
           const strategy = ConflictStrategy ?? ConflictResolutionStrategy.FAIL;
 
           if (strategy === ConflictResolutionStrategy.FAIL) {
-            const fileName = Key.split('/').pop() || '';
+            const fileName = GetFileName(Key);
             const targetFileName = Name || fileName;
             throw new HttpException(
               plainToInstance(ConflictDetailsResponseModel, {
@@ -570,7 +575,7 @@ export class CloudObjectService {
 
       // Update originalfilename metadata if the key was changed by KEEP_BOTH
       if (targetKey !== sourceKey) {
-        const resolvedFileName = targetRelative.split('/').pop() || '';
+        const resolvedFileName = GetFileName(targetRelative);
         if (resolvedFileName) {
           sanitizedProvidedMetadata['originalfilename'] = resolvedFileName;
         }

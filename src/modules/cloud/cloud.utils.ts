@@ -1,3 +1,4 @@
+import { RedisOptions } from 'ioredis';
 import { ArchiveFormat } from '@common/enums';
 
 export const NormalizeDirectoryPath = (path: string): string =>
@@ -11,6 +12,54 @@ export const JoinKey = (...parts: string[]): string =>
     .map((part) => (part || '').replace(/^\/+|\/+$/g, ''))
     .filter((part) => !!part)
     .join('/');
+
+// Parent directory of a key/path; '' for root or single-segment paths.
+export const GetParentDirectoryPath = (path: string): string => {
+  const normalized = NormalizeDirectoryPath(path);
+  if (!normalized) {
+    return '';
+  }
+  const parts = normalized.split('/').filter((part) => !!part);
+  if (parts.length <= 1) {
+    return '';
+  }
+  parts.pop();
+  return parts.join('/');
+};
+
+// ─── Name / Extension ────────────────────────────────────────────────────────
+
+// Last path segment (file/folder name) of an S3 key; '' when empty.
+export const GetFileName = (key: string): string =>
+  (key || '').split('/').pop() || '';
+
+// Extension of a file name (without the dot); '' when there is none.
+export const GetExtension = (name: string): string =>
+  name.includes('.') ? (name.split('.').pop() ?? '') : '';
+
+// ─── Folder Containment ──────────────────────────────────────────────────────
+
+// First folder in `folders` that contains `relativePath` (exact match or
+// ancestor prefix), or null. Encrypted vs hidden is purely the caller's Set.
+export const FindContainingFolder = (
+  relativePath: string,
+  folders?: Set<string>,
+): string | null => {
+  if (!folders || folders.size === 0) {
+    return null;
+  }
+  for (const folder of folders) {
+    if (relativePath === folder || relativePath.startsWith(folder + '/')) {
+      return folder;
+    }
+  }
+  return null;
+};
+
+export const IsInsideFolder = (
+  relativePath: string,
+  folders?: Set<string>,
+): boolean => FindContainingFolder(relativePath, folders) !== null;
 
 // ─── Archive Format Detection ────────────────────────────────────────────────
 
@@ -95,4 +144,25 @@ export const NormalizeArchiveEntryPath = (entryPath: string): string | null => {
   )
     return null;
   return segments.join('/');
+};
+
+// ─── BullMQ Redis Connection ─────────────────────────────────────────────────
+
+// Direct IORedis options for BullMQ queues/workers. These intentionally differ
+// from the cache-manager RedisService config (maxRetriesPerRequest: null is
+// required by BullMQ). Returns null when Redis env is not configured.
+export const BuildBullRedisConnectionOptions = (): RedisOptions | null => {
+  const host = process.env.REDIS_HOSTNAME;
+  const portValue = process.env.REDIS_PORT ?? '';
+  const port = parseInt(portValue, 10);
+  if (!host || Number.isNaN(port)) {
+    return null;
+  }
+  return {
+    host,
+    port,
+    password: process.env.REDIS_PASSWORD,
+    maxRetriesPerRequest: null,
+    enableReadyCheck: false,
+  };
 };

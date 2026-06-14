@@ -13,6 +13,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { RedisModule } from '@modules/redis/redis.module';
 import { CloudS3Service } from './cloud.s3.service';
 import { CloudMetadataService } from './cloud.metadata.service';
+import { CloudObjectModelService } from './cloud.object-model.service';
 import { CloudListService } from './cloud.list.service';
 import { CloudObjectService } from './cloud.object.service';
 import { CloudArchiveService } from './cloud.archive.service';
@@ -54,6 +55,7 @@ import { CloudDuplicateService } from './cloud.duplicate.service';
     CloudService,
     CloudS3Service,
     CloudMetadataService,
+    CloudObjectModelService,
     CloudListService,
     CloudObjectService,
     CloudArchiveService,

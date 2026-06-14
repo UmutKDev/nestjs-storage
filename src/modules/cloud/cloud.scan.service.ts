@@ -7,12 +7,13 @@ import {
 } from '@nestjs/common';
 import { Readable } from 'stream';
 import { Job, Queue, Worker } from 'bullmq';
-import IORedis, { RedisOptions } from 'ioredis';
+import IORedis from 'ioredis';
 import * as net from 'net';
 import { CloudS3Service } from './cloud.s3.service';
 import { RedisService } from '@modules/redis/redis.service';
 import { CloudKeys } from '@modules/redis/redis.keys';
 import { KeyBuilder } from '@common/helpers/cast.helper';
+import { BuildBullRedisConnectionOptions } from './cloud.utils';
 import { ScanStatus } from '@common/enums';
 
 type ScanJobData = {
@@ -63,7 +64,7 @@ export class CloudScanService implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
-    const options = this.BuildRedisConnectionOptions();
+    const options = BuildBullRedisConnectionOptions();
     if (!options) {
       this.Logger.warn('Redis config missing; AV scan queue disabled.');
       return;
@@ -163,22 +164,6 @@ export class CloudScanService implements OnModuleInit, OnModuleDestroy {
         scannedAt: new Date().toISOString(),
       });
     }
-  }
-
-  private BuildRedisConnectionOptions(): RedisOptions | null {
-    const host = process.env.REDIS_HOSTNAME;
-    const portValue = process.env.REDIS_PORT ?? '';
-    const port = parseInt(portValue, 10);
-    if (!host || Number.isNaN(port)) {
-      return null;
-    }
-    return {
-      host,
-      port,
-      password: process.env.REDIS_PASSWORD,
-      maxRetriesPerRequest: null,
-      enableReadyCheck: false,
-    };
   }
 
   private async SetStatus(

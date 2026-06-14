@@ -14,7 +14,7 @@ import {
 import { createHash } from 'crypto';
 import { Readable } from 'stream';
 import { Job, Queue, Worker } from 'bullmq';
-import IORedis, { RedisOptions } from 'ioredis';
+import IORedis from 'ioredis';
 import sharp from 'sharp';
 import { CloudS3Service } from './cloud.s3.service';
 import { RedisService } from '@modules/redis/redis.service';
@@ -33,6 +33,7 @@ import {
 } from '@common/enums';
 import { IsImageFile, KeyBuilder } from '@common/helpers/cast.helper';
 import { GetStorageOwnerId, GetCacheOwnerId } from './cloud.context';
+import { BuildBullRedisConnectionOptions } from './cloud.utils';
 import { uuidGenerator } from '@common/helpers/cast.helper';
 import {
   CloudDuplicateScanStartRequestModel,
@@ -128,7 +129,7 @@ export class CloudDuplicateService implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
-    const options = this.BuildRedisConnectionOptions();
+    const options = BuildBullRedisConnectionOptions();
     if (!options) {
       this.Logger.warn('Redis config missing; duplicate scan queue disabled.');
       return;
@@ -967,21 +968,5 @@ export class CloudDuplicateService implements OnModuleInit, OnModuleDestroy {
     };
 
     return mimeMap[ext];
-  }
-
-  private BuildRedisConnectionOptions(): RedisOptions | null {
-    const host = process.env.REDIS_HOSTNAME;
-    const portValue = process.env.REDIS_PORT ?? '';
-    const port = parseInt(portValue, 10);
-    if (!host || Number.isNaN(port)) {
-      return null;
-    }
-    return {
-      host,
-      port,
-      password: process.env.REDIS_PASSWORD,
-      maxRetriesPerRequest: null,
-      enableReadyCheck: false,
-    };
   }
 }

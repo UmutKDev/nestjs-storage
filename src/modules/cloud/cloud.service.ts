@@ -78,7 +78,7 @@ import { CloudScanService } from './cloud.scan.service';
 import { CloudVersionService } from './cloud.version.service';
 import { CloudDuplicateService } from './cloud.duplicate.service';
 import { CloudS3Service } from './cloud.s3.service';
-import { NormalizeDirectoryPath } from './cloud.utils';
+import { NormalizeDirectoryPath, GetParentDirectoryPath } from './cloud.utils';
 import { GetStorageOwnerId } from './cloud.context';
 import { KeyBuilder, SizeFormatter } from '@common/helpers/cast.helper';
 import { RedisService } from '@modules/redis/redis.service';
@@ -537,16 +537,6 @@ export class CloudService {
       );
       await this.CloudListService.InvalidateListCache(GetStorageOwnerId(User));
 
-      // Notify user about file deletion
-      const deletedNames = files.map((f) => f.Key.split('/').pop() || f.Key);
-      this.NotificationService.EmitToUser(
-        User.Id,
-        NotificationType.FILE_DELETED,
-        'Files Deleted',
-        `${deletedNames.length} file(s) deleted successfully.`,
-        { Keys: files.map((f) => f.Key), Count: files.length },
-      );
-
       return deleted;
     }
     await this.SetIdempotentResult(
@@ -594,7 +584,7 @@ export class CloudService {
       Key,
     );
     if (Name) {
-      const parent = this.GetParentDirectoryPath(Key);
+      const parent = GetParentDirectoryPath(Key);
       const renamedPath = parent ? `${parent}/${Name}` : Name;
       await this.CloudListService.InvalidateDirectoryThumbnailCache(
         GetStorageOwnerId(User),
@@ -790,16 +780,6 @@ export class CloudService {
         this.Logger.warn(
           `Version cleanup failed for "${Key}": ${err?.message}`,
         ),
-    );
-
-    // Notify user about upload completion
-    const fileName = Key.split('/').pop() || Key;
-    this.NotificationService.EmitToUser(
-      User.Id,
-      NotificationType.UPLOAD_COMPLETE,
-      'Upload Complete',
-      `"${fileName}" has been uploaded successfully.`,
-      { Key, Size: uploadedSize },
     );
 
     return result;
@@ -1007,7 +987,7 @@ export class CloudService {
       Path,
     );
     if (Name) {
-      const parent = this.GetParentDirectoryPath(Path);
+      const parent = GetParentDirectoryPath(Path);
       const renamedPath = parent ? `${parent}/${Name}` : Name;
       await this.CloudListService.InvalidateDirectoryThumbnailCache(
         GetStorageOwnerId(User),
@@ -1213,45 +1193,32 @@ export class CloudService {
     return this.CloudDuplicateService.EnqueueDuplicateScan(model, User);
   }
 
-  async DuplicateScanStatus(
-    { ScanId }: CloudDuplicateScanIdRequestModel,
-  ): Promise<CloudDuplicateScanStatusResponseModel | null> {
+  async DuplicateScanStatus({
+    ScanId,
+  }: CloudDuplicateScanIdRequestModel): Promise<CloudDuplicateScanStatusResponseModel | null> {
     return this.CloudDuplicateService.GetDuplicateScanStatus(ScanId);
   }
 
-  async DuplicateScanResult(
-    { ScanId }: CloudDuplicateScanIdRequestModel,
-  ): Promise<CloudDuplicateScanResultResponseModel | null> {
+  async DuplicateScanResult({
+    ScanId,
+  }: CloudDuplicateScanIdRequestModel): Promise<CloudDuplicateScanResultResponseModel | null> {
     return this.CloudDuplicateService.GetDuplicateScanResult(ScanId);
   }
 
-  async DuplicateScanCancel(
-    { ScanId }: CloudDuplicateScanIdRequestModel,
-  ): Promise<CloudDuplicateScanCancelResponseModel> {
+  async DuplicateScanCancel({
+    ScanId,
+  }: CloudDuplicateScanIdRequestModel): Promise<CloudDuplicateScanCancelResponseModel> {
     return this.CloudDuplicateService.CancelDuplicateScan(ScanId);
   }
 
   //#endregion
-
-  private GetParentDirectoryPath(key: string): string {
-    const normalized = NormalizeDirectoryPath(key);
-    if (!normalized) {
-      return '';
-    }
-    const parts = normalized.split('/').filter((part) => !!part);
-    if (parts.length <= 1) {
-      return '';
-    }
-    parts.pop();
-    return parts.join('/');
-  }
 
   private async EnsureUploadAccess(
     key: string,
     userId: string,
     sessionToken?: string,
   ): Promise<void> {
-    const folderPath = this.GetParentDirectoryPath(key);
+    const folderPath = GetParentDirectoryPath(key);
     const accessCheck = await this.CheckEncryptedFolderAccess(
       folderPath,
       userId,

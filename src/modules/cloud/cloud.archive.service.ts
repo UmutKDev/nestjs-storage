@@ -16,7 +16,7 @@ import {
 import { plainToInstance } from 'class-transformer';
 import { PassThrough, Readable } from 'stream';
 import { Job, Queue, Worker } from 'bullmq';
-import IORedis, { RedisOptions } from 'ioredis';
+import IORedis from 'ioredis';
 import { randomUUID } from 'crypto';
 import {
   CloudArchiveExtractStartRequestModel,
@@ -36,6 +36,7 @@ import { KeyBuilder, MimeTypeFromExtension } from '@common/helpers/cast.helper';
 import { GetStorageOwnerId } from './cloud.context';
 import {
   BuildArchiveExtractPrefix,
+  BuildBullRedisConnectionOptions,
   GetArchiveFormat,
   JoinKey,
   NormalizeArchiveEntryPath,
@@ -240,7 +241,7 @@ export class CloudArchiveService implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
-    const options = this.BuildRedisConnectionOptions();
+    const options = BuildBullRedisConnectionOptions();
     if (!options) {
       this.Logger.warn(
         'Redis connection options are missing; archive queues will not be available.',
@@ -1108,22 +1109,6 @@ export class CloudArchiveService implements OnModuleInit, OnModuleDestroy {
       MaxEntryBytes: this.ExtractMaxEntryBytes,
       MaxTotalBytes: this.ExtractMaxTotalBytes,
       MaxCompressionRatio: this.ExtractMaxCompressionRatio,
-    };
-  }
-
-  private BuildRedisConnectionOptions(): RedisOptions | null {
-    const host = process.env.REDIS_HOSTNAME;
-    const portValue = process.env.REDIS_PORT ?? '';
-    const port = parseInt(portValue, 10);
-    if (!host || Number.isNaN(port)) {
-      return null;
-    }
-    return {
-      host,
-      port,
-      password: process.env.REDIS_PASSWORD,
-      maxRetriesPerRequest: null,
-      enableReadyCheck: false,
     };
   }
 

@@ -1,8 +1,6 @@
 export enum NotificationType {
   // Cloud / Storage
-  UPLOAD_COMPLETE = 'UPLOAD_COMPLETE',
   UPLOAD_FAILED = 'UPLOAD_FAILED',
-  FILE_DELETED = 'FILE_DELETED',
   FILE_MOVED = 'FILE_MOVED',
 
   // Archive

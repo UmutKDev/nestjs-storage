@@ -1,6 +1,5 @@
 import {
   CommonPrefix,
-  HeadObjectCommand,
   ListObjectsV2Command,
   ListObjectsV2CommandInput,
   _Object,
@@ -15,14 +14,18 @@ import {
   CloudObjectModel,
 } from './cloud.model';
 import { CloudBreadcrumbLevelType } from '@common/enums';
-import {
-  IsImageFile,
-  KeyBuilder,
-  MimeTypeFromExtension,
-} from '@common/helpers/cast.helper';
+import { IsImageFile, KeyBuilder } from '@common/helpers/cast.helper';
 import { CloudS3Service } from './cloud.s3.service';
 import { CloudMetadataService } from './cloud.metadata.service';
-import { NormalizeDirectoryPath } from './cloud.utils';
+import { CloudObjectModelService } from './cloud.object-model.service';
+import {
+  NormalizeDirectoryPath,
+  GetParentDirectoryPath,
+  GetFileName,
+  GetExtension,
+  FindContainingFolder,
+  IsInsideFolder,
+} from './cloud.utils';
 import { GetStorageOwnerId } from './cloud.context';
 import { RedisService } from '@modules/redis/redis.service';
 import { CloudKeys } from '@modules/redis/redis.keys';
@@ -58,6 +61,7 @@ export class CloudListService {
   constructor(
     private readonly CloudS3Service: CloudS3Service,
     private readonly CloudMetadataService: CloudMetadataService,
+    private readonly CloudObjectModelService: CloudObjectModelService,
     private readonly RedisService: RedisService,
   ) {}
 
@@ -536,8 +540,8 @@ export class CloudListService {
         const relativePath = obj.Key.replace(GetStorageOwnerId(User) + '/', '');
 
         // Check encrypted folder access
-        if (this.IsInsideEncryptedFolder(relativePath, EncryptedFolders)) {
-          const encFolder = this.FindEncryptingFolder(
+        if (IsInsideFolder(relativePath, EncryptedFolders)) {
+          const encFolder = FindContainingFolder(
             relativePath,
             EncryptedFolders,
           );
@@ -558,8 +562,8 @@ export class CloudListService {
         }
 
         // Check hidden folder access
-        if (this.IsInsideHiddenFolder(relativePath, HiddenFolders)) {
-          const hiddenFolder = this.FindHiddenFolder(
+        if (IsInsideFolder(relativePath, HiddenFolders)) {
+          const hiddenFolder = FindContainingFolder(
             relativePath,
             HiddenFolders,
           );
@@ -586,7 +590,7 @@ export class CloudListService {
             '/' + this.EmptyFolderPlaceholder,
             '',
           );
-          const folderName = folderPath.split('/').pop() || '';
+          const folderName = GetFileName(folderPath);
           if (
             folderName.toLowerCase().includes(lowerQuery) &&
             !matchedDirs.has(folderPath)
@@ -613,13 +617,11 @@ export class CloudListService {
         }
 
         // Match file name
-        const fileName = obj.Key.split('/').pop() || '';
+        const fileName = GetFileName(obj.Key);
         if (!fileName.toLowerCase().includes(lowerQuery)) continue;
 
         if (lowerExtension) {
-          const ext = fileName.includes('.')
-            ? fileName.split('.').pop()?.toLowerCase()
-            : '';
+          const ext = GetExtension(fileName).toLowerCase();
           if (ext !== lowerExtension) continue;
         }
 
@@ -736,9 +738,10 @@ export class CloudListService {
     const pending: PendingEntry[] = [];
     for (const commonPrefix of CommonPrefixesFiltered) {
       if (!commonPrefix.Prefix) continue;
-      const DirectoryName = commonPrefix.Prefix
-        .replace(Prefix, '')
-        .replace('/', '');
+      const DirectoryName = commonPrefix.Prefix.replace(Prefix, '').replace(
+        '/',
+        '',
+      );
       const DirectoryPrefix: string = commonPrefix.Prefix.replace(
         GetStorageOwnerId(User) + '/',
         '',
@@ -789,8 +792,13 @@ export class CloudListService {
     // Faz 3: Sonuçları map'ten okuyarak sync assembly yap
     const directories: CloudDirectoryModel[] = [];
     for (const entry of pending) {
-      const { DirectoryName, DirectoryPrefix, normalizedPrefix, isEncrypted, isHidden } =
-        entry;
+      const {
+        DirectoryName,
+        DirectoryPrefix,
+        normalizedPrefix,
+        isEncrypted,
+        isHidden,
+      } = entry;
       const isLocked = isEncrypted
         ? !(encMap.get(normalizedPrefix) ?? false)
         : false;
@@ -876,12 +884,11 @@ export class CloudListService {
           break;
         }
         const content = Contents[current];
-        processedContents[current] = await this.BuildObjectModel(
-          content,
-          User,
-          IsMetadataProcessing,
-          IsSignedUrlProcessing,
-        );
+        processedContents[current] =
+          await this.CloudObjectModelService.BuildObjectModel(content, User, {
+            IsMetadataProcessing,
+            IsSignedUrlProcessing,
+          });
       }
     };
     const concurrency = Math.min(
@@ -890,56 +897,6 @@ export class CloudListService {
     );
     await Promise.all(Array.from({ length: concurrency }, () => worker()));
     return processedContents.filter((item) => !!item);
-  }
-
-  private async BuildObjectModel(
-    content: _Object,
-    User: UserContext,
-    IsMetadataProcessing: boolean,
-    IsSignedUrlProcessing: boolean,
-  ): Promise<CloudObjectModel> {
-    let metadata: Record<string, string> = {};
-    let contentType: string | undefined = undefined;
-
-    if (IsMetadataProcessing) {
-      const head = await this.CloudS3Service.Send(
-        new HeadObjectCommand({
-          Bucket: this.CloudS3Service.GetBuckets().Storage,
-          Key: content.Key,
-        }),
-      );
-      metadata = this.CloudMetadataService.DecodeMetadataFromS3(head.Metadata);
-      contentType = head.ContentType;
-    }
-
-    const SignedUrl = await this.CloudS3Service.SignedUrlBuilder(
-      content,
-      IsSignedUrlProcessing,
-      this.CloudS3Service,
-      this.CloudS3Service.PresignedUrlExpirySeconds,
-    );
-
-    const Name = content.Key?.split('/').pop();
-    const Extension = Name?.includes('.') ? Name.split('.').pop() : '';
-
-    return {
-      Name: Name,
-      Extension: Extension,
-      MimeType:
-        (contentType ?? MimeTypeFromExtension(Extension)) ||
-        'application/octet-stream',
-      Path: {
-        Host: this.CloudS3Service.GetPublicHostname(),
-        Key: this.CloudS3Service.GetKey(content.Key!, GetStorageOwnerId(User)),
-        Url: SignedUrl,
-      },
-      Metadata: metadata,
-      Size: content.Size,
-      ETag: content.ETag,
-      LastModified: content.LastModified
-        ? content.LastModified.toISOString()
-        : '',
-    };
   }
 
   private async ListDirectoryThumbnails(
@@ -1013,11 +970,10 @@ export class CloudListService {
           const bucket = folderBuckets.get(groupKey);
           if (bucket && bucket.length < this.DirectoryThumbnailLimit) {
             bucket.push(
-              await this.BuildObjectModel(
+              await this.CloudObjectModelService.BuildObjectModel(
                 content,
                 User,
-                false,
-                IsSignedUrlProcessing,
+                { IsSignedUrlProcessing },
               ),
             );
           }
@@ -1032,11 +988,10 @@ export class CloudListService {
         const rootBucket = folderBuckets.get('root');
         if (rootBucket && rootBucket.length < this.DirectoryThumbnailLimit) {
           rootBucket.push(
-            await this.BuildObjectModel(
+            await this.CloudObjectModelService.BuildObjectModel(
               content,
               User,
-              false,
-              IsSignedUrlProcessing,
+              { IsSignedUrlProcessing },
             ),
           );
         }
@@ -1110,7 +1065,7 @@ export class CloudListService {
     userId: string,
     objectKey: string,
   ): Promise<void> {
-    const parent = this.GetParentDirectoryPath(objectKey);
+    const parent = GetParentDirectoryPath(objectKey);
     if (!parent) {
       return;
     }
@@ -1138,19 +1093,6 @@ export class CloudListService {
     return ancestors;
   }
 
-  private GetParentDirectoryPath(path: string): string {
-    const normalized = NormalizeDirectoryPath(path);
-    if (!normalized) {
-      return '';
-    }
-    const parts = normalized.split('/').filter((part) => !!part);
-    if (parts.length <= 1) {
-      return '';
-    }
-    parts.pop();
-    return parts.join('/');
-  }
-
   private GetThumbnailGroupKey(
     prefix: string,
     objectKey: string,
@@ -1166,55 +1108,4 @@ export class CloudListService {
     return parts[0];
   }
 
-  private IsInsideEncryptedFolder(
-    relativePath: string,
-    encryptedFolders?: Set<string>,
-  ): boolean {
-    if (!encryptedFolders || encryptedFolders.size === 0) return false;
-    for (const folder of encryptedFolders) {
-      if (relativePath === folder || relativePath.startsWith(folder + '/')) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  private FindEncryptingFolder(
-    relativePath: string,
-    encryptedFolders?: Set<string>,
-  ): string | null {
-    if (!encryptedFolders) return null;
-    for (const folder of encryptedFolders) {
-      if (relativePath === folder || relativePath.startsWith(folder + '/')) {
-        return folder;
-      }
-    }
-    return null;
-  }
-
-  private IsInsideHiddenFolder(
-    relativePath: string,
-    hiddenFolders?: Set<string>,
-  ): boolean {
-    if (!hiddenFolders || hiddenFolders.size === 0) return false;
-    for (const folder of hiddenFolders) {
-      if (relativePath === folder || relativePath.startsWith(folder + '/')) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  private FindHiddenFolder(
-    relativePath: string,
-    hiddenFolders?: Set<string>,
-  ): string | null {
-    if (!hiddenFolders) return null;
-    for (const folder of hiddenFolders) {
-      if (relativePath === folder || relativePath.startsWith(folder + '/')) {
-        return folder;
-      }
-    }
-    return null;
-  }
 }
