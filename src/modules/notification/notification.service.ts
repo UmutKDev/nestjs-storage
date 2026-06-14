@@ -3,8 +3,13 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Server } from 'socket.io';
 import dayjs from 'dayjs';
+import { plainToInstance } from 'class-transformer';
 import { NotificationType } from '@common/enums';
-import { NotificationPayloadModel } from './notification.model';
+import { asyncLocalStorage } from '@common/context/context.service';
+import {
+  NotificationHistoryItemModel,
+  NotificationPayloadModel,
+} from './notification.model';
 import {
   NotificationHistory,
   NotificationHistoryDocument,
@@ -140,7 +145,7 @@ export class NotificationService {
     UserId: string,
     Skip: number,
     Take: number,
-  ): Promise<{ Items: NotificationHistoryDocument[]; Count: number }> {
+  ): Promise<NotificationHistoryItemModel[]> {
     const [Items, Count] = await Promise.all([
       this.NotificationHistoryModel.find({ UserId })
         .sort({ CreatedAt: -1 })
@@ -151,7 +156,32 @@ export class NotificationService {
       this.NotificationHistoryModel.countDocuments({ UserId }),
     ]);
 
-    return { Items: Items as NotificationHistoryDocument[], Count };
+    // The TransformInterceptor reads `request.TotalRowCount` to fill the
+    // paginated envelope's `Options.Count` (the true total, for the client's
+    // "load more"). The service has no @Req, so reach the request via the
+    // AsyncLocalStorage store (the user/cloud list pattern).
+    const request = asyncLocalStorage.getStore()?.get('request');
+    if (request) request.TotalRowCount = Count;
+
+    // Map the raw Mongo docs to the exposed response model — crucially `_id` →
+    // `Id` (there's no Mongo `_id`→`Id` serializer; map it explicitly) and the
+    // Date fields → ISO strings. ClassSerializer keeps only @Expose()d fields.
+    return Items.map((doc) =>
+      plainToInstance(NotificationHistoryItemModel, {
+        Id: String(doc._id),
+        Type: doc.Type,
+        Title: doc.Title,
+        Message: doc.Message,
+        Data: doc.Data ?? null,
+        IsRead: doc.IsRead,
+        CreatedAt:
+          doc.CreatedAt instanceof Date
+            ? doc.CreatedAt.toISOString()
+            : doc.CreatedAt,
+        ReadAt:
+          doc.ReadAt instanceof Date ? doc.ReadAt.toISOString() : doc.ReadAt,
+      }),
+    );
   }
 
   /**

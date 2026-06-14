@@ -19,6 +19,7 @@ import { User } from '@common/decorators/user.decorator';
 import { CheckPolicies } from '@modules/authentication/casl/check-policies.decorator';
 import { CaslAction, CaslSubject } from '@common/enums';
 import { TEAM_ID_HEADER } from '@modules/team/guards/team-context.guard';
+import { CloudVersionListResponseModel } from '@modules/cloud/cloud.model';
 import { DocumentService } from './document.service';
 import {
   DocumentCreateRequestModel,
@@ -250,6 +251,7 @@ export class DocumentController {
   // =========================================================================
 
   @Get('Versions')
+  @ApiSuccessResponse(CloudVersionListResponseModel)
   @ApiOperation({
     summary: 'List document versions',
     description: 'Returns the version history for the document.',

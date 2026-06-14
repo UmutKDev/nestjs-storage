@@ -1,8 +1,16 @@
 import { Controller, Get, Param, Patch, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { User } from '@common/decorators/user.decorator';
+import {
+  ApiSuccessArrayResponse,
+  ApiSuccessResponse,
+} from '@common/decorators/response.decorator';
 import { PaginationRequestModel } from '@common/models/pagination.model';
 import { NotificationService } from './notification.service';
+import {
+  NotificationHistoryItemModel,
+  UnreadCountResponseModel,
+} from './notification.model';
 
 @Controller({ path: 'Notification', version: '1' })
 @ApiTags('Notification')
@@ -10,10 +18,11 @@ export class NotificationController {
   constructor(private readonly NotificationService: NotificationService) {}
 
   @Get('History')
+  @ApiSuccessArrayResponse(NotificationHistoryItemModel)
   async History(
     @Query() query: PaginationRequestModel,
     @User() user: UserContext,
-  ) {
+  ): Promise<NotificationHistoryItemModel[]> {
     return this.NotificationService.GetNotificationHistory(
       user.Id,
       query.Skip,
@@ -22,7 +31,10 @@ export class NotificationController {
   }
 
   @Get('UnreadCount')
-  async UnreadCount(@User() user: UserContext) {
+  @ApiSuccessResponse(UnreadCountResponseModel)
+  async UnreadCount(
+    @User() user: UserContext,
+  ): Promise<UnreadCountResponseModel> {
     const Count = await this.NotificationService.GetUnreadCount(user.Id);
     return { Count };
   }
