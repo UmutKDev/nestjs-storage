@@ -16,6 +16,8 @@ import {
   CloudArchiveCreateStartResponseModel,
   CloudArchiveCreateCancelRequestModel,
   CloudArchiveCreateCancelResponseModel,
+  CloudArchiveStatusRequestModel,
+  CloudArchiveStatusResponseModel,
   CloudCreateMultipartUploadRequestModel,
   CloudCreateMultipartUploadResponseModel,
   CloudKeyRequestModel,
@@ -849,6 +851,17 @@ export class CloudService {
     User: UserContext,
   ): Promise<CloudArchiveCreateCancelResponseModel> {
     return this.CloudArchiveService.ArchiveCreateCancel(model, User);
+  }
+
+  //#endregion
+
+  //#region Archive Status
+
+  async ArchiveStatus(
+    model: CloudArchiveStatusRequestModel,
+    User: UserContext,
+  ): Promise<CloudArchiveStatusResponseModel> {
+    return this.CloudArchiveService.ArchiveStatus(model, User);
   }
 
   //#endregion

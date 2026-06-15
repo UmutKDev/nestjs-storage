@@ -1,6 +1,8 @@
 import {
   ArchiveEntryType,
   ArchiveFormat,
+  ArchiveJobState,
+  ArchivePhase,
   CloudBreadcrumbLevelType,
   ConflictResolutionStrategy,
   DuplicateScanPhase,
@@ -621,6 +623,64 @@ export class CloudArchiveCreateCancelResponseModel {
   @Expose()
   @ApiProperty()
   Cancelled: boolean;
+}
+
+export class CloudArchiveStatusRequestModel {
+  @ApiProperty({ description: 'Job ID returned by archive create/extract start' })
+  @IsString()
+  @IsNotEmpty()
+  JobId: string;
+
+  @ApiProperty({
+    description: 'Which archive job the JobId belongs to (create or extract)',
+    enum: ArchivePhase,
+  })
+  @IsEnum(ArchivePhase)
+  @IsNotEmpty()
+  Kind: string;
+}
+
+export class CloudArchiveStatusResponseModel {
+  @Expose()
+  @ApiProperty()
+  JobId: string;
+
+  @Expose()
+  @ApiProperty({ enum: ArchivePhase })
+  Kind: string;
+
+  @Expose()
+  @ApiProperty({
+    enum: ArchiveJobState,
+    description: 'Current BullMQ job state',
+  })
+  Status: string;
+
+  @Expose()
+  @ApiProperty({ required: false })
+  EntriesProcessed?: number;
+
+  @Expose()
+  @ApiProperty({ required: false })
+  TotalEntries?: number;
+
+  @Expose()
+  @ApiProperty({
+    required: false,
+    description: 'Computed completion percentage (0-100)',
+  })
+  Percentage?: number;
+
+  @Expose()
+  @ApiProperty({
+    required: false,
+    description: 'Output archive key (create jobs only)',
+  })
+  OutputKey?: string;
+
+  @Expose()
+  @ApiProperty({ required: false })
+  Error?: string;
 }
 
 export class CloudCompleteMultipartUploadResponseModel {

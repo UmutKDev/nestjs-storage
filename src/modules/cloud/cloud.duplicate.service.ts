@@ -318,14 +318,18 @@ export class CloudDuplicateService implements OnModuleInit, OnModuleDestroy {
 
     try {
       // ── Phase 1: LISTING ─────────────────────────────────────────────
-      await this.UpdateScanStatus(ScanId, {
-        Status: DuplicateScanStatus.SCANNING,
-        Progress: {
-          TotalFiles: 0,
-          ProcessedFiles: 0,
-          Phase: DuplicateScanPhase.LISTING,
+      await this.UpdateScanStatus(
+        ScanId,
+        {
+          Status: DuplicateScanStatus.SCANNING,
+          Progress: {
+            TotalFiles: 0,
+            ProcessedFiles: 0,
+            Phase: DuplicateScanPhase.LISTING,
+          },
         },
-      });
+        UserId,
+      );
 
       const prefix = Path ? KeyBuilder([OwnerId, Path]) : `${OwnerId}/`;
       const files = await this.ListAllObjects(prefix, Recursive, OwnerId);
@@ -348,13 +352,17 @@ export class CloudDuplicateService implements OnModuleInit, OnModuleDestroy {
       const totalFiles = files.length;
 
       // ── Phase 2: SIZE_GROUPING ───────────────────────────────────────
-      await this.UpdateScanStatus(ScanId, {
-        Progress: {
-          TotalFiles: totalFiles,
-          ProcessedFiles: 0,
-          Phase: DuplicateScanPhase.SIZE_GROUPING,
+      await this.UpdateScanStatus(
+        ScanId,
+        {
+          Progress: {
+            TotalFiles: totalFiles,
+            ProcessedFiles: 0,
+            Phase: DuplicateScanPhase.SIZE_GROUPING,
+          },
         },
-      });
+        UserId,
+      );
 
       const sizeGroups = new Map<number, FileRecord[]>();
       const imageFiles: FileRecord[] = [];
@@ -383,13 +391,17 @@ export class CloudDuplicateService implements OnModuleInit, OnModuleDestroy {
       }
 
       // ── Phase 3: CONTENT_HASHING ─────────────────────────────────────
-      await this.UpdateScanStatus(ScanId, {
-        Progress: {
-          TotalFiles: totalFiles,
-          ProcessedFiles: 0,
-          Phase: DuplicateScanPhase.CONTENT_HASHING,
+      await this.UpdateScanStatus(
+        ScanId,
+        {
+          Progress: {
+            TotalFiles: totalFiles,
+            ProcessedFiles: 0,
+            Phase: DuplicateScanPhase.CONTENT_HASHING,
+          },
         },
-      });
+        UserId,
+      );
 
       const contentHashedFiles: HashedFile[] = [];
       let processedCount = 0;
@@ -412,14 +424,18 @@ export class CloudDuplicateService implements OnModuleInit, OnModuleDestroy {
 
         processedCount++;
         if (processedCount % this.ProgressBatchSize === 0) {
-          await this.UpdateScanStatus(ScanId, {
-            Progress: {
-              TotalFiles: totalFiles,
-              ProcessedFiles: processedCount,
-              Phase: DuplicateScanPhase.CONTENT_HASHING,
-              Percentage: Math.round((processedCount / totalFiles) * 100),
+          await this.UpdateScanStatus(
+            ScanId,
+            {
+              Progress: {
+                TotalFiles: totalFiles,
+                ProcessedFiles: processedCount,
+                Phase: DuplicateScanPhase.CONTENT_HASHING,
+                Percentage: Math.round((processedCount / totalFiles) * 100),
+              },
             },
-          });
+            UserId,
+          );
 
           if (await this.IsCancelled(ScanId)) {
             await this.HandleCancellation(ScanId, UserId, cacheOwnerId);
@@ -438,13 +454,17 @@ export class CloudDuplicateService implements OnModuleInit, OnModuleDestroy {
       }
 
       // ── Phase 4: PERCEPTUAL_HASHING ──────────────────────────────────
-      await this.UpdateScanStatus(ScanId, {
-        Progress: {
-          TotalFiles: totalFiles,
-          ProcessedFiles: processedCount,
-          Phase: DuplicateScanPhase.PERCEPTUAL_HASHING,
+      await this.UpdateScanStatus(
+        ScanId,
+        {
+          Progress: {
+            TotalFiles: totalFiles,
+            ProcessedFiles: processedCount,
+            Phase: DuplicateScanPhase.PERCEPTUAL_HASHING,
+          },
         },
-      });
+        UserId,
+      );
 
       const perceptualHashedFiles: HashedFile[] = [];
 
@@ -466,14 +486,18 @@ export class CloudDuplicateService implements OnModuleInit, OnModuleDestroy {
 
         processedCount++;
         if (processedCount % this.ProgressBatchSize === 0) {
-          await this.UpdateScanStatus(ScanId, {
-            Progress: {
-              TotalFiles: totalFiles,
-              ProcessedFiles: processedCount,
-              Phase: DuplicateScanPhase.PERCEPTUAL_HASHING,
-              Percentage: Math.round((processedCount / totalFiles) * 100),
+          await this.UpdateScanStatus(
+            ScanId,
+            {
+              Progress: {
+                TotalFiles: totalFiles,
+                ProcessedFiles: processedCount,
+                Phase: DuplicateScanPhase.PERCEPTUAL_HASHING,
+                Percentage: Math.round((processedCount / totalFiles) * 100),
+              },
             },
-          });
+            UserId,
+          );
 
           if (await this.IsCancelled(ScanId)) {
             await this.HandleCancellation(ScanId, UserId, cacheOwnerId);
@@ -489,14 +513,18 @@ export class CloudDuplicateService implements OnModuleInit, OnModuleDestroy {
       );
 
       // ── Phase 5: FINALIZING ──────────────────────────────────────────
-      await this.UpdateScanStatus(ScanId, {
-        Progress: {
-          TotalFiles: totalFiles,
-          ProcessedFiles: totalFiles,
-          Phase: DuplicateScanPhase.FINALIZING,
-          Percentage: 100,
+      await this.UpdateScanStatus(
+        ScanId,
+        {
+          Progress: {
+            TotalFiles: totalFiles,
+            ProcessedFiles: totalFiles,
+            Phase: DuplicateScanPhase.FINALIZING,
+            Percentage: 100,
+          },
         },
-      });
+        UserId,
+      );
 
       const duplicateGroups: DuplicateGroup[] = [];
 
@@ -919,6 +947,7 @@ export class CloudDuplicateService implements OnModuleInit, OnModuleDestroy {
   private async UpdateScanStatus(
     scanId: string,
     partial: Partial<CloudDuplicateScanStatusResponseModel>,
+    userId?: string,
   ): Promise<void> {
     const raw = await this.RedisService.Get<string>(
       CloudKeys.DuplicateScanStatus(scanId),
@@ -933,6 +962,26 @@ export class CloudDuplicateService implements OnModuleInit, OnModuleDestroy {
       JSON.stringify(updated),
       DUPLICATE_SCAN_STATUS_TTL,
     );
+
+    // Emit a TRANSIENT progress event (socket-only, never persisted) so the
+    // client can drive a live progress bar. Terminal statuses (complete/failed/
+    // cancelled) emit their own persisted notification elsewhere, so they are
+    // skipped here.
+    if (
+      userId &&
+      updated.Progress &&
+      updated.Status !== DuplicateScanStatus.COMPLETED &&
+      updated.Status !== DuplicateScanStatus.FAILED &&
+      updated.Status !== DuplicateScanStatus.CANCELLED
+    ) {
+      this.NotificationService.EmitTransientToUser(
+        userId,
+        NotificationType.DUPLICATE_SCAN_PROGRESS,
+        'Duplicate Scan Progress',
+        `Scanning… ${updated.Progress.ProcessedFiles}/${updated.Progress.TotalFiles}`,
+        { ScanId: scanId, ...updated.Progress },
+      );
+    }
   }
 
   private async ClearActiveLock(cacheOwnerId: string): Promise<void> {

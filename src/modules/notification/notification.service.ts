@@ -77,6 +77,36 @@ export class NotificationService {
   }
 
   /**
+   * Emit a TRANSIENT notification to a user (`user:{UserId}` room) WITHOUT
+   * persisting it to history. Use for high-frequency progress events (archive /
+   * duplicate-scan progress) that should drive live UI but must not pollute the
+   * notification inbox. Terminal events (complete/failed/cancelled) still go
+   * through `EmitToUser` so they are persisted.
+   */
+  EmitTransientToUser(
+    UserId: string,
+    Type: NotificationType,
+    Title: string,
+    Message: string,
+    Data?: Record<string, unknown>,
+  ): void {
+    if (!this.Server) {
+      this.Logger.warn('Socket.IO server not initialized — skipping emission');
+      return;
+    }
+
+    const payload: NotificationPayloadModel = {
+      Type,
+      Title,
+      Message,
+      Data: Data ?? null,
+      Timestamp: dayjs().utc().format(),
+    };
+
+    this.Server.to(`user:${UserId}`).emit('notification', payload);
+  }
+
+  /**
    * Emit a notification to multiple users.
    */
   EmitToUsers(

@@ -29,6 +29,8 @@ import {
   CloudArchiveCreateStartResponseModel,
   CloudArchiveCreateCancelRequestModel,
   CloudArchiveCreateCancelResponseModel,
+  CloudArchiveStatusRequestModel,
+  CloudArchiveStatusResponseModel,
 } from './cloud.model';
 import { CloudS3Service } from './cloud.s3.service';
 import { CloudMetadataService } from './cloud.metadata.service';
@@ -587,6 +589,67 @@ export class CloudArchiveService implements OnModuleInit, OnModuleDestroy {
   }
 
   // ══════════════════════════════════════════════════════════════════════════
+  // Public API – Status (polling fallback for missed socket progress events)
+  // ══════════════════════════════════════════════════════════════════════════
+
+  async ArchiveStatus(
+    { JobId, Kind }: CloudArchiveStatusRequestModel,
+    User: UserContext,
+  ): Promise<CloudArchiveStatusResponseModel> {
+    const isCreate = Kind === ArchivePhase.CREATE;
+    const queue = isCreate ? this.CreateQueue : this.ExtractQueue;
+    if (!queue) {
+      throw new HttpException(
+        'Archive queue is not available.',
+        HttpStatus.SERVICE_UNAVAILABLE,
+      );
+    }
+
+    const job = await queue.getJob(JobId);
+    if (!job) {
+      throw new HttpException('Job not found.', HttpStatus.NOT_FOUND);
+    }
+    if (job.data.userId !== User.Id) {
+      throw new HttpException('Access denied.', HttpStatus.FORBIDDEN);
+    }
+
+    const state = await job.getState();
+    const rawProgress = job.progress;
+    const progress = (
+      typeof rawProgress === 'object' && rawProgress ? rawProgress : {}
+    ) as {
+      EntriesProcessed?: number;
+      TotalEntries?: number | null;
+    };
+
+    const entriesProcessed =
+      typeof progress.EntriesProcessed === 'number'
+        ? progress.EntriesProcessed
+        : undefined;
+    const totalEntries =
+      progress.TotalEntries != null ? Number(progress.TotalEntries) : undefined;
+    const percentage =
+      state === ArchiveJobState.COMPLETED
+        ? 100
+        : totalEntries && totalEntries > 0 && entriesProcessed != null
+          ? Math.min(100, Math.round((entriesProcessed / totalEntries) * 100))
+          : undefined;
+
+    return plainToInstance(CloudArchiveStatusResponseModel, {
+      JobId,
+      Kind,
+      Status: state,
+      EntriesProcessed: entriesProcessed,
+      TotalEntries: totalEntries,
+      Percentage: percentage,
+      OutputKey: isCreate
+        ? (job.data as ArchiveCreateJobData).outputKey
+        : undefined,
+      Error: state === ArchiveJobState.FAILED ? job.failedReason : undefined,
+    });
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
   // Private – Extract job processor
   // ══════════════════════════════════════════════════════════════════════════
 
@@ -700,7 +763,7 @@ export class CloudArchiveService implements OnModuleInit, OnModuleDestroy {
                 lastProgressEntries = progress.EntriesProcessed;
                 lastProgressBytes = progress.BytesRead;
                 await job.updateProgress(progress);
-                this.NotificationService.EmitToUser(
+                this.NotificationService.EmitTransientToUser(
                   job.data.userId,
                   NotificationType.ARCHIVE_EXTRACT_PROGRESS,
                   'Extraction Progress',
@@ -856,7 +919,7 @@ export class CloudArchiveService implements OnModuleInit, OnModuleDestroy {
             const now = Date.now();
             if (now - lastProgressEmit >= 500) {
               lastProgressEmit = now;
-              this.NotificationService.EmitToUser(
+              this.NotificationService.EmitTransientToUser(
                 userId,
                 NotificationType.ARCHIVE_CREATE_PROGRESS,
                 'Archive Progress',

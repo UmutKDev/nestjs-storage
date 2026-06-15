@@ -17,6 +17,8 @@ import {
   CloudArchiveCreateStartResponseModel,
   CloudArchiveCreateCancelRequestModel,
   CloudArchiveCreateCancelResponseModel,
+  CloudArchiveStatusRequestModel,
+  CloudArchiveStatusResponseModel,
 } from './cloud.model';
 import { ApiSuccessResponse } from '@common/decorators/response.decorator';
 import { User } from '@common/decorators/user.decorator';
@@ -131,5 +133,19 @@ export class CloudArchiveController {
     @User() user: UserContext,
   ): Promise<CloudArchiveCreateCancelResponseModel> {
     return this.cloudService.ArchiveCreateCancel(model, user);
+  }
+
+  @ApiOperation({
+    summary: 'Get archive job status',
+    description:
+      'Returns the current state and progress of an archive create/extract job. Polling fallback for clients that missed socket progress events.',
+  })
+  @Get('Status')
+  @ApiSuccessResponse(CloudArchiveStatusResponseModel)
+  async ArchiveStatus(
+    @Query() model: CloudArchiveStatusRequestModel,
+    @User() user: UserContext,
+  ): Promise<CloudArchiveStatusResponseModel> {
+    return this.cloudService.ArchiveStatus(model, user);
   }
 }
