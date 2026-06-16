@@ -11,6 +11,8 @@ module.exports = {
   moduleNameMapper: {
     '^src/(.*)$': '<rootDir>/$1',
     '^@common/(.*)$': '<rootDir>/common/$1',
+    '^@decorators/(.*)$': '<rootDir>/common/decorators/$1',
+    '^@schemas/(.*)$': '<rootDir>/schemas/$1',
     '^@entities/(.*)$': '<rootDir>/entities/$1',
     '^@modules/(.*)$': '<rootDir>/modules/$1',
   },

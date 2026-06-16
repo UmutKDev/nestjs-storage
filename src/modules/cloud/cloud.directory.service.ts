@@ -920,6 +920,58 @@ export class CloudDirectoryService {
     };
   }
 
+  /**
+   * The HIDDEN-folder counterpart of {@link CheckEncryptedFolderAccess}: is
+   * `path` itself a hidden folder or inside one (ancestor-aware), and if so does
+   * the caller hold a valid reveal session for it? Listing inside a hidden folder
+   * must be gated the same way encrypted is — otherwise the per-entry conceal
+   * filter (which only hides directly-hidden children) leaks the folder's OWN
+   * files and subfolders once you're inside it.
+   */
+  async CheckHiddenFolderAccess(
+    path: string,
+    userId: string,
+    hiddenSessionToken?: string,
+  ): Promise<{
+    isHidden: boolean;
+    hasAccess: boolean;
+    hidingFolder?: string;
+  }> {
+    const normalizedPath = NormalizeDirectoryPath(path);
+    const manifest = await this.GetHiddenFolderManifestByUserId(userId);
+
+    let hidingFolder: string | undefined;
+    for (const hidPath of Object.keys(manifest.folders)) {
+      if (
+        normalizedPath === hidPath ||
+        normalizedPath.startsWith(hidPath + '/')
+      ) {
+        hidingFolder = hidPath;
+        break;
+      }
+    }
+
+    if (!hidingFolder) {
+      return { isHidden: false, hasAccess: true };
+    }
+
+    if (!hiddenSessionToken) {
+      return { isHidden: true, hasAccess: false, hidingFolder };
+    }
+
+    const session = await this.ValidateHiddenSession(
+      userId,
+      hidingFolder,
+      hiddenSessionToken,
+    );
+
+    return {
+      isHidden: true,
+      hasAccess: !!session,
+      hidingFolder,
+    };
+  }
+
   async GetActiveSession(
     userId: string,
     folderPath: string,

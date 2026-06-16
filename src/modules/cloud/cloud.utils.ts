@@ -61,6 +61,27 @@ export const IsInsideFolder = (
   folders?: Set<string>,
 ): boolean => FindContainingFolder(relativePath, folders) !== null;
 
+// A background job (duplicate scan / archive create) excludes secure folders so
+// their contents can't leak into a broad/root scan. But the user can EXPLICITLY
+// scan a folder they navigated into — which may itself be hidden/encrypted (or
+// nested inside one). Those ancestor-or-self secure folders must NOT be excluded
+// (the user has access; it's their explicit target), otherwise the whole scan
+// returns nothing. Returns the secure folders that should still be excluded for
+// a scan rooted at `scanPath`: every folder that is NOT the scan root or an
+// ancestor of it (so secure folders elsewhere — and strictly nested below the
+// root — stay excluded). An empty `scanPath` (root scan) keeps them all.
+export const SecureFoldersToExcludeForScan = (
+  folders: Set<string>,
+  scanPath: string,
+): Set<string> => {
+  const root = (scanPath || '').replace(/^\/+|\/+$/g, '');
+  return new Set(
+    [...folders].filter(
+      (folder) => !(root === folder || root.startsWith(folder + '/')),
+    ),
+  );
+};
+
 // ─── Archive Format Detection ────────────────────────────────────────────────
 
 export const ArchiveExtensionMap: Record<string, ArchiveFormat> = {

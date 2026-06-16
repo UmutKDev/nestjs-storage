@@ -34,7 +34,11 @@ import {
 } from '@common/enums';
 import { IsImageFile, KeyBuilder } from '@common/helpers/cast.helper';
 import { GetStorageOwnerId, GetCacheOwnerId } from './cloud.context';
-import { BuildBullRedisConnectionOptions, IsInsideFolder } from './cloud.utils';
+import {
+  BuildBullRedisConnectionOptions,
+  IsInsideFolder,
+  SecureFoldersToExcludeForScan,
+} from './cloud.utils';
 import { uuidGenerator } from '@common/helpers/cast.helper';
 import {
   CloudDuplicateScanStartRequestModel,
@@ -195,10 +199,24 @@ export class CloudDuplicateService implements OnModuleInit, OnModuleDestroy {
     const activeKey = CloudKeys.DuplicateScanActive(GetCacheOwnerId(User));
     const activeScanId = await this.RedisService.Get<string>(activeKey);
     if (activeScanId) {
-      throw new HttpException(
-        'A duplicate scan is already in progress.',
-        HttpStatus.CONFLICT,
-      );
+      // Self-healing: only block if the locked scan is genuinely still running.
+      // A lock must never outlive its scan — a crash, or (historically) a worker
+      // that cleared the lock in a different Redis DB, can strand the lock for
+      // its full TTL and wedge every future scan at 409. If the locked scan is
+      // terminal or its status is gone, the lock is stale — fall through and
+      // overwrite it.
+      const activeStatus = await this.GetDuplicateScanStatus(activeScanId);
+      const stillRunning =
+        activeStatus &&
+        activeStatus.Status !== DuplicateScanStatus.COMPLETED &&
+        activeStatus.Status !== DuplicateScanStatus.FAILED &&
+        activeStatus.Status !== DuplicateScanStatus.CANCELLED;
+      if (stillRunning) {
+        throw new HttpException(
+          'A duplicate scan is already in progress.',
+          HttpStatus.CONFLICT,
+        );
+      }
     }
 
     const scanId = uuidGenerator();
@@ -282,6 +300,7 @@ export class CloudDuplicateService implements OnModuleInit, OnModuleDestroy {
 
   async CancelDuplicateScan(
     ScanId: string,
+    User: UserContext,
   ): Promise<CloudDuplicateScanCancelResponseModel> {
     const status = await this.GetDuplicateScanStatus(ScanId);
     if (!status) {
@@ -296,10 +315,33 @@ export class CloudDuplicateService implements OnModuleInit, OnModuleDestroy {
       return { Cancelled: false };
     }
 
+    // Signal a still-running worker to abort at its next checkpoint…
     await this.RedisService.Set(
       CloudKeys.DuplicateScanCancel(ScanId),
       JSON.stringify(true),
       DUPLICATE_SCAN_CANCEL_TTL,
+    );
+
+    // …but settle the scan synchronously instead of waiting for the worker. The
+    // worker only releases the per-owner active lock when it reaches a
+    // cancellation checkpoint — which may be far off, or never if it is already
+    // mid-finalize — so a "successful" cancel could otherwise leave the lock
+    // held for its (6h) TTL and block the next scan with a 409. Mark CANCELLED,
+    // release the lock (scoped to THIS scan so a re-scan's lock is never
+    // clobbered), and emit the terminal event the client settles the job on.
+    const cacheOwnerId = GetCacheOwnerId(User);
+    await this.UpdateScanStatus(ScanId, {
+      Status: DuplicateScanStatus.CANCELLED,
+      CompletedAt: new Date().toISOString(),
+    });
+    await this.ClearActiveLock(cacheOwnerId, ScanId);
+
+    this.NotificationService.EmitToUser(
+      User.Id,
+      NotificationType.DUPLICATE_SCAN_CANCELLED,
+      'Duplicate Scan Cancelled',
+      'Duplicate scan was cancelled.',
+      { ScanId },
     );
 
     return { Cancelled: true };
@@ -319,6 +361,16 @@ export class CloudDuplicateService implements OnModuleInit, OnModuleDestroy {
       : OwnerId;
 
     try {
+      // A job cancelled while it sat queued must cost nothing. The user can
+      // cancel then immediately re-scan (cancel frees the active lock), so a
+      // backlog of cancelled jobs can pile up behind the single-concurrency
+      // worker — skip them BEFORE any S3 listing/hashing so the queue drains to
+      // the live scan promptly instead of grinding a full listing per dead job.
+      if (await this.IsCancelled(ScanId)) {
+        await this.HandleCancellation(ScanId, cacheOwnerId);
+        return;
+      }
+
       // ── Phase 1: LISTING ─────────────────────────────────────────────
       await this.UpdateScanStatus(
         ScanId,
@@ -344,16 +396,26 @@ export class CloudDuplicateService implements OnModuleInit, OnModuleDestroy {
         this.CloudDirectoryService.GetEncryptedFolderSet(scanUser),
         this.CloudDirectoryService.GetHiddenFolderSet(scanUser),
       ]);
+      // …but if the user EXPLICITLY scans a folder that is itself secure (or is
+      // nested inside one), don't exclude that target/ancestor — only other
+      // secure folders. Otherwise scanning inside a hidden/encrypted folder
+      // returns nothing.
+      const scopedEncrypted = SecureFoldersToExcludeForScan(
+        encryptedFolders,
+        Path,
+      );
+      const scopedHidden = SecureFoldersToExcludeForScan(hiddenFolders, Path);
       const files = await this.ListAllObjects(
         prefix,
         Recursive,
         OwnerId,
-        encryptedFolders,
-        hiddenFolders,
+        scopedEncrypted,
+        scopedHidden,
+        ScanId,
       );
 
       if (await this.IsCancelled(ScanId)) {
-        await this.HandleCancellation(ScanId, UserId, cacheOwnerId);
+        await this.HandleCancellation(ScanId, cacheOwnerId);
         return;
       }
 
@@ -404,7 +466,7 @@ export class CloudDuplicateService implements OnModuleInit, OnModuleDestroy {
       }
 
       if (await this.IsCancelled(ScanId)) {
-        await this.HandleCancellation(ScanId, UserId, cacheOwnerId);
+        await this.HandleCancellation(ScanId, cacheOwnerId);
         return;
       }
 
@@ -424,6 +486,37 @@ export class CloudDuplicateService implements OnModuleInit, OnModuleDestroy {
       const contentHashedFiles: HashedFile[] = [];
       let processedCount = 0;
 
+      // Progress is driven over the files actually hashed (size-collision
+      // candidates + images) — the real work — so the bar reaches 100% at the
+      // end of hashing. Emit only when the whole-percent value changes: a small
+      // folder (a handful of files) still advances 0→100 instead of sitting at 0
+      // until it finishes (the old `% ProgressBatchSize` gate never fired for
+      // < N files), while a huge scan stays bounded to ~100 emits.
+      const hashableTotal = contentHashCandidates.length + imageFiles.length;
+      let lastPct = -1;
+      const emitHashProgress = async (
+        phase: DuplicateScanPhase,
+      ): Promise<void> => {
+        const pct =
+          hashableTotal > 0
+            ? Math.round((processedCount / hashableTotal) * 100)
+            : 0;
+        if (pct === lastPct) return;
+        lastPct = pct;
+        await this.UpdateScanStatus(
+          ScanId,
+          {
+            Progress: {
+              TotalFiles: totalFiles,
+              ProcessedFiles: processedCount,
+              Phase: phase,
+              Percentage: pct,
+            },
+          },
+          UserId,
+        );
+      };
+
       for (const file of contentHashCandidates) {
         if (file.Size > this.MaxFileSizeForHash) {
           processedCount++;
@@ -441,24 +534,13 @@ export class CloudDuplicateService implements OnModuleInit, OnModuleDestroy {
         }
 
         processedCount++;
-        if (processedCount % this.ProgressBatchSize === 0) {
-          await this.UpdateScanStatus(
-            ScanId,
-            {
-              Progress: {
-                TotalFiles: totalFiles,
-                ProcessedFiles: processedCount,
-                Phase: DuplicateScanPhase.CONTENT_HASHING,
-                Percentage: Math.round((processedCount / totalFiles) * 100),
-              },
-            },
-            UserId,
-          );
-
-          if (await this.IsCancelled(ScanId)) {
-            await this.HandleCancellation(ScanId, UserId, cacheOwnerId);
-            return;
-          }
+        await emitHashProgress(DuplicateScanPhase.CONTENT_HASHING);
+        if (
+          processedCount % this.ProgressBatchSize === 0 &&
+          (await this.IsCancelled(ScanId))
+        ) {
+          await this.HandleCancellation(ScanId, cacheOwnerId);
+          return;
         }
       }
 
@@ -503,24 +585,13 @@ export class CloudDuplicateService implements OnModuleInit, OnModuleDestroy {
         }
 
         processedCount++;
-        if (processedCount % this.ProgressBatchSize === 0) {
-          await this.UpdateScanStatus(
-            ScanId,
-            {
-              Progress: {
-                TotalFiles: totalFiles,
-                ProcessedFiles: processedCount,
-                Phase: DuplicateScanPhase.PERCEPTUAL_HASHING,
-                Percentage: Math.round((processedCount / totalFiles) * 100),
-              },
-            },
-            UserId,
-          );
-
-          if (await this.IsCancelled(ScanId)) {
-            await this.HandleCancellation(ScanId, UserId, cacheOwnerId);
-            return;
-          }
+        await emitHashProgress(DuplicateScanPhase.PERCEPTUAL_HASHING);
+        if (
+          processedCount % this.ProgressBatchSize === 0 &&
+          (await this.IsCancelled(ScanId))
+        ) {
+          await this.HandleCancellation(ScanId, cacheOwnerId);
+          return;
         }
       }
 
@@ -543,6 +614,13 @@ export class CloudDuplicateService implements OnModuleInit, OnModuleDestroy {
         },
         UserId,
       );
+
+      // FINALIZING has no progress loop, so check once more before building the
+      // result — otherwise a cancel during finalize would still emit COMPLETE.
+      if (await this.IsCancelled(ScanId)) {
+        await this.HandleCancellation(ScanId, cacheOwnerId);
+        return;
+      }
 
       const duplicateGroups: DuplicateGroup[] = [];
 
@@ -659,7 +737,7 @@ export class CloudDuplicateService implements OnModuleInit, OnModuleDestroy {
         },
       });
 
-      await this.ClearActiveLock(cacheOwnerId);
+      await this.ClearActiveLock(cacheOwnerId, ScanId);
       await this.RedisService.Delete(CloudKeys.DuplicateScanCancel(ScanId));
 
       this.NotificationService.EmitToUser(
@@ -694,12 +772,17 @@ export class CloudDuplicateService implements OnModuleInit, OnModuleDestroy {
     ownerId: string,
     encryptedFolders: Set<string>,
     hiddenFolders: Set<string>,
+    scanId: string,
   ): Promise<FileRecord[]> {
     const bucket = this.CloudS3Service.GetBuckets().Storage;
     const files: FileRecord[] = [];
     let continuationToken: string | undefined;
 
     do {
+      // Listing a large drive is the long, uninterruptible pole — bail between
+      // pages if the scan was cancelled so the single worker slot frees fast
+      // (the caller re-checks IsCancelled and routes to HandleCancellation).
+      if (await this.IsCancelled(scanId)) break;
       const response = await this.CloudS3Service.Send(
         new ListObjectsV2Command({
           Bucket: bucket,
@@ -933,23 +1016,19 @@ export class CloudDuplicateService implements OnModuleInit, OnModuleDestroy {
 
   private async HandleCancellation(
     scanId: string,
-    userId: string,
     cacheOwnerId: string,
   ): Promise<void> {
+    // The cancel request (`CancelDuplicateScan`) already settled the status,
+    // released the lock, and emitted the terminal event. This worker-side path
+    // just stops the job and best-effort cleans up its scan-scoped keys — all
+    // idempotent, and the lock clear is compare-and-delete so it can never free
+    // a newer scan's lock.
     await this.UpdateScanStatus(scanId, {
       Status: DuplicateScanStatus.CANCELLED,
       CompletedAt: new Date().toISOString(),
     });
-    await this.ClearActiveLock(cacheOwnerId);
+    await this.ClearActiveLock(cacheOwnerId, scanId);
     await this.RedisService.Delete(CloudKeys.DuplicateScanCancel(scanId));
-
-    this.NotificationService.EmitToUser(
-      userId,
-      NotificationType.DUPLICATE_SCAN_CANCELLED,
-      'Duplicate Scan Cancelled',
-      'Duplicate scan was cancelled.',
-      { ScanId: scanId },
-    );
   }
 
   private async HandleFailure(
@@ -963,7 +1042,7 @@ export class CloudDuplicateService implements OnModuleInit, OnModuleDestroy {
       Error: errorMessage,
       CompletedAt: new Date().toISOString(),
     });
-    await this.ClearActiveLock(cacheOwnerId);
+    await this.ClearActiveLock(cacheOwnerId, scanId);
     await this.RedisService.Delete(CloudKeys.DuplicateScanCancel(scanId));
 
     this.NotificationService.EmitToUser(
@@ -1015,8 +1094,25 @@ export class CloudDuplicateService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private async ClearActiveLock(cacheOwnerId: string): Promise<void> {
-    await this.RedisService.Delete(CloudKeys.DuplicateScanActive(cacheOwnerId));
+  /**
+   * Release the per-owner active-scan lock, but only if it still points at THIS
+   * scan. A user can cancel a scan and immediately start a new one; the old
+   * worker may then reach a cancellation checkpoint *after* the new scan has
+   * acquired the lock. A blind delete would free the new scan's lock and break
+   * the single-active-scan invariant — so compare-and-delete on the scanId.
+   */
+  private async ClearActiveLock(
+    cacheOwnerId: string,
+    scanId: string,
+  ): Promise<void> {
+    const current = await this.RedisService.Get<string>(
+      CloudKeys.DuplicateScanActive(cacheOwnerId),
+    );
+    if (current === scanId) {
+      await this.RedisService.Delete(
+        CloudKeys.DuplicateScanActive(cacheOwnerId),
+      );
+    }
   }
 
   private GuessMimeType(name: string): string | undefined {

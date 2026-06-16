@@ -133,6 +133,22 @@ export class CloudService {
       );
     }
 
+    // Conceal: listing inside a hidden folder without a valid reveal session
+    // returns nothing (mirrors hiding the folder entry in its parent). Encrypted
+    // 403s into an unlock prompt; hidden stays silent.
+    const hiddenAccess = await this.CheckHiddenFolderAccess(
+      cleanedPath,
+      GetStorageOwnerId(User),
+      hiddenSessionToken,
+    );
+    if (hiddenAccess.isHidden && !hiddenAccess.hasAccess) {
+      return {
+        Breadcrumb: [],
+        Directories: [],
+        Contents: [],
+      } as CloudListResponseModel;
+    }
+
     const encryptedFolders = await this.GetEncryptedFolderSet(User);
     const hiddenFolders = await this.GetHiddenFolderSet(User);
 
@@ -209,6 +225,16 @@ export class CloudService {
       );
     }
 
+    // Conceal: inside a hidden folder without a valid reveal session → empty.
+    const hiddenAccess = await this.CheckHiddenFolderAccess(
+      cleanedPath,
+      GetStorageOwnerId(User),
+      hiddenSessionToken,
+    );
+    if (hiddenAccess.isHidden && !hiddenAccess.hasAccess) {
+      return [];
+    }
+
     const encryptedFolders = await this.GetEncryptedFolderSet(User);
     const hiddenFolders = await this.GetHiddenFolderSet(User);
 
@@ -245,6 +271,7 @@ export class CloudService {
     }: CloudListRequestModel,
     User: UserContext,
     sessionToken?: string,
+    hiddenSessionToken?: string,
   ): Promise<CloudObjectModel[]> {
     const store = asyncLocalStorage.getStore();
     const request: Request = store?.get('request');
@@ -263,6 +290,17 @@ export class CloudService {
         `Access denied. Folder "${accessCheck.encryptingFolder}" is encrypted. Unlock it first via POST /Cloud/Directories/Unlock`,
         HttpStatus.FORBIDDEN,
       );
+    }
+
+    // Conceal: inside a hidden folder without a valid reveal session → empty.
+    // (The object listing applied NO hidden filtering at all — this is the gate.)
+    const hiddenAccess = await this.CheckHiddenFolderAccess(
+      cleanedPath,
+      GetStorageOwnerId(User),
+      hiddenSessionToken,
+    );
+    if (hiddenAccess.isHidden && !hiddenAccess.hasAccess) {
+      return [];
     }
 
     const result = await this.CloudListService.ListObjects(
@@ -626,6 +664,22 @@ export class CloudService {
       path,
       userId,
       sessionToken,
+    );
+  }
+
+  async CheckHiddenFolderAccess(
+    path: string,
+    userId: string,
+    hiddenSessionToken?: string,
+  ): Promise<{
+    isHidden: boolean;
+    hasAccess: boolean;
+    hidingFolder?: string;
+  }> {
+    return this.CloudDirectoryService.CheckHiddenFolderAccess(
+      path,
+      userId,
+      hiddenSessionToken,
     );
   }
 
@@ -1218,10 +1272,11 @@ export class CloudService {
     return this.CloudDuplicateService.GetDuplicateScanResult(ScanId);
   }
 
-  async DuplicateScanCancel({
-    ScanId,
-  }: CloudDuplicateScanIdRequestModel): Promise<CloudDuplicateScanCancelResponseModel> {
-    return this.CloudDuplicateService.CancelDuplicateScan(ScanId);
+  async DuplicateScanCancel(
+    { ScanId }: CloudDuplicateScanIdRequestModel,
+    User: UserContext,
+  ): Promise<CloudDuplicateScanCancelResponseModel> {
+    return this.CloudDuplicateService.CancelDuplicateScan(ScanId, User);
   }
 
   //#endregion

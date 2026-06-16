@@ -167,13 +167,24 @@ export class CloudController {
     required: false,
     description: 'Session token for encrypted folder access',
   })
+  @ApiHeader({
+    name: HIDDEN_SESSION_HEADER,
+    required: false,
+    description: 'Session token for hidden folder access',
+  })
   @ApiSuccessArrayResponse(CloudObjectModel)
   async ListObjects(
     @Query() model: CloudListObjectsRequestModel,
     @User() user: UserContext,
     @Headers(FOLDER_SESSION_HEADER) sessionToken?: string,
+    @Headers(HIDDEN_SESSION_HEADER) hiddenSessionToken?: string,
   ): Promise<CloudObjectModel[]> {
-    return this.cloudService.ListObjects(model, user, sessionToken);
+    return this.cloudService.ListObjects(
+      model,
+      user,
+      sessionToken,
+      hiddenSessionToken,
+    );
   }
 
   @ApiOperation({
@@ -490,7 +501,8 @@ export class CloudController {
   @ApiSuccessResponse(CloudDuplicateScanCancelResponseModel)
   async DuplicateScanCancel(
     @Body() model: CloudDuplicateScanIdRequestModel,
+    @User() user: UserContext,
   ): Promise<CloudDuplicateScanCancelResponseModel> {
-    return this.cloudService.DuplicateScanCancel(model);
+    return this.cloudService.DuplicateScanCancel(model, user);
   }
 }
