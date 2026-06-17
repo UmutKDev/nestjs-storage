@@ -127,6 +127,10 @@ export declare global {
       MONGO_URI?: string;
       MONGO_DATABASE?: string;
       MONGO_ENABLED?: string;
+
+      // Notification Retention
+      NOTIFICATION_RETENTION_DAYS?: string;
+      NOTIFICATION_CLEANUP_CRON?: string;
     }
   }
 

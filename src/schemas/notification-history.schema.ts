@@ -40,8 +40,7 @@ export const NotificationHistorySchema =
 // Primary query: unread notifications for a user, newest first
 NotificationHistorySchema.index({ UserId: 1, IsRead: 1, CreatedAt: -1 });
 
-// TTL index: auto-expire after 90 days
-NotificationHistorySchema.index(
-  { CreatedAt: 1 },
-  { expireAfterSeconds: 90 * 24 * 60 * 60 },
-);
+// Retention is enforced by NotificationCleanupService (an explicit @Cron prune),
+// not a DB TTL index — so the app owns the policy (env-configurable + logged).
+// The plain `CreatedAt` index (the field-level `@Prop({ index: true })` above)
+// backs the prune's `deleteMany({ CreatedAt: { $lt } })` and the inbox sort.
